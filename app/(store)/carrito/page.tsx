@@ -48,7 +48,7 @@ export default function CarritoPage() {
                     </p>
                     <Link
                       href={`/producto?slug=${item.product.slug}`}
-                      className="text-sm font-semibold text-ink hover:text-accent sm:text-base"
+                      className="text-sm font-semibold text-ink hover:text-primary sm:text-base"
                     >
                       {item.product.name}
                     </Link>
@@ -107,7 +107,7 @@ export default function CarritoPage() {
                 </Link>
                 <Link
                   href="/productos"
-                  className="mt-3 block text-center text-sm font-semibold text-primary hover:text-accent"
+                  className="mt-3 block text-center text-sm font-semibold text-primary hover:text-primary"
                 >
                   Seguir comprando
                 </Link>

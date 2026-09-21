@@ -61,7 +61,7 @@ export function ProductCard({ product }: { product: Product }) {
           {brandName(product.brand)}
         </p>
         <h3 className="mt-0.5 line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-snug text-ink">
-          <Link href={`/producto?slug=${product.slug}`} className="hover:text-accent">
+          <Link href={`/producto?slug=${product.slug}`} className="hover:text-primary">
             {product.name}
           </Link>
         </h3>

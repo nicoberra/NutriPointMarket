@@ -17,7 +17,7 @@ export function BrandCarousel() {
     <section className="bg-page-soft py-10 sm:py-14">
       <div className="container-page">
         <div className="mb-6 text-center">
-          <p className="mb-1 text-sm font-bold uppercase tracking-wider text-accent">
+          <p className="mb-1 text-sm font-bold uppercase tracking-wider text-primary">
             Trabajamos con
           </p>
           <h2 className="section-title">Las mejores marcas</h2>
@@ -31,7 +31,7 @@ export function BrandCarousel() {
               className="group flex h-20 items-center justify-center rounded-xl border border-line bg-white px-3 text-center shadow-soft transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-card"
               aria-label={b.name}
             >
-              <span className="font-display text-sm font-black uppercase tracking-tight text-primary transition-colors group-hover:text-accent">
+              <span className="font-display text-sm font-black uppercase tracking-tight text-primary transition-colors group-hover:text-primary">
                 {b.name}
               </span>
             </Link>

@@ -75,7 +75,7 @@ export function MobileMenu({
                           href={item.href}
                           onClick={onClose}
                           className={`flex-1 px-3 py-3 text-[15px] font-semibold ${
-                            item.highlight ? "text-accent" : "text-ink"
+                            item.highlight ? "text-primary" : "text-ink"
                           }`}
                         >
                           {item.label}
@@ -100,7 +100,7 @@ export function MobileMenu({
                               <Link
                                 href={child.href}
                                 onClick={onClose}
-                                className="block rounded-md px-3 py-2 text-sm text-muted hover:bg-page-soft hover:text-accent"
+                                className="block rounded-md px-3 py-2 text-sm text-muted hover:bg-page-soft hover:text-primary"
                               >
                                 {child.label}
                               </Link>
@@ -114,7 +114,7 @@ export function MobileMenu({
                       href={item.href}
                       onClick={onClose}
                       className={`block px-3 py-3 text-[15px] font-semibold ${
-                        item.highlight ? "text-accent" : "text-ink"
+                        item.highlight ? "text-primary" : "text-ink"
                       }`}
                     >
                       {item.label}

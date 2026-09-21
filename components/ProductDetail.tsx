@@ -122,7 +122,7 @@ export function ProductDetail({ product: initial }: { product: Product }) {
               <span className="font-semibold text-ink">{installment(product.price)}</span>
             </p>
             {product.freeShipping && (
-              <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-accent">
+              <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
                 <TruckIcon className="h-4.5 w-4.5" /> Envío gratis
               </p>
             )}
@@ -183,7 +183,7 @@ export function ProductDetail({ product: initial }: { product: Product }) {
             <QuantitySelector value={qty} onChange={setQty} />
             <span
               className={`text-xs font-medium ${
-                product.inStock !== false ? "text-accent" : "text-sale"
+                product.inStock !== false ? "text-primary" : "text-sale"
               }`}
             >
               {product.inStock !== false ? "En stock" : "Sin stock"}

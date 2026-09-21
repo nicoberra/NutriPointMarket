@@ -12,30 +12,30 @@
    ============================================================================ */
 
 :root {
-  /* --- Paleta principal (cambiar cuando exista identidad definitiva) --- */
-  --color-primary: 12 30 51; /* Azul marino muy oscuro (#0C1E33) */
-  --color-primary-soft: 22 48 79; /* Navy un poco más claro */
-  --color-secondary: 30 58 95; /* Azul secundario (#1E3A5F) */
-  --color-accent: 46 213 115; /* Verde lima intenso (#2ED573) */
-  --color-accent-soft: 214 250 229; /* Verde muy suave para fondos */
+  /* --- Paleta de marca NutriPoint (del logo) --- */
+  --color-primary: 33 41 227; /* Azul principal #2129E3 (domina) */
+  --color-primary-soft: 112 146 243; /* Azul claro #7092F3 */
+  --color-secondary: 154 172 239; /* Celeste/lila #9AACEF */
+  --color-accent: 224 249 18; /* Verde lima #E0F912 (impacto) */
+  --color-accent-soft: 240 250 185; /* Lima suave para fondos */
 
   /* --- Fondos y superficies --- */
-  --color-bg: 255 255 255; /* Fondo general */
-  --color-bg-soft: 244 247 250; /* Gris muy claro (#F4F7FA) */
-  --color-surface: 255 255 255; /* Tarjetas / superficies */
+  --color-bg: 254 253 233; /* Crema #FEFDE9 (fondo general) */
+  --color-bg-soft: 247 245 219; /* Crema un poco más profundo */
+  --color-surface: 255 255 255; /* Tarjetas / superficies (blanco) */
 
   /* --- Texto --- */
-  --color-ink: 15 27 42; /* Texto principal */
-  --color-muted: 100 116 139; /* Texto secundario / gris */
+  --color-ink: 22 25 64; /* Azul muy oscuro (texto principal) */
+  --color-muted: 96 105 150; /* Gris azulado (texto secundario) */
 
   /* --- Bordes y estados --- */
-  --color-border: 226 232 240; /* Bordes suaves */
+  --color-border: 231 228 202; /* Borde tono crema */
   --color-sale: 239 68 68; /* Rojo de ofertas / descuentos */
 
   /* --- Botones (semánticos, apuntan a la paleta) --- */
-  --btn-primary-bg: var(--color-accent);
-  --btn-primary-text: 8 22 40; /* Navy casi negro sobre verde => buen contraste */
-  --btn-secondary-bg: var(--color-primary);
+  --btn-primary-bg: var(--color-accent); /* Lima */
+  --btn-primary-text: 20 22 70; /* Azul oscuro sobre lima => buen contraste */
+  --btn-secondary-bg: var(--color-primary); /* Azul */
   --btn-secondary-text: 255 255 255;
 
   /* --- Tipografía --- */

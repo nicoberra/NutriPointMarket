@@ -15,7 +15,7 @@ export function CategoryCard({ category }: { category: Category }) {
         />
       </div>
       <div>
-        <p className="text-sm font-bold text-ink group-hover:text-accent">
+        <p className="text-sm font-bold text-ink group-hover:text-primary">
           {category.name}
         </p>
         <p className="mt-0.5 text-[11px] text-muted">{category.tagline}</p>

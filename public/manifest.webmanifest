@@ -6,8 +6,8 @@
   "scope": "/NutriPointMarket/admin/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0C1E33",
-  "theme_color": "#0C1E33",
+  "background_color": "#2129E3",
+  "theme_color": "#2129E3",
   "icons": [
     {
       "src": "/NutriPointMarket/icon.svg",

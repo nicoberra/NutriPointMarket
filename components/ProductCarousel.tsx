@@ -31,7 +31,7 @@ export function ProductCarousel({
       <div className="mb-6 flex items-end justify-between gap-4">
         <div>
           {eyebrow && (
-            <p className="mb-1 text-sm font-bold uppercase tracking-wider text-accent">
+            <p className="mb-1 text-sm font-bold uppercase tracking-wider text-primary">
               {eyebrow}
             </p>
           )}
@@ -41,7 +41,7 @@ export function ProductCarousel({
           {viewAllHref && (
             <Link
               href={viewAllHref}
-              className="hidden items-center gap-1 text-sm font-semibold text-primary hover:text-accent sm:inline-flex"
+              className="hidden items-center gap-1 text-sm font-semibold text-primary hover:text-primary sm:inline-flex"
             >
               Ver todo <ArrowRightIcon className="h-4 w-4" />
             </Link>

@@ -139,7 +139,7 @@ export function CartDrawer() {
                           <Link
                             href={`/producto?slug=${item.product.slug}`}
                             onClick={closeCart}
-                            className="line-clamp-2 text-sm font-semibold text-ink hover:text-accent"
+                            className="line-clamp-2 text-sm font-semibold text-ink hover:text-primary"
                           >
                             {item.product.name}
                           </Link>

@@ -15,14 +15,14 @@ export function PageBanner({
     <div className="border-b border-line bg-page-soft">
       <div className="container-page py-8 sm:py-10">
         <nav aria-label="Migas" className="mb-3 flex flex-wrap items-center gap-1 text-xs text-muted">
-          <Link href="/" className="hover:text-accent">
+          <Link href="/" className="hover:text-primary">
             Inicio
           </Link>
           {crumbs.map((c) => (
             <span key={c.label} className="flex items-center gap-1">
               <ChevronRightIcon className="h-3.5 w-3.5" />
               {c.href ? (
-                <Link href={c.href} className="hover:text-accent">
+                <Link href={c.href} className="hover:text-primary">
                   {c.label}
                 </Link>
               ) : (

@@ -173,7 +173,7 @@ export function AdminApp() {
               key={id}
               onClick={() => setSection(id)}
               className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[10px] font-semibold transition-colors ${
-                active ? "text-accent" : "text-muted"
+                active ? "text-primary" : "text-muted"
               }`}
             >
               <Icon className="h-6 w-6" />
@@ -223,7 +223,7 @@ function Login({ onOk }: { onOk: () => void }) {
             N
           </span>
           <h1 className="font-display text-xl font-extrabold text-primary">
-            NutriPoint <span className="text-accent">CRM</span>
+            NutriPoint <span className="text-primary">CRM</span>
           </h1>
           <p className="mt-1 text-sm text-muted">Panel privado. Ingresá tu PIN.</p>
         </div>
@@ -252,7 +252,7 @@ function Login({ onOk }: { onOk: () => void }) {
         </form>
         <Link
           href="/"
-          className="mt-5 block text-center text-xs font-semibold text-muted hover:text-accent"
+          className="mt-5 block text-center text-xs font-semibold text-muted hover:text-primary"
         >
           ← Volver a la tienda
         </Link>
