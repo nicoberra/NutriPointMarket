@@ -42,6 +42,8 @@ export interface Product {
   /** Nombres de imágenes / referencias. Como aún no hay fotos, usamos visuales generados. */
   images: string[];
   stock: number;
+  /** Hay stock (viene de la planilla: Stock sí/no). Por defecto true. */
+  inStock?: boolean;
   flavors: string[];
   presentations?: string[];
   featured: boolean;

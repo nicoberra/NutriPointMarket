@@ -179,22 +179,27 @@ export function ProductDetail({ product: initial }: { product: Product }) {
             <QuantitySelector value={qty} onChange={setQty} />
             <span
               className={`text-xs font-medium ${
-                product.stock > 5 ? "text-accent" : "text-sale"
+                product.inStock !== false ? "text-accent" : "text-sale"
               }`}
             >
-              {product.stock > 0
-                ? product.stock > 5
-                  ? "En stock"
-                  : `¡Últimas ${product.stock} unidades!`
-                : "Sin stock"}
+              {product.inStock !== false ? "En stock" : "Sin stock"}
             </span>
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <button onClick={add} className="btn btn-primary btn-lg">
-              <CartIcon className="h-5 w-5" /> Agregar al carrito
+            <button
+              onClick={add}
+              disabled={product.inStock === false}
+              className="btn btn-primary btn-lg"
+            >
+              <CartIcon className="h-5 w-5" />
+              {product.inStock === false ? "Sin stock" : "Agregar al carrito"}
             </button>
-            <button onClick={buyNow} className="btn btn-secondary btn-lg">
+            <button
+              onClick={buyNow}
+              disabled={product.inStock === false}
+              className="btn btn-secondary btn-lg"
+            >
               Comprar ahora
             </button>
           </div>

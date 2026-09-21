@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -9,23 +10,21 @@ import {
   type ReactNode,
 } from "react";
 import type { Product, CategorySlug } from "@/lib/types";
-import { products as SEED } from "@/data/products";
-import { fetchProducts } from "@/lib/api";
+import { products as CATALOG } from "@/data/products";
+import { fetchPrices, mergePrices } from "@/lib/api";
 
 /**
- * Provee el catálogo de productos a toda la tienda.
- * - Arranca con los productos demo (`data/products.ts`) como respaldo, así la
- *   web se ve al instante y funciona aunque la API falle.
- * - Lee un cache de localStorage (pintar-desde-cache-primero).
- * - Refresca en segundo plano desde la planilla de Google (Apps Script).
- * Resultado: editás precio/stock en Google Sheets y la web se actualiza sola.
+ * Provee el catálogo combinado con los precios de la planilla.
+ * - CATÁLOGO fijo (data/products.ts): nombre, categoría, descripción, fotos…
+ * - PRECIOS (planilla): precio, stock, precio ML y destacado, cruzados por nombre.
+ * Arranca con el catálogo (respaldo instantáneo), pinta desde cache y refresca
+ * los precios en segundo plano. Editás la planilla → la web se actualiza sola.
  */
 
 interface ProductsContextValue {
   products: Product[];
   loading: boolean;
-  /** "seed" = demo | "cache" = localStorage | "live" = planilla */
-  source: "seed" | "cache" | "live";
+  refresh: () => Promise<void>;
   getBySlug: (slug: string) => Product | undefined;
   getById: (id: string) => Product | undefined;
   byCategory: (c: CategorySlug) => Product[];
@@ -35,62 +34,44 @@ interface ProductsContextValue {
 }
 
 const ProductsContext = createContext<ProductsContextValue | null>(null);
+const CACHE_KEY = "npm-products-cache-v2";
 
-const CACHE_KEY = "npm-products-cache-v1";
-
-interface CacheShape {
-  ts: number;
-  products: Product[];
-}
+const SEED: Product[] = CATALOG.map((p) => ({ ...p, inStock: true }));
 
 export function ProductsProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>(SEED);
   const [loading, setLoading] = useState(true);
-  const [source, setSource] = useState<"seed" | "cache" | "live">("seed");
+
+  const refresh = useCallback(async () => {
+    const prices = await fetchPrices();
+    if (!prices.length) return;
+    const merged = mergePrices(CATALOG, prices);
+    setProducts(merged);
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(merged));
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    // 1) Pintar desde cache al instante (si existe), aunque después se refresque
+    // 1) Pintar desde cache al instante
     try {
       const raw = localStorage.getItem(CACHE_KEY);
       if (raw) {
-        const parsed = JSON.parse(raw) as CacheShape;
-        if (parsed?.products?.length) {
-          setProducts(parsed.products);
-          setSource("cache");
-        }
+        const parsed = JSON.parse(raw) as Product[];
+        if (Array.isArray(parsed) && parsed.length) setProducts(parsed);
       }
     } catch {
       /* ignore */
     }
-
-    // 2) Refrescar SIEMPRE desde la planilla en segundo plano
-    fetchProducts()
-      .then((live) => {
-        if (cancelled || !live.length) return;
-        setProducts(live);
-        setSource("live");
-        try {
-          localStorage.setItem(
-            CACHE_KEY,
-            JSON.stringify({ ts: Date.now(), products: live } as CacheShape),
-          );
-        } catch {
-          /* ignore */
-        }
-      })
+    // 2) Refrescar precios en segundo plano
+    refresh()
       .catch(() => {
-        /* se queda con cache o seed */
+        /* se queda con cache o catálogo */
       })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+      .finally(() => setLoading(false));
+  }, [refresh]);
 
   const value = useMemo<ProductsContextValue>(() => {
     const bySlug = new Map(products.map((p) => [p.slug, p]));
@@ -98,7 +79,7 @@ export function ProductsProvider({ children }: { children: ReactNode }) {
     return {
       products,
       loading,
-      source,
+      refresh,
       getBySlug: (slug) => bySlug.get(slug),
       getById: (id) => byId.get(id),
       byCategory: (c) => products.filter((p) => p.category === c),
@@ -106,7 +87,7 @@ export function ProductsProvider({ children }: { children: ReactNode }) {
       bestSellers: products.filter((p) => p.bestSeller),
       onSale: products.filter((p) => p.discount > 0),
     };
-  }, [products, loading, source]);
+  }, [products, loading, refresh]);
 
   return <ProductsContext.Provider value={value}>{children}</ProductsContext.Provider>;
 }

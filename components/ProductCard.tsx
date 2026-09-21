@@ -102,11 +102,12 @@ export function ProductCard({ product }: { product: Product }) {
         {/* CTA */}
         <button
           type="button"
+          disabled={product.inStock === false}
           onClick={() => addItem(product, { flavor: flavor || undefined })}
           className="btn btn-primary btn-md mt-3 w-full"
         >
           <CartIcon className="h-4.5 w-4.5" />
-          Agregar al carrito
+          {product.inStock === false ? "Sin stock" : "Agregar al carrito"}
         </button>
       </div>
     </article>

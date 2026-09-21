@@ -30,10 +30,7 @@ export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
       .catch(() => {});
   }, []);
 
-  const lowStock = products
-    .filter((p) => p.stock <= 5)
-    .sort((a, b) => a.stock - b.stock)
-    .slice(0, 6);
+  const sinStock = products.filter((p) => p.inStock === false).slice(0, 8);
 
   const cards = [
     { id: "productos" as const, label: "Productos", value: products.length, Icon: PackageIcon },
@@ -60,16 +57,16 @@ export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
         ))}
       </div>
 
-      {/* Stock bajo */}
+      {/* Sin stock */}
       <section>
-        <h2 className="mb-2 text-sm font-bold text-ink">Stock bajo</h2>
-        {lowStock.length === 0 ? (
+        <h2 className="mb-2 text-sm font-bold text-ink">Sin stock</h2>
+        {sinStock.length === 0 ? (
           <p className="rounded-xl border border-dashed border-line bg-white py-6 text-center text-sm text-muted">
-            Todo con buen stock 👍
+            Todos los productos con stock 👍
           </p>
         ) : (
           <ul className="space-y-2">
-            {lowStock.map((p) => (
+            {sinStock.map((p) => (
               <li
                 key={p.id}
                 className="flex items-center justify-between rounded-xl border border-line bg-white p-3"
@@ -78,12 +75,8 @@ export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
                   <p className="truncate text-sm font-semibold text-ink">{p.name}</p>
                   <p className="text-xs text-muted">{formatPrice(p.price)}</p>
                 </div>
-                <span
-                  className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${
-                    p.stock === 0 ? "bg-sale/10 text-sale" : "bg-amber-100 text-amber-700"
-                  }`}
-                >
-                  {p.stock === 0 ? "Sin stock" : `${p.stock} u.`}
+                <span className="shrink-0 rounded-full bg-sale/10 px-2.5 py-1 text-xs font-bold text-sale">
+                  Sin stock
                 </span>
               </li>
             ))}

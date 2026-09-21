@@ -2,6 +2,14 @@
 
 Este es el "puente" entre la planilla de Google Sheets (la base de datos) y la tienda web / el CRM.
 
+## Cómo se publican los productos
+
+- El **catálogo** (nombre, categoría, descripción, fotos, sabores) vive en el código: `data/products.ts`. Casi no cambia.
+- La **planilla** (pestaña **Productos**) guarda solo lo que cambia seguido, en 5 columnas: **Nombre · Precio · Stock (sí/no) · Precio ML · Destacado (sí/no)**.
+- La web cruza ambos por el **Nombre** (tiene que coincidir EXACTO con el `name` del catálogo). Precio ML se muestra como precio tachado.
+- Para cambiar precio/stock/destacado: editás la planilla (o el CRM). No hay que tocar código.
+- Si venías del formato viejo de la pestaña Productos, ejecutá una vez la función `resetProductos` para reconstruirla con las 5 columnas.
+
 - **Planilla**: https://docs.google.com/spreadsheets/d/12paAzW6OcSgYv4u6L7QVI4tpvrEx1yqnujW0OjcieMc/
 - **Código**: [`Codigo.gs`](./Codigo.gs)
 
