@@ -1,0 +1,181 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================================
+   NUTRIPOINTMARKET · IDENTIDAD VISUAL PROVISORIA
+   ----------------------------------------------------------------------------
+   TODO el branding se controla desde acá. Para cambiar colores, tipografías,
+   bordes o sombras de todo el sitio, editá SOLO estas variables.
+   Los colores se declaran como triples "R G B" para poder usar opacidades
+   (ej: bg-primary/80) desde las clases de Tailwind.
+   ============================================================================ */
+
+:root {
+  /* --- Paleta principal (cambiar cuando exista identidad definitiva) --- */
+  --color-primary: 12 30 51; /* Azul marino muy oscuro (#0C1E33) */
+  --color-primary-soft: 22 48 79; /* Navy un poco más claro */
+  --color-secondary: 30 58 95; /* Azul secundario (#1E3A5F) */
+  --color-accent: 46 213 115; /* Verde lima intenso (#2ED573) */
+  --color-accent-soft: 214 250 229; /* Verde muy suave para fondos */
+
+  /* --- Fondos y superficies --- */
+  --color-bg: 255 255 255; /* Fondo general */
+  --color-bg-soft: 244 247 250; /* Gris muy claro (#F4F7FA) */
+  --color-surface: 255 255 255; /* Tarjetas / superficies */
+
+  /* --- Texto --- */
+  --color-ink: 15 27 42; /* Texto principal */
+  --color-muted: 100 116 139; /* Texto secundario / gris */
+
+  /* --- Bordes y estados --- */
+  --color-border: 226 232 240; /* Bordes suaves */
+  --color-sale: 239 68 68; /* Rojo de ofertas / descuentos */
+
+  /* --- Botones (semánticos, apuntan a la paleta) --- */
+  --btn-primary-bg: var(--color-accent);
+  --btn-primary-text: 8 22 40; /* Navy casi negro sobre verde => buen contraste */
+  --btn-secondary-bg: var(--color-primary);
+  --btn-secondary-text: 255 255 255;
+
+  /* --- Tipografía --- */
+  --font-sans: var(--font-inter, "Inter"), system-ui, sans-serif;
+  --font-display: var(--font-sora, "Sora"), var(--font-inter, "Inter"), sans-serif;
+
+  /* --- Border radius --- */
+  --radius-sm: 0.5rem; /* 8px */
+  --radius: 0.75rem; /* 12px */
+  --radius-lg: 1rem; /* 16px */
+  --radius-xl: 1.25rem; /* 20px */
+  --radius-2xl: 1.75rem; /* 28px */
+
+  /* --- Sombras --- */
+  --shadow-soft: 0 1px 2px rgb(15 27 42 / 0.04), 0 1px 3px rgb(15 27 42 / 0.06);
+  --shadow-card: 0 1px 2px rgb(15 27 42 / 0.04), 0 6px 16px rgb(15 27 42 / 0.06);
+  --shadow-card-hover: 0 8px 30px rgb(15 27 42 / 0.12);
+  --shadow-drawer: -12px 0 40px rgb(15 27 42 / 0.18);
+
+  /* --- Layout --- */
+  --content-width: 1280px;
+}
+
+/* ============================================================================
+   BASE
+   ============================================================================ */
+@layer base {
+  * {
+    @apply border-line;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-page text-ink font-sans antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3, h4 {
+    @apply font-display tracking-tight;
+  }
+
+  /* Evita overflow horizontal en todo el sitio */
+  html, body {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+
+  ::selection {
+    background: rgb(var(--color-accent) / 0.3);
+  }
+
+  /* Scrollbars horizontales de carruseles: discretas */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ============================================================================
+   COMPONENTES UTILITARIOS
+   ============================================================================ */
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-content px-4 sm:px-6 lg:px-8;
+  }
+
+  /* --- Botones --- */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg font-semibold
+      transition-all duration-200 focus-visible:outline-none focus-visible:ring-2
+      focus-visible:ring-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed
+      disabled:opacity-50 select-none;
+  }
+
+  .btn-primary {
+    background: rgb(var(--btn-primary-bg));
+    color: rgb(var(--btn-primary-text));
+    @apply shadow-soft hover:brightness-105 hover:shadow-card-hover active:scale-[0.98];
+  }
+
+  .btn-secondary {
+    background: rgb(var(--btn-secondary-bg));
+    color: rgb(var(--btn-secondary-text));
+    @apply hover:brightness-110 active:scale-[0.98];
+  }
+
+  .btn-outline {
+    @apply border-2 border-primary text-primary bg-transparent hover:bg-primary hover:text-white active:scale-[0.98];
+  }
+
+  .btn-ghost {
+    @apply text-ink hover:bg-page-soft;
+  }
+
+  .btn-sm {
+    @apply h-9 px-3 text-sm;
+  }
+  .btn-md {
+    @apply h-11 px-5 text-sm;
+  }
+  .btn-lg {
+    @apply h-13 px-7 text-base;
+  }
+
+  /* --- Etiquetas / chips --- */
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold uppercase tracking-wide;
+  }
+
+  .card {
+    @apply rounded-lg bg-surface shadow-card;
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-line bg-white px-4 text-sm text-ink
+      placeholder:text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30;
+  }
+
+  .section-title {
+    @apply font-display text-2xl font-extrabold tracking-tight text-primary sm:text-3xl;
+  }
+
+  .link-muted {
+    @apply text-muted transition-colors hover:text-accent;
+  }
+}
+
+/* Utilidad de altura para botones (h-13 no existe por defecto) */
+@layer utilities {
+  .h-13 {
+    height: 3.25rem;
+  }
+  .animation-delay-2000 {
+    animation-delay: 2s;
+  }
+}
