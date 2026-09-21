@@ -86,7 +86,7 @@ export function SearchBar({
             {suggestions.map((p) => (
               <li key={p.id}>
                 <Link
-                  href={`/producto/${p.slug}`}
+                  href={`/producto?slug=${p.slug}`}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     setOpen(false);

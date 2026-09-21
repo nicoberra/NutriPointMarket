@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useProducts } from "@/context/ProductsContext";
 import { categories } from "@/data/categories";
-import { brands, brandName } from "@/data/brands";
+import { brandName } from "@/data/brands";
 import type { CategorySlug } from "@/lib/types";
 import { formatPrice } from "@/lib/format";
 import { ProductCard } from "./ProductCard";
@@ -26,7 +26,7 @@ export function Catalog({ onlyOffers = false }: { onlyOffers?: boolean }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const { products: ALL } = useProducts();
+  const { products: ALL, brands } = useProducts();
 
   const [search, setSearch] = useState(searchParams.get("buscar") ?? "");
   const [selectedCats, setSelectedCats] = useState<CategorySlug[]>(
@@ -84,7 +84,8 @@ export function Catalog({ onlyOffers = false }: { onlyOffers?: boolean }) {
     let list = ALL.filter((p) => {
       if (onlyOffers && p.discount <= 0) return false;
       if (selectedCats.length && !selectedCats.includes(p.category)) return false;
-      if (selectedBrands.length && !selectedBrands.includes(p.brand)) return false;
+      if (selectedBrands.length && !selectedBrands.includes(p.brand.toLowerCase()))
+        return false;
       if (p.price > maxPrice) return false;
       if (q) {
         const hay = `${p.name} ${brandName(p.brand)} ${p.category}`.toLowerCase();

@@ -1,6 +1,37 @@
-import type { Product } from "./types";
+import type { Product, CategorySlug } from "./types";
 import { SHEETS_API_URL } from "./config";
 import { discountPercent } from "./format";
+import { categories } from "@/data/categories";
+
+/** Quita acentos y pasa a minúsculas (para comparar/armar slugs). */
+function deaccent(s: string): string {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+/** Genera un slug de URL a partir del nombre del producto. */
+export function slugify(name: string): string {
+  return deaccent(String(name))
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
+
+/** Convierte el texto de "Categoría" de la planilla a un slug conocido. */
+export function normalizeCategory(text: string): CategorySlug {
+  const t = deaccent(String(text).trim());
+  if (!t) return "proteinas";
+  for (const c of categories) {
+    if (deaccent(c.slug) === t || deaccent(c.name) === t) return c.slug;
+  }
+  // coincidencia parcial (ej: "proteina", "pre-entreno", "barras")
+  for (const c of categories) {
+    const key = deaccent(c.name);
+    if (t.includes(key) || key.includes(t)) return c.slug;
+  }
+  if (t.includes("pre")) return "pre-entreno";
+  if (t.includes("barra") || t.includes("snack")) return "barras-snacks";
+  return "proteinas";
+}
 
 /**
  * Cliente JSONP para hablar con el backend (Google Apps Script).
@@ -58,16 +89,7 @@ export function api<T = unknown>(
   return jsonp<ApiResult<T>>(`${SHEETS_API_URL}?${qs.toString()}`);
 }
 
-/* =========================== PRECIOS (planilla) =========================== */
-
-/** Fila de precio tal como la devuelve la planilla. */
-export interface PriceRow {
-  nombre: string;
-  precio: number;
-  stock: boolean;
-  precioML: number;
-  destacado: boolean;
-}
+/* =========================== PRODUCTOS (planilla) ========================= */
 
 function toNum(v: unknown): number {
   const n = Number(v);
@@ -79,44 +101,52 @@ function toBool(v: unknown): boolean {
     ["si", "sí", "true", "x", "1"].includes(String(v).trim().toLowerCase())
   );
 }
+function toList(v: unknown): string[] {
+  if (Array.isArray(v)) return v.map(String).map((s) => s.trim()).filter(Boolean);
+  return String(v ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
 
-/** Trae las filas de precios desde la planilla. */
-export async function fetchPrices(): Promise<PriceRow[]> {
+/** Convierte una fila cruda de la planilla en un Product de la tienda. */
+export function buildProduct(row: Record<string, unknown>): Product {
+  const nombre = String(row.nombre ?? "").trim();
+  const precio = toNum(row.precio);
+  const precioML = toNum(row.precioML);
+  const oldPrice = precioML > precio ? precioML : undefined;
+  const category = normalizeCategory(String(row.categoria ?? ""));
+  return {
+    id: slugify(nombre),
+    slug: slugify(nombre),
+    name: nombre,
+    brand: String(row.marca ?? "").trim(),
+    category,
+    description: "",
+    price: precio,
+    oldPrice,
+    discount: discountPercent(precio, oldPrice),
+    images: [],
+    stock: 0,
+    inStock: row.stock === undefined || row.stock === "" ? true : toBool(row.stock),
+    flavors: toList(row.variantes),
+    presentations: [],
+    featured: toBool(row.destacado),
+    bestSeller: false,
+    freeShipping: false,
+    isNew: false,
+    rating: 0,
+    reviews: 0,
+  };
+}
+
+/** Trae TODOS los productos desde la planilla. */
+export async function fetchProducts(): Promise<Product[]> {
   const res = await api<Record<string, unknown>[]>("productos_list");
   if (!res || res.ok === false || !Array.isArray(res.data)) {
     throw new Error("Respuesta inválida de la API");
   }
-  return res.data
-    .map((r) => ({
-      nombre: String(r.nombre ?? "").trim(),
-      precio: toNum(r.precio),
-      stock: toBool(r.stock),
-      precioML: toNum(r.precioML),
-      destacado: toBool(r.destacado),
-    }))
-    .filter((r) => r.nombre);
-}
-
-/**
- * Combina el CATÁLOGO (código) con los PRECIOS (planilla), cruzando por nombre.
- * Los precios pisan: precio, oldPrice (Precio ML), descuento, destacado y stock.
- */
-export function mergePrices(catalog: Product[], prices: PriceRow[]): Product[] {
-  const byName = new Map(prices.map((p) => [p.nombre.trim().toLowerCase(), p]));
-  return catalog.map((prod) => {
-    const pr = byName.get(prod.name.trim().toLowerCase());
-    if (!pr) return { ...prod, inStock: prod.inStock ?? true };
-    const oldPrice = pr.precioML > pr.precio ? pr.precioML : undefined;
-    const price = pr.precio || prod.price;
-    return {
-      ...prod,
-      price,
-      oldPrice,
-      discount: discountPercent(price, oldPrice),
-      featured: pr.destacado,
-      inStock: pr.stock,
-    };
-  });
+  return res.data.map(buildProduct).filter((p) => p.slug && p.name);
 }
 
 /* ============================ API DEL CRM ================================= */
@@ -137,18 +167,26 @@ export async function listTable<T = Record<string, unknown>>(tab: string): Promi
   return Array.isArray(r.data) ? r.data : [];
 }
 
-/** Guarda (crea o actualiza) el precio de un producto, cruzando por nombre. */
-export async function saveProduct(row: {
+/** Guarda (crea o actualiza) un producto en la planilla, cruzando por nombre. */
+export interface ProductInput {
   nombre: string;
+  marca?: string;
+  categoria?: string;
   precio: number;
   precioML?: number;
+  variantes?: string;
   stock: boolean;
   destacado: boolean;
-}): Promise<boolean> {
+}
+
+export async function saveProduct(row: ProductInput): Promise<boolean> {
   const data = JSON.stringify({
     nombre: row.nombre,
+    marca: row.marca ?? "",
+    categoria: row.categoria ?? "",
     precio: row.precio,
     precioML: row.precioML ?? "",
+    variantes: row.variantes ?? "",
     stock: row.stock,
     destacado: row.destacado,
   });

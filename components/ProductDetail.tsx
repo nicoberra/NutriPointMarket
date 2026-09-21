@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Product } from "@/lib/types";
-import { brandName, getBrand } from "@/data/brands";
+import { brandName } from "@/data/brands";
 import { categoryMap } from "@/data/categories";
 import { formatPrice, installment } from "@/lib/format";
 import { useCart } from "@/context/CartContext";
@@ -63,7 +63,9 @@ export function ProductDetail({ product: initial }: { product: Product }) {
             <FavoriteButton id={product.id} className="absolute right-4 top-4 z-10 h-11 w-11" />
             <ProductVisual
               shape={shape}
-              brandLabel={getBrand(product.brand)?.label}
+              brandLabel={
+                product.brand ? product.brand.split(" ")[0].toUpperCase().slice(0, 7) : undefined
+              }
               accent={gallery[activeThumb]}
               className="aspect-square w-full"
             />
@@ -92,9 +94,11 @@ export function ProductDetail({ product: initial }: { product: Product }) {
           <h1 className="mt-1 font-display text-2xl font-extrabold leading-tight text-primary sm:text-3xl">
             {product.name}
           </h1>
-          <div className="mt-2.5">
-            <Rating value={product.rating} reviews={product.reviews} size="md" />
-          </div>
+          {product.reviews > 0 && (
+            <div className="mt-2.5">
+              <Rating value={product.rating} reviews={product.reviews} size="md" />
+            </div>
+          )}
 
           {/* Precio */}
           <div className="mt-5 rounded-xl border border-line bg-white p-5">

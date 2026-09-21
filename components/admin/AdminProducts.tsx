@@ -3,51 +3,49 @@
 import { useMemo, useState } from "react";
 import type { Product } from "@/lib/types";
 import { useProducts } from "@/context/ProductsContext";
-import { saveProduct } from "@/lib/api";
+import { saveProduct, type ProductInput } from "@/lib/api";
 import { formatPrice, discountPercent } from "@/lib/format";
-import { brandName } from "@/data/brands";
 import { categories, categoryMap } from "@/data/categories";
-import { SearchIcon, CloseIcon, CheckIcon } from "@/components/Icons";
+import { SearchIcon, CloseIcon, CheckIcon, PlusIcon } from "@/components/Icons";
 
 /**
- * CRM · Productos. Edita lo que vive en la planilla (Precio, Precio ML, Stock,
- * Destacado). El resto (nombre, categoría, descripción) es del catálogo/código.
+ * CRM · Productos. Agregá y editá productos; se guardan en la planilla y
+ * aparecen en la web. Campos: nombre, marca, categoría, precio, precio ML,
+ * variantes (sabores), stock y destacado.
  */
 export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
   const { products, refresh } = useProducts();
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<string>("");
   const [editing, setEditing] = useState<Product | null>(null);
+  const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
     return products.filter((p) => {
       if (cat && p.category !== cat) return false;
-      if (query && !`${p.name} ${brandName(p.brand)}`.toLowerCase().includes(query))
-        return false;
+      if (query && !`${p.name} ${p.brand}`.toLowerCase().includes(query)) return false;
       return true;
     });
   }, [products, q, cat]);
 
-  const handleSave = async (row: {
-    nombre: string;
-    precio: number;
-    precioML?: number;
-    stock: boolean;
-    destacado: boolean;
-  }) => {
+  const handleSave = async (row: ProductInput) => {
     setSaving(true);
     const ok = await saveProduct(row);
     setSaving(false);
     setEditing(null);
-    onToast(ok ? "Precio guardado ✓" : "Guardado (verificá la planilla)");
-    // refrescar tras un momento (la escritura es asíncrona)
+    setAdding(false);
+    onToast(ok ? "Producto guardado ✓" : "Guardado (verificá la planilla)");
     setTimeout(() => refresh().catch(() => {}), 1200);
   };
 
   return (
     <div className="space-y-4">
+      <button onClick={() => setAdding(true)} className="btn btn-primary btn-md w-full">
+        <PlusIcon className="h-5 w-5" /> Agregar producto
+      </button>
+
       <div className="relative">
         <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
         <input
@@ -69,46 +67,57 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
         ))}
       </div>
 
-      <p className="text-xs text-muted">{filtered.length} productos</p>
-      <ul className="space-y-2">
-        {filtered.map((p) => (
-          <li key={p.id}>
-            <button
-              onClick={() => setEditing(p)}
-              className="flex w-full items-center gap-3 rounded-xl border border-line bg-white p-3 text-left transition-colors active:bg-page-soft"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-bold uppercase text-muted">
-                  {brandName(p.brand)} · {categoryMap[p.category]?.name}
-                </p>
-                <p className="truncate text-sm font-semibold text-ink">{p.name}</p>
-                <p className="mt-0.5 text-sm">
-                  <span className="font-bold text-primary">{formatPrice(p.price)}</span>
-                  {p.oldPrice && (
-                    <span className="ml-1.5 text-xs text-muted line-through">
-                      {formatPrice(p.oldPrice)}
-                    </span>
-                  )}
-                </p>
-              </div>
-              <div className="flex shrink-0 flex-col items-end gap-1">
-                {p.inStock === false ? (
-                  <span className="badge bg-sale/10 text-sale">Sin stock</span>
-                ) : (
-                  <span className="badge bg-accent-soft text-primary">En stock</span>
-                )}
-                {p.featured && <span className="badge bg-amber-100 text-amber-700">★</span>}
-              </div>
-            </button>
-          </li>
-        ))}
-      </ul>
+      {products.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-line bg-white py-12 text-center text-sm text-muted">
+          Todavía no hay productos. Tocá “Agregar producto”.
+        </div>
+      ) : (
+        <>
+          <p className="text-xs text-muted">{filtered.length} productos</p>
+          <ul className="space-y-2">
+            {filtered.map((p) => (
+              <li key={p.id}>
+                <button
+                  onClick={() => setEditing(p)}
+                  className="flex w-full items-center gap-3 rounded-xl border border-line bg-white p-3 text-left transition-colors active:bg-page-soft"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-bold uppercase text-muted">
+                      {p.brand || "—"} · {categoryMap[p.category]?.name}
+                    </p>
+                    <p className="truncate text-sm font-semibold text-ink">{p.name}</p>
+                    <p className="mt-0.5 text-sm">
+                      <span className="font-bold text-primary">{formatPrice(p.price)}</span>
+                      {p.oldPrice && (
+                        <span className="ml-1.5 text-xs text-muted line-through">
+                          {formatPrice(p.oldPrice)}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    {p.inStock === false ? (
+                      <span className="badge bg-sale/10 text-sale">Sin stock</span>
+                    ) : (
+                      <span className="badge bg-accent-soft text-primary">En stock</span>
+                    )}
+                    {p.featured && <span className="badge bg-amber-100 text-amber-700">★</span>}
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
-      {editing && (
-        <EditPriceSheet
+      {(editing || adding) && (
+        <ProductSheet
           product={editing}
           saving={saving}
-          onClose={() => setEditing(null)}
+          onClose={() => {
+            setEditing(null);
+            setAdding(false);
+          }}
           onSave={handleSave}
         />
       )}
@@ -137,79 +146,138 @@ function Chip({
   );
 }
 
-function EditPriceSheet({
+/** Alta/edición de producto. Si `product` es null, es alta. */
+function ProductSheet({
   product,
   saving,
   onClose,
   onSave,
 }: {
-  product: Product;
+  product: Product | null;
   saving: boolean;
   onClose: () => void;
-  onSave: (row: {
-    nombre: string;
-    precio: number;
-    precioML?: number;
-    stock: boolean;
-    destacado: boolean;
-  }) => void;
+  onSave: (row: ProductInput) => void;
 }) {
-  const [precio, setPrecio] = useState<number>(product.price);
-  const [precioML, setPrecioML] = useState<number | "">(product.oldPrice ?? "");
-  const [stock, setStock] = useState<boolean>(product.inStock !== false);
-  const [destacado, setDestacado] = useState<boolean>(product.featured);
+  const isEdit = !!product;
+  const [nombre, setNombre] = useState(product?.name ?? "");
+  const [marca, setMarca] = useState(product?.brand ?? "");
+  const [categoria, setCategoria] = useState<string>(
+    product ? categoryMap[product.category]?.name ?? "Proteínas" : "Proteínas",
+  );
+  const [precio, setPrecio] = useState<number>(product?.price ?? 0);
+  const [precioML, setPrecioML] = useState<number | "">(product?.oldPrice ?? "");
+  const [variantes, setVariantes] = useState(product?.flavors.join(", ") ?? "");
+  const [stock, setStock] = useState<boolean>(product?.inStock !== false);
+  const [destacado, setDestacado] = useState<boolean>(product?.featured ?? false);
 
   const desc = discountPercent(precio, precioML ? Number(precioML) : undefined);
+
+  const submit = () => {
+    if (!nombre.trim()) return;
+    onSave({
+      nombre: nombre.trim(),
+      marca: marca.trim(),
+      categoria,
+      precio,
+      precioML: precioML ? Number(precioML) : undefined,
+      variantes: variantes.trim(),
+      stock,
+      destacado,
+    });
+  };
 
   return (
     <div className="fixed inset-0 z-[90] flex items-end justify-center sm:items-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-page p-5 sm:rounded-2xl">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-bold uppercase text-muted">
-              {brandName(product.brand)}
-            </p>
-            <h3 className="font-display text-lg font-bold text-primary">{product.name}</h3>
-          </div>
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="font-display text-lg font-bold text-primary">
+            {isEdit ? "Editar producto" : "Agregar producto"}
+          </h3>
           <button
             onClick={onClose}
             aria-label="Cerrar"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-ink hover:bg-page-soft"
+            className="grid h-9 w-9 place-items-center rounded-full text-ink hover:bg-page-soft"
           >
             <CloseIcon className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Precio">
+        <div className="space-y-3">
+          <Field label="Nombre del producto">
             <input
-              type="number"
-              inputMode="numeric"
-              value={precio || ""}
-              onChange={(e) => setPrecio(Number(e.target.value))}
-              className="input h-11 text-base"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              readOnly={isEdit}
+              className={`input h-11 text-base ${isEdit ? "bg-page-soft text-muted" : ""}`}
+              placeholder="Ej: Whey Protein 1 Kg"
             />
           </Field>
-          <Field label={`Precio ML (tachado)`}>
-            <input
-              type="number"
-              inputMode="numeric"
-              value={precioML}
-              onChange={(e) => setPrecioML(e.target.value ? Number(e.target.value) : "")}
-              className="input h-11 text-base"
-            />
-          </Field>
-        </div>
-        <p className="mt-1.5 text-xs text-muted">
-          {desc > 0
-            ? `Se mostrará ${desc}% OFF`
-            : "Sin descuento (dejá Precio ML vacío o menor al precio)"}
-        </p>
+          {isEdit && (
+            <p className="-mt-1 text-[11px] text-muted">
+              El nombre es la clave; no se puede cambiar desde acá.
+            </p>
+          )}
 
-        <div className="mt-4 space-y-2">
-          <Toggle label="Hay stock" checked={stock} onChange={setStock} />
-          <Toggle label="Destacado" checked={destacado} onChange={setDestacado} />
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Marca">
+              <input
+                value={marca}
+                onChange={(e) => setMarca(e.target.value)}
+                className="input h-11 text-base"
+                placeholder="Ej: ENA"
+              />
+            </Field>
+            <Field label="Categoría">
+              <select
+                value={categoria}
+                onChange={(e) => setCategoria(e.target.value)}
+                className="input h-11 text-base"
+              >
+                {categories.map((c) => (
+                  <option key={c.slug} value={c.name}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Precio">
+              <input
+                type="number"
+                inputMode="numeric"
+                value={precio || ""}
+                onChange={(e) => setPrecio(Number(e.target.value))}
+                className="input h-11 text-base"
+              />
+            </Field>
+            <Field label="Precio ML (tachado)">
+              <input
+                type="number"
+                inputMode="numeric"
+                value={precioML}
+                onChange={(e) => setPrecioML(e.target.value ? Number(e.target.value) : "")}
+                className="input h-11 text-base"
+              />
+            </Field>
+          </div>
+
+          <Field label="Variantes / sabores (separados por coma)">
+            <input
+              value={variantes}
+              onChange={(e) => setVariantes(e.target.value)}
+              className="input h-11 text-base"
+              placeholder="Vainilla, Chocolate, Frutilla"
+            />
+          </Field>
+
+          <p className="text-xs text-muted">
+            {desc > 0 ? `Se mostrará ${desc}% OFF` : "Sin descuento"}
+          </p>
+
+          <div className="space-y-2">
+            <Toggle label="Hay stock" checked={stock} onChange={setStock} />
+            <Toggle label="Destacado" checked={destacado} onChange={setDestacado} />
+          </div>
         </div>
 
         <div className="mt-5 flex gap-2">
@@ -217,16 +285,8 @@ function EditPriceSheet({
             Cancelar
           </button>
           <button
-            onClick={() =>
-              onSave({
-                nombre: product.name,
-                precio,
-                precioML: precioML ? Number(precioML) : undefined,
-                stock,
-                destacado,
-              })
-            }
-            disabled={saving}
+            onClick={submit}
+            disabled={saving || !nombre.trim()}
             className="btn btn-primary btn-md flex-1"
           >
             {saving ? "Guardando…" : (

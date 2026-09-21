@@ -121,7 +121,7 @@ export function CartDrawer() {
                     className="flex gap-3 rounded-lg border border-line bg-white p-2.5"
                   >
                     <Link
-                      href={`/producto/${item.product.slug}`}
+                      href={`/producto?slug=${item.product.slug}`}
                       onClick={closeCart}
                       className="shrink-0"
                     >
@@ -137,7 +137,7 @@ export function CartDrawer() {
                             {brandName(item.product.brand)}
                           </p>
                           <Link
-                            href={`/producto/${item.product.slug}`}
+                            href={`/producto?slug=${item.product.slug}`}
                             onClick={closeCart}
                             className="line-clamp-2 text-sm font-semibold text-ink hover:text-accent"
                           >

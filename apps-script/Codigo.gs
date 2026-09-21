@@ -24,12 +24,16 @@ var API_VERSION = "v2";
 
 var TABLES = {
   Productos: {
-    // Planilla de PRECIOS. La clave de cruce es "nombre".
+    // Fuente COMPLETA de productos. Vos agregás filas acá y aparecen en la web.
+    // La clave (para actualizar) es "nombre".
     columns: [
       ["nombre", "Nombre"],
+      ["marca", "Marca"],
+      ["categoria", "Categoría"],
       ["precio", "Precio"],
-      ["stock", "Stock"],
       ["precioML", "Precio ML"],
+      ["variantes", "Variantes"],
+      ["stock", "Stock"],
       ["destacado", "Destacado"],
     ],
     idField: "nombre",
@@ -309,7 +313,7 @@ function siNo(v) {
   return parseSiNo(v) ? "sí" : "no";
 }
 
-// Devuelve las filas de precios: {nombre, precio, stock, precioML, destacado}.
+// Devuelve los productos completos de la planilla.
 function listProductos() {
   var sh = sheetFor("Productos");
   var values = sh.getDataRange().getValues();
@@ -321,10 +325,13 @@ function listProductos() {
     if (!nombre) continue;
     list.push({
       nombre: nombre,
-      precio: Number(row[1]) || 0,
-      stock: parseSiNo(row[2]),
-      precioML: row[3] === "" || row[3] == null ? 0 : Number(row[3]) || 0,
-      destacado: parseSiNo(row[4]),
+      marca: String(row[1] || "").trim(),
+      categoria: String(row[2] || "").trim(),
+      precio: Number(row[3]) || 0,
+      precioML: row[4] === "" || row[4] == null ? 0 : Number(row[4]) || 0,
+      variantes: String(row[5] || "").trim(),
+      stock: row[6] === "" || row[6] == null ? true : parseSiNo(row[6]),
+      destacado: parseSiNo(row[7]),
     });
   }
   return list;
@@ -425,19 +432,17 @@ function setup() {
     }
     writeHeader(sh, tab);
   });
-  seedPrecios(book.getSheetByName("Productos"));
-  SpreadsheetApp.getActive().toast("Listo: pestañas y precios cargados.", "NutriPointMarket", 5);
+  SpreadsheetApp.getActive().toast("Listo: pestañas creadas.", "NutriPointMarket", 5);
 }
 
-// Reescribe SOLO la pestaña Productos con el formato de precios y la vuelve a
-// sembrar. Útil si venías del formato viejo. (Borra los precios actuales.)
+// Reescribe SOLO la pestaña Productos con las columnas correctas y la deja
+// VACÍA (los productos los cargás vos). Útil si venías de un formato viejo.
 function resetProductos() {
   var sh = ss().getSheetByName("Productos");
   if (!sh) sh = ss().insertSheet("Productos");
   sh.clear();
   writeHeader(sh, "Productos");
-  seedPrecios(sh, true);
-  SpreadsheetApp.getActive().toast("Pestaña Productos reconstruida.", "NutriPointMarket", 5);
+  SpreadsheetApp.getActive().toast("Pestaña Productos lista (vacía).", "NutriPointMarket", 5);
 }
 
 function writeHeader(sh, tab) {
@@ -453,12 +458,6 @@ function writeHeader(sh, tab) {
   sh.autoResizeColumns(1, titles.length);
 }
 
-function seedPrecios(sh, force) {
-  if (!force && sh.getLastRow() > 1) return;
-  if (SEED_PRECIOS.length)
-    sh.getRange(2, 1, SEED_PRECIOS.length, 5).setValues(SEED_PRECIOS);
-}
-
 // Función opcional para setear el PIN del CRM y NO dejarlo en el código.
 // Cambiá el valor, ejecutala UNA vez, y después volvé a poner "" para no dejarlo.
 function setCrmPin() {
@@ -468,25 +467,3 @@ function setCrmPin() {
     SpreadsheetApp.getActive().toast("PIN del CRM configurado.", "NutriPointMarket", 4);
   }
 }
-
-// Semilla de precios: [Nombre, Precio, Stock, Precio ML, Destacado]
-var SEED_PRECIOS = [
-  ["Whey Protein 1 Kg", 38900, "sí", 48625, "sí"],
-  ["True Made Whey Protein 1 Kg", 44500, "sí", 52350, "sí"],
-  ["Creatina Monohidrato 300 g", 22400, "sí", 26350, "sí"],
-  ["Creatina Micronizada 300 g", 24900, "sí", "", "sí"],
-  ["Pre Entreno Shock 300 g", 31200, "sí", 39000, "sí"],
-  ["Pre Entreno Nitro 250 g", 36800, "sí", "", "no"],
-  ["BCAA 2000 · 120 caps", 16800, "sí", 19765, "sí"],
-  ["Glutamina 300 g", 19500, "sí", "", "no"],
-  ["Multivitamínico Complete 60 caps", 14200, "sí", 16700, "sí"],
-  ["Vitamina C 1000 · 90 caps", 11900, "sí", "", "no"],
-  ["Citrato de Magnesio 450 g", 17300, "sí", 20350, "sí"],
-  ["ZMB6 (Zinc + Magnesio + B6) 120 caps", 15600, "sí", "", "no"],
-  ["Colágeno Hidrolizado 250 g", 21800, "sí", 27250, "sí"],
-  ["Colágeno Beauty 240 g", 22900, "sí", "", "no"],
-  ["Protein Bar (Caja x12)", 18700, "sí", 22000, "sí"],
-  ["Pasta de Maní 500 g", 8900, "sí", "", "no"],
-  ["Combo Proteína + Creatina", 56900, "sí", 71120, "sí"],
-  ["Combo Vitalidad", 39900, "sí", 49875, "sí"],
-];

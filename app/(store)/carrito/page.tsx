@@ -36,7 +36,7 @@ export default function CarritoPage() {
                   key={item.key}
                   className="flex gap-4 rounded-xl border border-line bg-white p-3 sm:p-4"
                 >
-                  <Link href={`/producto/${item.product.slug}`} className="shrink-0">
+                  <Link href={`/producto?slug=${item.product.slug}`} className="shrink-0">
                     <ProductVisual
                       shape={categoryMap[item.product.category]?.shape ?? "tub"}
                       className="h-24 w-24 rounded-lg sm:h-28 sm:w-28"
@@ -47,7 +47,7 @@ export default function CarritoPage() {
                       {brandName(item.product.brand)}
                     </p>
                     <Link
-                      href={`/producto/${item.product.slug}`}
+                      href={`/producto?slug=${item.product.slug}`}
                       className="text-sm font-semibold text-ink hover:text-accent sm:text-base"
                     >
                       {item.product.name}

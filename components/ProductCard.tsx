@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { Product } from "@/lib/types";
-import { brandName, getBrand } from "@/data/brands";
+import { brandName } from "@/data/brands";
 import { categoryMap } from "@/data/categories";
 import { formatPrice, installment } from "@/lib/format";
 import { useCart } from "@/context/CartContext";
@@ -41,13 +41,15 @@ export function ProductCard({ product }: { product: Product }) {
         <FavoriteButton id={product.id} className="absolute right-2.5 top-2.5 z-10 h-9 w-9" />
 
         <Link
-          href={`/producto/${product.slug}`}
+          href={`/producto?slug=${product.slug}`}
           className="block bg-page-soft"
           aria-label={product.name}
         >
           <ProductVisual
             shape={shape}
-            brandLabel={getBrand(product.brand)?.label}
+            brandLabel={
+              product.brand ? product.brand.split(" ")[0].toUpperCase().slice(0, 7) : undefined
+            }
             className="aspect-square w-full transition-transform duration-500 group-hover:scale-[1.06]"
           />
         </Link>
@@ -59,7 +61,7 @@ export function ProductCard({ product }: { product: Product }) {
           {brandName(product.brand)}
         </p>
         <h3 className="mt-0.5 line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-snug text-ink">
-          <Link href={`/producto/${product.slug}`} className="hover:text-accent">
+          <Link href={`/producto?slug=${product.slug}`} className="hover:text-accent">
             {product.name}
           </Link>
         </h3>
