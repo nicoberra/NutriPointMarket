@@ -1,6 +1,6 @@
 import { Hero } from "@/components/Hero";
 import { TrustStrip } from "@/components/TrustStrip";
-import { CategorySection } from "@/components/CategorySection";
+import { CategoryCarousel } from "@/components/CategoryCarousel";
 import { HomeCarousel } from "@/components/HomeCarousel";
 import { PromoBannerRow } from "@/components/PromoBanner";
 import { BrandCarousel } from "@/components/BrandCarousel";
@@ -14,7 +14,7 @@ export default function HomePage() {
 
       <HomeCarousel kind="onSale" />
 
-      <CategorySection />
+      <CategoryCarousel />
 
       <PromoBannerRow />
 
