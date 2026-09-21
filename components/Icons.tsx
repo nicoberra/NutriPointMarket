@@ -183,3 +183,41 @@ export const MapPinIcon = (p: IconProps) => (
     <circle cx="12" cy="10" r="2.5" />
   </svg>
 );
+
+export const GridIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <rect x="3" y="3" width="7" height="7" rx="1.5" />
+    <rect x="14" y="3" width="7" height="7" rx="1.5" />
+    <rect x="3" y="14" width="7" height="7" rx="1.5" />
+    <rect x="14" y="14" width="7" height="7" rx="1.5" />
+  </svg>
+);
+
+export const PackageIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M21 8 12 3 3 8v8l9 5 9-5Z" />
+    <path d="m3 8 9 5 9-5M12 13v8" />
+  </svg>
+);
+
+export const ClipboardIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <rect x="5" y="4" width="14" height="17" rx="2" />
+    <path d="M9 4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1H9Z" />
+    <path d="M8.5 10h7M8.5 14h7M8.5 18h4" />
+  </svg>
+);
+
+export const BellIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6" />
+    <path d="M10.5 20a1.5 1.5 0 0 0 3 0" />
+  </svg>
+);
+
+export const LogoutIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" />
+    <path d="M10 17l-5-5 5-5M4.5 12H15" />
+  </svg>
+);

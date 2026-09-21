@@ -112,3 +112,68 @@ export async function fetchProducts(): Promise<Product[]> {
     .map(normalizeProduct)
     .filter((p) => p.slug && p.name); // descartar filas vacías/incompletas
 }
+
+/* ===================== API DEL CRM (lectura y escritura) ===================== */
+
+type ApiResult<T = unknown> = { ok?: boolean; error?: string; data?: T; [k: string]: unknown };
+
+/** Llamada genérica a la API por JSONP (sirve para leer y escribir). */
+export function api<T = unknown>(
+  action: string,
+  params: Record<string, string | number | boolean> = {},
+): Promise<ApiResult<T>> {
+  const qs = new URLSearchParams({ action });
+  for (const [k, v] of Object.entries(params)) qs.set(k, String(v));
+  return jsonp<ApiResult<T>>(`${SHEETS_API_URL}?${qs.toString()}`);
+}
+
+/** Login del CRM: valida el PIN contra el backend. */
+export async function crmLogin(pin: string): Promise<boolean> {
+  try {
+    const r = await api("crm_login", { pin });
+    return r.ok === true;
+  } catch {
+    return false;
+  }
+}
+
+/** Lista las filas de una pestaña (Clientes, Pedidos, Seguimientos). */
+export async function listTable<T = Record<string, unknown>>(
+  tab: string,
+): Promise<T[]> {
+  const r = await api<T[]>("list", { tab });
+  return Array.isArray(r.data) ? r.data : [];
+}
+
+/** Guarda (crea o actualiza) un producto en la planilla. */
+export async function saveProduct(product: Partial<Product>): Promise<boolean> {
+  const payload = { ...product };
+  // arrays → texto separado por comas (como los guarda la planilla)
+  const data = JSON.stringify({
+    ...payload,
+    flavors: (payload.flavors ?? []).join(", "),
+    presentations: (payload.presentations ?? []).join(", "),
+    images: (payload.images ?? []).join(", "),
+  });
+  const r = await api("productos_save", { data });
+  return r.ok !== false;
+}
+
+/** Crea una fila en una pestaña. */
+export async function addRow(
+  tab: string,
+  obj: Record<string, unknown>,
+): Promise<boolean> {
+  const r = await api("add", { tab, data: JSON.stringify(obj) });
+  return r.ok !== false;
+}
+
+/** Actualiza una fila por id. */
+export async function updateRow(
+  tab: string,
+  id: string,
+  obj: Record<string, unknown>,
+): Promise<boolean> {
+  const r = await api("update", { tab, id, data: JSON.stringify(obj) });
+  return r.ok !== false;
+}

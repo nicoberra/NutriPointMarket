@@ -5,11 +5,6 @@ import { SITE } from "@/lib/config";
 import { CartProvider } from "@/context/CartContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { ProductsProvider } from "@/context/ProductsContext";
-import { Header } from "@/components/Header";
-import { Footer } from "@/components/Footer";
-import { CartDrawer } from "@/components/CartDrawer";
-import { WhatsAppButton } from "@/components/WhatsAppButton";
-import { ToastHost } from "@/components/ToastHost";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -62,17 +57,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es-AR" className={`${inter.variable} ${sora.variable}`}>
-      <body className="flex min-h-screen flex-col">
+      <body>
         <AuthProvider>
           <ProductsProvider>
-            <CartProvider>
-              <Header />
-              <main className="flex-1">{children}</main>
-              <Footer />
-              <CartDrawer />
-              <WhatsAppButton />
-              <ToastHost />
-            </CartProvider>
+            <CartProvider>{children}</CartProvider>
           </ProductsProvider>
         </AuthProvider>
       </body>

@@ -180,6 +180,11 @@ function handle(e) {
         out = login(p.email, p.password);
         break;
 
+      // --- Login del panel CRM (PIN) ---
+      case "crm_login":
+        out = crmLogin(p.pin);
+        break;
+
       // --- Analytics ---
       case "evento_add":
         out = { ok: true, data: addRow("Eventos", parseData(p)) };
@@ -421,6 +426,17 @@ function login(email, password) {
     }
   }
   return { ok: false, error: "No existe una cuenta con ese email" };
+}
+
+/**
+ * Login del CRM. El PIN NO se guarda en este código (que está en un repo público)
+ * sino en una Propiedad del Script (Configuración del proyecto → Propiedades del
+ * script → CRM_PIN). Así la clave queda del lado del servidor.
+ */
+function crmLogin(pin) {
+  var stored = PropertiesService.getScriptProperties().getProperty("CRM_PIN");
+  if (!stored) return { ok: false, error: "PIN no configurado en el servidor" };
+  return { ok: String(pin || "").trim() === String(stored).trim() };
 }
 
 function hash(txt) {
