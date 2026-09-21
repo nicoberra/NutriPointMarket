@@ -18,6 +18,14 @@ export const SITE = {
   instagram: "https://instagram.com/nutripointmarket", // placeholder
 };
 
+/**
+ * URL de la API (Google Apps Script) que lee/escribe la planilla de Google Sheets.
+ * Es la "base de datos" de NutriPointMarket. Se lee desde la web con JSONP.
+ * Si redeployás con URL nueva, cambiala acá.
+ */
+export const SHEETS_API_URL =
+  "https://script.google.com/macros/s/AKfycbyYjIkAmdpAE7PS6Oa4AvKlfcE8EU09ePkIq1dS-TuCAykVy2GIy_sFQAzeuS1hkjMBSA/exec";
+
 /** Reemplazar por el número real (formato internacional sin +, ej: 5491100000000) */
 export const WHATSAPP_NUMBER = "5491100000000";
 export const WHATSAPP_MESSAGE = "Hola NutriPointMarket, quería consultar por…";
