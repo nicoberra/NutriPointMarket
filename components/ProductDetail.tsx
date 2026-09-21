@@ -7,6 +7,7 @@ import { brandName, getBrand } from "@/data/brands";
 import { categoryMap } from "@/data/categories";
 import { formatPrice, installment } from "@/lib/format";
 import { useCart } from "@/context/CartContext";
+import { useProducts } from "@/context/ProductsContext";
 import { ProductVisual } from "./ProductVisual";
 import { Rating } from "./Rating";
 import { QuantitySelector } from "./QuantitySelector";
@@ -20,9 +21,12 @@ import {
   ChevronDownIcon,
 } from "./Icons";
 
-export function ProductDetail({ product }: { product: Product }) {
+export function ProductDetail({ product: initial }: { product: Product }) {
   const router = useRouter();
   const { addItem } = useCart();
+  const { getBySlug } = useProducts();
+  // Usa la versión en vivo de la planilla si está disponible; si no, el respaldo.
+  const product = getBySlug(initial.slug) ?? initial;
   const shape = categoryMap[product.category]?.shape ?? "tub";
 
   const [flavor, setFlavor] = useState(product.flavors[0] ?? "");

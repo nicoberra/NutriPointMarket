@@ -4,6 +4,7 @@ import "./globals.css";
 import { SITE } from "@/lib/config";
 import { CartProvider } from "@/context/CartContext";
 import { AuthProvider } from "@/context/AuthContext";
+import { ProductsProvider } from "@/context/ProductsContext";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { CartDrawer } from "@/components/CartDrawer";
@@ -63,14 +64,16 @@ export default function RootLayout({
     <html lang="es-AR" className={`${inter.variable} ${sora.variable}`}>
       <body className="flex min-h-screen flex-col">
         <AuthProvider>
-          <CartProvider>
-            <Header />
-            <main className="flex-1">{children}</main>
-            <Footer />
-            <CartDrawer />
-            <WhatsAppButton />
-            <ToastHost />
-          </CartProvider>
+          <ProductsProvider>
+            <CartProvider>
+              <Header />
+              <main className="flex-1">{children}</main>
+              <Footer />
+              <CartDrawer />
+              <WhatsAppButton />
+              <ToastHost />
+            </CartProvider>
+          </ProductsProvider>
         </AuthProvider>
       </body>
     </html>

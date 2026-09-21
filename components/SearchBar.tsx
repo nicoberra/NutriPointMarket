@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
-import { products } from "@/data/products";
+import { useProducts } from "@/context/ProductsContext";
 import { brandName } from "@/data/brands";
 import { categoryMap } from "@/data/categories";
 import { SearchIcon } from "./Icons";
@@ -16,6 +16,7 @@ export function SearchBar({
   autoFocus?: boolean;
 }) {
   const router = useRouter();
+  const { products } = useProducts();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -35,7 +36,7 @@ export function SearchBar({
         return hay.includes(q);
       })
       .slice(0, 6);
-  }, [query]);
+  }, [query, products]);
 
   const submit = (value: string) => {
     const q = value.trim();

@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { products as ALL } from "@/data/products";
+import { useProducts } from "@/context/ProductsContext";
 import { categories } from "@/data/categories";
 import { brands, brandName } from "@/data/brands";
 import type { CategorySlug } from "@/lib/types";
@@ -26,6 +26,7 @@ export function Catalog({ onlyOffers = false }: { onlyOffers?: boolean }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+  const { products: ALL } = useProducts();
 
   const [search, setSearch] = useState(searchParams.get("buscar") ?? "");
   const [selectedCats, setSelectedCats] = useState<CategorySlug[]>(
@@ -108,7 +109,7 @@ export function Catalog({ onlyOffers = false }: { onlyOffers?: boolean }) {
     });
 
     return list;
-  }, [search, selectedCats, selectedBrands, maxPrice, sort, onlyOffers]);
+  }, [ALL, search, selectedCats, selectedBrands, maxPrice, sort, onlyOffers]);
 
   const activeCount =
     selectedCats.length + selectedBrands.length + (maxPrice < PRICE_MAX ? 1 : 0);

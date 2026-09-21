@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
-import { products } from "@/data/products";
+import { useProducts } from "@/context/ProductsContext";
 import { PageBanner } from "@/components/PageBanner";
 import { ProductCard } from "@/components/ProductCard";
 import { UserIcon, HeartIcon } from "@/components/Icons";
@@ -12,6 +12,7 @@ import { UserIcon, HeartIcon } from "@/components/Icons";
 export default function CuentaPage() {
   const { user, ready, login, register, logout } = useAuth();
   const { favorites } = useCart();
+  const { products } = useProducts();
 
   const [mode, setMode] = useState<"login" | "register">("login");
   const [name, setName] = useState("");

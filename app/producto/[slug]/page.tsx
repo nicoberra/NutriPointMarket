@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getProductBySlug, getRelated, products } from "@/data/products";
+import { getProductBySlug, products } from "@/data/products";
 import { brandName } from "@/data/brands";
 import { categoryMap } from "@/data/categories";
 import { ProductDetail } from "@/components/ProductDetail";
-import { ProductCarousel } from "@/components/ProductCarousel";
+import { RelatedProducts } from "@/components/RelatedProducts";
 import { PageBanner } from "@/components/PageBanner";
 
 export function generateStaticParams() {
@@ -28,7 +28,6 @@ export default function ProductoPage({ params }: { params: { slug: string } }) {
   const product = getProductBySlug(params.slug);
   if (!product) notFound();
 
-  const related = getRelated(product);
   const category = categoryMap[product.category];
 
   return (
@@ -46,7 +45,7 @@ export default function ProductoPage({ params }: { params: { slug: string } }) {
       />
       <ProductDetail product={product} />
       <div className="border-t border-line bg-page-soft">
-        <ProductCarousel title="Productos relacionados" products={related} />
+        <RelatedProducts slug={product.slug} />
       </div>
     </>
   );
