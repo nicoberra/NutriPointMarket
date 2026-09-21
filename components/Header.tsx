@@ -4,12 +4,12 @@ import Link from "next/link";
 import { useState } from "react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
+import { ASSET_PREFIX } from "@/lib/config";
 import { Logo } from "./Logo";
 import { Navbar } from "./Navbar";
 import { MobileMenu } from "./MobileMenu";
 import { SearchBar } from "./SearchBar";
 import {
-  CartIcon,
   HeartIcon,
   MenuIcon,
   SearchIcon,
@@ -91,9 +91,16 @@ export function Header() {
               type="button"
               onClick={openCart}
               aria-label="Abrir carrito"
-              className="relative grid h-10 w-10 place-items-center rounded-lg text-white/90 transition-colors hover:bg-white/10"
+              className="relative grid h-10 w-10 place-items-center rounded-lg transition-colors hover:bg-white/10"
             >
-              <CartIcon className="h-6 w-6" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`${ASSET_PREFIX}/carrito.png`}
+                alt="Carrito"
+                width={36}
+                height={36}
+                className="h-8 w-8 object-contain"
+              />
               {count > 0 && (
                 <span className="absolute -right-0.5 -top-0.5 grid h-4.5 min-w-4.5 place-items-center rounded-full bg-accent px-1 text-[10px] font-bold text-primary">
                   {count}
