@@ -6,6 +6,7 @@ import { useCart } from "@/context/CartContext";
 import { categoryMap } from "@/data/categories";
 import { brandName } from "@/data/brands";
 import { formatPrice } from "@/lib/format";
+import { ASSET_PREFIX } from "@/lib/config";
 import { ProductVisual } from "./ProductVisual";
 import { QuantitySelector } from "./QuantitySelector";
 import { CartIcon, CloseIcon, TrashIcon, TruckIcon, ArrowRightIcon } from "./Icons";
@@ -78,9 +79,14 @@ export function CartDrawer() {
 
         {items.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-            <div className="grid h-20 w-20 place-items-center rounded-full bg-page-soft text-muted">
-              <CartIcon className="h-9 w-9" />
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`${ASSET_PREFIX}/carrito.png`}
+              alt=""
+              width={128}
+              height={128}
+              className="h-28 w-28 object-contain"
+            />
             <div>
               <p className="font-semibold text-ink">Tu carrito está vacío</p>
               <p className="mt-1 text-sm text-muted">

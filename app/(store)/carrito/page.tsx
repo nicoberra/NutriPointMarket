@@ -5,10 +5,11 @@ import { useCart } from "@/context/CartContext";
 import { brandName } from "@/data/brands";
 import { categoryMap } from "@/data/categories";
 import { formatPrice } from "@/lib/format";
+import { ASSET_PREFIX } from "@/lib/config";
 import { PageBanner } from "@/components/PageBanner";
 import { ProductVisual } from "@/components/ProductVisual";
 import { QuantitySelector } from "@/components/QuantitySelector";
-import { TrashIcon, ArrowRightIcon, CartIcon } from "@/components/Icons";
+import { TrashIcon, ArrowRightIcon } from "@/components/Icons";
 
 export default function CarritoPage() {
   const { items, subtotal, setQuantity, removeItem, count } = useCart();
@@ -19,9 +20,14 @@ export default function CarritoPage() {
       <div className="container-page py-10">
         {items.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-line bg-white py-20 text-center">
-            <span className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full bg-page-soft text-muted">
-              <CartIcon className="h-8 w-8" />
-            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`${ASSET_PREFIX}/carrito.png`}
+              alt=""
+              width={128}
+              height={128}
+              className="mx-auto mb-4 h-28 w-28 object-contain"
+            />
             <p className="font-semibold text-ink">Tu carrito está vacío</p>
             <Link href="/productos" className="btn btn-primary btn-md mt-4">
               Ver productos
