@@ -90,19 +90,6 @@ var TABLES = {
     ],
     idField: "id",
   },
-  Cotizaciones: {
-    columns: [
-      ["id", "id"],
-      ["fecha", "Fecha"],
-      ["cliente", "Cliente"],
-      ["telefono", "Teléfono"],
-      ["detalle", "Detalle"],
-      ["monto", "Monto"],
-      ["estado", "Estado"],
-      ["notas", "Notas"],
-    ],
-    idField: "id",
-  },
   Seguimientos: {
     columns: [
       ["id", "id"],

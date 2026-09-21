@@ -15,8 +15,8 @@ Este es el "puente" entre la planilla de Google Sheets (la base de datos) y la t
    - Google va a pedir permisos → **Revisar permisos** → elegí tu cuenta →
      "Configuración avanzada" → "Ir a NutriPointMarket (no seguro)" → **Permitir**.
      (Es tu propio script, es seguro.)
-   - Esto crea las pestañas (Productos, Clientes, Pedidos, Cotizaciones,
-     Seguimientos, Eventos) y carga los 18 productos de ejemplo.
+   - Esto crea las pestañas (Productos, Clientes, Pedidos, Seguimientos,
+     Eventos) y carga los 18 productos de ejemplo.
 6. **Publicar como app web**: botón **Deploy → Nuevo despliegue**.
    - Tipo (⚙️): **Aplicación web**.
    - Ejecutar como: **Yo**.
@@ -36,7 +36,7 @@ Verificá con: `TU_URL/exec?action=version` (debe devolver `{"ok":true,"version"
 Lecturas (desde la web con JSONP, agregando `&callback=nombre`):
 - `?action=version`
 - `?action=productos_list` → lista de productos
-- `?action=list&tab=Clientes` (o Pedidos, Cotizaciones, Seguimientos)
+- `?action=list&tab=Clientes` (o Pedidos, Seguimientos)
 
 Escrituras:
 - `?action=productos_save` + `data=` (JSON del producto)
