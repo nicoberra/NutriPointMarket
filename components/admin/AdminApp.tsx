@@ -128,9 +128,9 @@ export function AdminApp() {
   };
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-lg flex-col">
+    <div className="crm-app mx-auto flex min-h-screen max-w-lg flex-col">
       {/* Top bar */}
-      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-line bg-primary px-4 py-3 text-white">
+      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-line bg-primary px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] text-white">
         <div>
           <p className="text-[10px] uppercase tracking-widest text-white/50">
             NutriPoint · CRM

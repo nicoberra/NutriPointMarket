@@ -178,4 +178,19 @@
   .animation-delay-2000 {
     animation-delay: 2s;
   }
+
+  /* Experiencia tipo app para el CRM en el celular */
+  .crm-app {
+    overscroll-behavior: none; /* sin rebote / pull-to-refresh */
+    -webkit-tap-highlight-color: transparent; /* sin flash gris al tocar */
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation; /* sin delay de 300ms al tocar */
+  }
+  .crm-app input,
+  .crm-app textarea,
+  .crm-app select {
+    -webkit-user-select: text;
+    user-select: text;
+  }
 }
