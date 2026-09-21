@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import { ASSET_PREFIX } from "@/lib/config";
 import { ArrowRightIcon, ShieldIcon, TruckIcon, CardIcon } from "./Icons";
 
 /**
@@ -54,12 +54,10 @@ export function Hero() {
 
         {/* Logo */}
         <div className="relative flex justify-center lg:justify-end">
-          <Image
-            src="/logo.png"
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`${ASSET_PREFIX}/logo.png`}
             alt="NutriPoint Market"
-            width={560}
-            height={498}
-            priority
             className="w-full max-w-sm object-contain lg:max-w-md"
           />
         </div>

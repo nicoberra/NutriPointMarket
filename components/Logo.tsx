@@ -1,6 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
-import { SITE } from "@/lib/config";
+import { SITE, ASSET_PREFIX } from "@/lib/config";
 
 /**
  * Logotipo de NutriPointMarket: personaje (mascota del logo) + tipografía.
@@ -21,12 +20,12 @@ export function Logo({
       className={`group inline-flex items-center gap-2 ${className}`}
       aria-label={`${SITE.name} inicio`}
     >
-      <Image
-        src="/personaje.png"
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={`${ASSET_PREFIX}/personaje.png`}
         alt=""
         width={44}
         height={44}
-        priority
         className="h-9 w-9 shrink-0 object-contain transition-transform group-hover:scale-105 sm:h-10 sm:w-10"
       />
       <span
