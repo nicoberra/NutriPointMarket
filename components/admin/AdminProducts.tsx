@@ -9,10 +9,19 @@ import { categories, categoryMap } from "@/data/categories";
 import { SearchIcon, CloseIcon, CheckIcon, PlusIcon } from "@/components/Icons";
 
 /**
- * CRM · Productos. Agregá y editá productos; se guardan en la planilla y
- * aparecen en la web. Campos: nombre, marca, categoría, precio, precio ML,
- * variantes (sabores), stock y destacado.
+ * CRM · Productos. Cada producto es una tarjeta que se edita EN EL LUGAR:
+ * precio, precio ML (oferta/tachado), stock y destacado se guardan al toque.
+ * El resto (nombre, marca, categoría, variantes) se edita con "Editar".
+ * Se muestran agrupados por categoría.
  */
+
+type Changes = Partial<{
+  precio: number;
+  precioML: number | undefined;
+  stock: boolean;
+  destacado: boolean;
+}>;
+
 export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
   const { products, refresh } = useProducts();
   const [q, setQ] = useState("");
@@ -30,7 +39,25 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
     });
   }, [products, q, cat]);
 
-  const handleSave = async (row: ProductInput) => {
+  // Guardado inline (precio, precioML, stock, destacado). Cruza por nombre y
+  // conserva marca/categoría/variantes del producto.
+  const saveInline = async (p: Product, ch: Changes) => {
+    const row: ProductInput = {
+      nombre: p.name,
+      marca: p.brand,
+      categoria: categoryMap[p.category]?.name ?? "",
+      precio: ch.precio ?? p.price,
+      precioML: "precioML" in ch ? ch.precioML : p.oldPrice,
+      variantes: p.flavors.join(", "),
+      stock: ch.stock ?? p.inStock !== false,
+      destacado: ch.destacado ?? p.featured,
+    };
+    const ok = await saveProduct(row);
+    onToast(ok ? "Guardado ✓" : "Guardado (verificá)");
+    setTimeout(() => refresh().catch(() => {}), 1000);
+  };
+
+  const handleFullSave = async (row: ProductInput) => {
     setSaving(true);
     const ok = await saveProduct(row);
     setSaving(false);
@@ -39,6 +66,14 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
     onToast(ok ? "Producto guardado ✓" : "Guardado (verificá la planilla)");
     setTimeout(() => refresh().catch(() => {}), 1200);
   };
+
+  // Grupos por categoría (solo cuando el filtro es "Todas").
+  const groups =
+    cat === ""
+      ? categories
+          .map((c) => ({ cat: c, list: filtered.filter((p) => p.category === c.slug) }))
+          .filter((g) => g.list.length > 0)
+      : [{ cat: categoryMap[cat as keyof typeof categoryMap], list: filtered }];
 
   return (
     <div className="space-y-4">
@@ -49,7 +84,6 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
         >
           <PlusIcon className="h-5 w-5" /> Agregar producto
         </button>
-
         <div className="relative flex-1">
           <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
           <input
@@ -76,43 +110,29 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
         <div className="rounded-xl border border-dashed border-line bg-white py-12 text-center text-sm text-muted">
           Todavía no hay productos. Tocá “Agregar producto”.
         </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-line bg-white py-12 text-center text-sm text-muted">
+          No hay productos para esa búsqueda.
+        </div>
       ) : (
-        <>
-          <p className="text-xs text-muted">{filtered.length} productos</p>
-          <ul className="space-y-2 sm:grid sm:grid-cols-2 sm:gap-2 sm:space-y-0 xl:grid-cols-3">
-            {filtered.map((p) => (
-              <li key={p.id}>
-                <button
-                  onClick={() => setEditing(p)}
-                  className="flex w-full items-center gap-3 rounded-xl border border-line bg-white p-3 text-left transition-colors active:bg-page-soft"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-bold uppercase text-muted">
-                      {p.brand || "—"} · {categoryMap[p.category]?.name}
-                    </p>
-                    <p className="truncate text-sm font-semibold text-ink">{p.name}</p>
-                    <p className="mt-0.5 text-sm">
-                      <span className="font-bold text-primary">{formatPrice(p.price)}</span>
-                      {p.oldPrice && (
-                        <span className="ml-1.5 text-xs text-muted line-through">
-                          {formatPrice(p.oldPrice)}
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1">
-                    {p.inStock === false ? (
-                      <span className="badge bg-sale/10 text-sale">Sin stock</span>
-                    ) : (
-                      <span className="badge bg-accent-soft text-primary">En stock</span>
-                    )}
-                    {p.featured && <span className="badge bg-amber-100 text-amber-700">★</span>}
-                  </div>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </>
+        groups.map((g) => (
+          <section key={g.cat?.slug ?? "otros"}>
+            <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-primary">
+              {g.cat?.name ?? "Otros"}
+              <span className="text-xs font-normal text-muted">({g.list.length})</span>
+            </h3>
+            <div className="space-y-2 sm:grid sm:grid-cols-2 sm:gap-2 sm:space-y-0 xl:grid-cols-3">
+              {g.list.map((p) => (
+                <ProductRow
+                  key={p.id}
+                  product={p}
+                  onSave={saveInline}
+                  onEdit={() => setEditing(p)}
+                />
+              ))}
+            </div>
+          </section>
+        ))
       )}
 
       {(editing || adding) && (
@@ -123,9 +143,109 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
             setEditing(null);
             setAdding(false);
           }}
-          onSave={handleSave}
+          onSave={handleFullSave}
         />
       )}
+    </div>
+  );
+}
+
+/* ------------------------- Tarjeta editable inline ------------------------ */
+
+function ProductRow({
+  product,
+  onSave,
+  onEdit,
+}: {
+  product: Product;
+  onSave: (p: Product, ch: Changes) => void;
+  onEdit: () => void;
+}) {
+  const [precio, setPrecio] = useState<number>(product.price);
+  const [precioML, setPrecioML] = useState<number | "">(product.oldPrice ?? "");
+  const [stock, setStock] = useState<boolean>(product.inStock !== false);
+  const [destacado, setDestacado] = useState<boolean>(product.featured);
+
+  const desc = discountPercent(precio, precioML ? Number(precioML) : undefined);
+
+  const savePrices = () => {
+    const mlNum = precioML === "" ? undefined : Number(precioML);
+    if (precio === product.price && (product.oldPrice ?? undefined) === mlNum) return;
+    onSave(product, { precio, precioML: mlNum });
+  };
+
+  return (
+    <div className="rounded-xl border border-line bg-white p-4">
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[11px] font-bold uppercase text-muted">
+            {product.brand || "—"}
+          </p>
+          <p className="font-semibold text-ink">{product.name}</p>
+        </div>
+        <button
+          onClick={onEdit}
+          className="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-primary hover:bg-page-soft"
+        >
+          Editar
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold text-ink">Precio</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            value={precio || ""}
+            onChange={(e) => setPrecio(Number(e.target.value))}
+            onBlur={savePrices}
+            className="input h-11 text-base"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold text-ink">
+            Precio ML (oferta)
+          </span>
+          <input
+            type="number"
+            inputMode="numeric"
+            value={precioML}
+            onChange={(e) => setPrecioML(e.target.value ? Number(e.target.value) : "")}
+            onBlur={savePrices}
+            className="input h-11 text-base"
+          />
+        </label>
+      </div>
+
+      <p className="mt-1.5 text-xs text-muted">
+        {desc > 0 ? (
+          <span className="font-semibold text-sale">{desc}% OFF</span>
+        ) : (
+          "Sin oferta"
+        )}
+      </p>
+
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <Toggle
+          label="En stock"
+          checked={stock}
+          color="green"
+          onChange={(v) => {
+            setStock(v);
+            onSave(product, { stock: v });
+          }}
+        />
+        <Toggle
+          label="Destacado"
+          checked={destacado}
+          color="accent"
+          onChange={(v) => {
+            setDestacado(v);
+            onSave(product, { destacado: v });
+          }}
+        />
+      </div>
     </div>
   );
 }
@@ -151,7 +271,7 @@ function Chip({
   );
 }
 
-/** Alta/edición de producto. Si `product` es null, es alta. */
+/** Alta/edición completa de producto (nombre, marca, categoría, variantes). */
 function ProductSheet({
   product,
   saving,
@@ -280,8 +400,8 @@ function ProductSheet({
           </p>
 
           <div className="space-y-2">
-            <Toggle label="Hay stock" checked={stock} onChange={setStock} />
-            <Toggle label="Destacado" checked={destacado} onChange={setDestacado} />
+            <Toggle label="Hay stock" checked={stock} color="green" onChange={setStock} />
+            <Toggle label="Destacado" checked={destacado} color="accent" onChange={setDestacado} />
           </div>
         </div>
 
@@ -319,11 +439,14 @@ function Toggle({
   label,
   checked,
   onChange,
+  color = "accent",
 }: {
   label: string;
   checked: boolean;
   onChange: (v: boolean) => void;
+  color?: "accent" | "green";
 }) {
+  const onBg = color === "green" ? "bg-green-500" : "bg-accent";
   return (
     <button
       type="button"
@@ -332,8 +455,8 @@ function Toggle({
     >
       <span className="text-sm font-medium text-ink">{label}</span>
       <span
-        className={`relative h-6 w-11 rounded-full transition-colors ${
-          checked ? "bg-accent" : "bg-line"
+        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+          checked ? onBg : "bg-line"
         }`}
       >
         <span
