@@ -11,7 +11,7 @@ import { ChartIcon } from "@/components/Icons";
  * (El beneficio/ganancia se agrega en una segunda etapa, con el costo.)
  */
 
-type Sale = { amount: number; date: Date };
+type Sale = { amount: number; cost: number; date: Date };
 
 function parseAmount(v: unknown): number {
   const n = Number(String(v ?? "").replace(/[^\d.-]/g, ""));
@@ -45,8 +45,9 @@ export function AdminBilling() {
         const s: Sale[] = [];
         for (const r of rows) {
           const amount = parseAmount(r.monto);
+          const cost = parseAmount(r.costo);
           const date = parseDate(r.fecha);
-          if (amount > 0 && date) s.push({ amount, date });
+          if (amount > 0 && date) s.push({ amount, cost, date });
         }
         setSales(s);
       })
@@ -60,39 +61,47 @@ export function AdminBilling() {
     const monthKey = now.getFullYear() * 12 + now.getMonth();
     const year = now.getFullYear();
 
-    let wRev = 0, wCnt = 0, mRev = 0, mCnt = 0, yRev = 0, yCnt = 0, totRev = 0, totCnt = 0;
-    const byYear = new Map<number, { rev: number; cnt: number }>();
-    const byMonth = new Map<string, { rev: number; cnt: number; y: number; m: number }>();
-    const byWeek = new Map<number, { rev: number; cnt: number; start: Date }>();
+    let wRev = 0, wCnt = 0, wProf = 0;
+    let mRev = 0, mCnt = 0, mProf = 0;
+    let yRev = 0, yCnt = 0, yProf = 0, yWithCost = 0;
+    let totRev = 0, totCnt = 0;
+    type Agg = { rev: number; cnt: number; prof: number };
+    const byYear = new Map<number, Agg>();
+    const byMonth = new Map<string, Agg & { y: number; m: number }>();
+    const byWeek = new Map<number, Agg & { start: Date }>();
     const weeksWith = new Set<number>();
     const monthsWith = new Set<number>();
 
     for (const s of sales) {
+      const hasCost = s.cost > 0;
+      const prof = hasCost ? s.amount - s.cost : 0;
       totRev += s.amount;
       totCnt++;
       const ws = startOfWeek(s.date);
       const wk = ws.getTime();
       const mk = s.date.getFullYear() * 12 + s.date.getMonth();
-      if (s.date >= weekStart) { wRev += s.amount; wCnt++; }
-      if (mk === monthKey) { mRev += s.amount; mCnt++; }
-      if (s.date.getFullYear() === year) { yRev += s.amount; yCnt++; }
+      if (s.date >= weekStart) { wRev += s.amount; wCnt++; wProf += prof; }
+      if (mk === monthKey) { mRev += s.amount; mCnt++; mProf += prof; }
+      if (s.date.getFullYear() === year) {
+        yRev += s.amount; yCnt++; yProf += prof; if (hasCost) yWithCost++;
+      }
 
-      const yy = byYear.get(s.date.getFullYear()) ?? { rev: 0, cnt: 0 };
-      yy.rev += s.amount; yy.cnt++; byYear.set(s.date.getFullYear(), yy);
+      const yy = byYear.get(s.date.getFullYear()) ?? { rev: 0, cnt: 0, prof: 0 };
+      yy.rev += s.amount; yy.cnt++; yy.prof += prof; byYear.set(s.date.getFullYear(), yy);
       const mKey = `${s.date.getFullYear()}-${s.date.getMonth()}`;
-      const mm = byMonth.get(mKey) ?? { rev: 0, cnt: 0, y: s.date.getFullYear(), m: s.date.getMonth() };
-      mm.rev += s.amount; mm.cnt++; byMonth.set(mKey, mm);
-      const ww = byWeek.get(wk) ?? { rev: 0, cnt: 0, start: ws };
-      ww.rev += s.amount; ww.cnt++; byWeek.set(wk, ww);
+      const mm = byMonth.get(mKey) ?? { rev: 0, cnt: 0, prof: 0, y: s.date.getFullYear(), m: s.date.getMonth() };
+      mm.rev += s.amount; mm.cnt++; mm.prof += prof; byMonth.set(mKey, mm);
+      const ww = byWeek.get(wk) ?? { rev: 0, cnt: 0, prof: 0, start: ws };
+      ww.rev += s.amount; ww.cnt++; ww.prof += prof; byWeek.set(wk, ww);
       weeksWith.add(wk); monthsWith.add(mk);
     }
 
     const nWeeks = Math.max(weeksWith.size, 1);
     const nMonths = Math.max(monthsWith.size, 1);
     return {
-      week: { rev: wRev, cnt: wCnt },
-      month: { rev: mRev, cnt: mCnt },
-      year: { rev: yRev, cnt: yCnt },
+      week: { rev: wRev, cnt: wCnt, prof: wProf },
+      month: { rev: mRev, cnt: mCnt, prof: mProf },
+      year: { rev: yRev, cnt: yCnt, prof: yProf, withCost: yWithCost },
       avgSalesWeek: totCnt / nWeeks,
       avgSalesMonth: totCnt / nMonths,
       avgRevWeek: totRev / nWeeks,
@@ -123,12 +132,31 @@ export function AdminBilling() {
 
   return (
     <div className="space-y-6">
-      {/* Tarjetas resumen */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <BigCard label="Esta semana" rev={stats.week.rev} cnt={stats.week.cnt} />
-        <BigCard label="Este mes" rev={stats.month.rev} cnt={stats.month.cnt} />
-        <BigCard label="Este año" rev={stats.year.rev} cnt={stats.year.cnt} />
-      </div>
+      {/* Facturación */}
+      <section>
+        <h3 className="mb-2 text-sm font-bold text-ink">💰 Facturación</h3>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <BigCard label="Esta semana" rev={stats.week.rev} cnt={stats.week.cnt} />
+          <BigCard label="Este mes" rev={stats.month.rev} cnt={stats.month.cnt} />
+          <BigCard label="Este año" rev={stats.year.rev} cnt={stats.year.cnt} />
+        </div>
+      </section>
+
+      {/* Beneficio */}
+      <section>
+        <h3 className="mb-2 text-sm font-bold text-ink">
+          📈 Beneficio <span className="font-normal text-muted">(venta − costo)</span>
+        </h3>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <ProfitCard label="Esta semana" value={stats.week.prof} sub="venta − costo" />
+          <ProfitCard label="Este mes" value={stats.month.prof} sub="venta − costo" />
+          <ProfitCard
+            label="Este año"
+            value={stats.year.prof}
+            sub={`${stats.year.withCost} de ${stats.year.cnt} con costo`}
+          />
+        </div>
+      </section>
 
       {/* Promedios */}
       <section className="rounded-2xl border border-line bg-white p-5">
@@ -148,6 +176,7 @@ export function AdminBilling() {
           label: String(y.y),
           sub: `${y.cnt} ${y.cnt === 1 ? "venta" : "ventas"}`,
           rev: y.rev,
+          prof: y.prof,
         }))}
       />
 
@@ -158,6 +187,7 @@ export function AdminBilling() {
           label: `${MESES[m.m]} ${m.y}`,
           sub: `${m.cnt} ${m.cnt === 1 ? "venta" : "ventas"}`,
           rev: m.rev,
+          prof: m.prof,
         }))}
       />
 
@@ -171,6 +201,7 @@ export function AdminBilling() {
             label: `${dm(w.start)} – ${dm(end)}`,
             sub: `${w.cnt} ${w.cnt === 1 ? "venta" : "ventas"}`,
             rev: w.rev,
+            prof: w.prof,
           };
         })}
       />
@@ -191,6 +222,21 @@ function BigCard({ label, rev, cnt }: { label: string; rev: number; cnt: number 
   );
 }
 
+function ProfitCard({ label, value, sub }: { label: string; value: number; sub: string }) {
+  return (
+    <div className="flex items-start justify-between rounded-2xl border border-green-200 bg-green-50 p-5">
+      <div>
+        <p className="font-display text-2xl font-black text-green-600">
+          {formatPrice(value)}
+        </p>
+        <p className="mt-1 text-sm font-semibold text-ink">{label}</p>
+        <p className="text-xs text-muted">{sub}</p>
+      </div>
+      <span className="shrink-0 text-green-600">↗</span>
+    </div>
+  );
+}
+
 function Avg({ big, small }: { big: string; small: string }) {
   return (
     <div>
@@ -205,13 +251,15 @@ function Breakdown({
   rows,
 }: {
   title: string;
-  rows: { label: string; sub: string; rev: number }[];
+  rows: { label: string; sub: string; rev: number; prof: number }[];
 }) {
   if (rows.length === 0) return null;
   return (
     <section className="overflow-hidden rounded-2xl border border-line bg-white">
       <div className="border-b border-line px-5 py-3">
-        <h3 className="text-sm font-bold text-ink">{title}</h3>
+        <h3 className="text-sm font-bold text-ink">
+          {title} <span className="font-normal text-muted">facturación · beneficio</span>
+        </h3>
       </div>
       <ul className="divide-y divide-line">
         {rows.map((r, i) => (
@@ -220,7 +268,14 @@ function Breakdown({
               <p className="text-sm font-semibold capitalize text-ink">{r.label}</p>
               <p className="text-xs text-muted">{r.sub}</p>
             </div>
-            <p className="font-bold text-primary">{formatPrice(r.rev)}</p>
+            <div className="text-right">
+              <p className="font-bold text-primary">{formatPrice(r.rev)}</p>
+              {r.prof > 0 && (
+                <p className="text-sm font-semibold text-green-600">
+                  ↗ {formatPrice(r.prof)}
+                </p>
+              )}
+            </div>
           </li>
         ))}
       </ul>

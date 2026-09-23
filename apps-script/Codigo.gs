@@ -68,6 +68,7 @@ var TABLES = {
       ["envio", "Envío"],
       ["envioCobrado", "Envío cobrado"],
       ["montoEnvio", "Monto envío"],
+      ["costo", "Costo"],
     ],
     idField: "id",
   },
