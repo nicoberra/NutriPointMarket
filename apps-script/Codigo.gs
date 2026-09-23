@@ -38,6 +38,14 @@ var TABLES = {
     ],
     idField: "nombre",
   },
+  Categorias: {
+    // Categorías de la tienda, editables desde el CRM. La clave es "nombre".
+    columns: [
+      ["nombre", "Nombre"],
+      ["orden", "Orden"],
+    ],
+    idField: "nombre",
+  },
   Clientes: {
     columns: [
       ["id", "id"],
@@ -142,6 +150,9 @@ function handle(e) {
         break;
       case "delete":
         out = { ok: true, data: deleteRow(p.tab, p.id) };
+        break;
+      case "categoria_rename":
+        out = { ok: true, data: categoriaRename(p.from, p.to) };
         break;
       case "registrar":
         out = registrar(parseData(p));
@@ -346,6 +357,41 @@ function saveProducto(obj) {
   return addRow("Productos", obj);
 }
 
+/* ------------------------------ Categorías ------------------------------- */
+
+// Renombra una categoría y arrastra el cambio a todos los productos de esa
+// categoría (para que no queden "huérfanos").
+function categoriaRename(from, to) {
+  if (!from || !to) throw new Error("Faltan datos");
+  var n = findRowById("Categorias", from);
+  if (n > 0) updateRowByNumber("Categorias", n, { nombre: to });
+  var sh = sheetFor("Productos");
+  var keys = keysOf("Productos");
+  var iCat = keys.indexOf("categoria");
+  if (iCat >= 0) {
+    var data = sh.getDataRange().getValues();
+    for (var r = 1; r < data.length; r++) {
+      if (low(data[r][iCat]) === low(from)) sh.getRange(r + 1, iCat + 1).setValue(to);
+    }
+  }
+  return { from: from, to: to };
+}
+
+// Categorías por defecto (se cargan en la planilla la primera vez).
+var CATEGORIAS_DEFAULT = [
+  "Proteínas", "Creatinas", "Pre entreno", "Aminoácidos", "Vitaminas",
+  "Minerales", "Colágeno", "Barras y snacks", "Combos",
+];
+
+function seedCategorias() {
+  var sh = ss().getSheetByName("Categorias");
+  if (!sh) return;
+  if (sh.getLastRow() > 1) return; // ya tiene datos
+  for (var i = 0; i < CATEGORIAS_DEFAULT.length; i++) {
+    sh.appendRow([CATEGORIAS_DEFAULT[i], i + 1]);
+  }
+}
+
 /* --------------------------- Cuentas de clientes -------------------------- */
 
 function registrar(obj) {
@@ -433,6 +479,7 @@ function setup() {
     }
     writeHeader(sh, tab);
   });
+  seedCategorias();
   SpreadsheetApp.getActive().toast("Listo: pestañas creadas.", "NutriPointMarket", 5);
 }
 
