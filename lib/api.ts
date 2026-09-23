@@ -115,7 +115,9 @@ export function buildProduct(row: Record<string, unknown>): Product {
   const precio = toNum(row.precio);
   const precioML = toNum(row.precioML);
   const oldPrice = precioML > precio ? precioML : undefined;
-  const category = normalizeCategory(String(row.categoria ?? ""));
+  // El slug se genera del nombre de la categoría (categorías dinámicas).
+  const categoriaTxt = String(row.categoria ?? "").trim();
+  const category = categoriaTxt ? slugify(categoriaTxt) : "proteinas";
   return {
     id: slugify(nombre),
     slug: slugify(nombre),
@@ -271,4 +273,41 @@ export async function updateRow(
 ): Promise<boolean> {
   const r = await api("update", { tab, id, data: JSON.stringify(obj) });
   return r.ok !== false;
+}
+
+/** Borra una fila por id. */
+export async function deleteRow(tab: string, id: string): Promise<boolean> {
+  const r = await api("delete", { tab, id });
+  return r.ok !== false;
+}
+
+/* ----------------------------- Categorías -------------------------------- */
+
+export interface CategoryRow {
+  nombre: string;
+  orden?: number | string;
+}
+
+/** Lista las categorías desde la planilla, ordenadas. */
+export async function fetchCategories(): Promise<CategoryRow[]> {
+  const rows = await listTable<CategoryRow>("Categorias");
+  return rows
+    .filter((r) => String(r.nombre ?? "").trim())
+    .sort((a, b) => Number(a.orden ?? 0) - Number(b.orden ?? 0));
+}
+
+/** Agrega una categoría nueva. */
+export async function addCategory(nombre: string, orden: number): Promise<boolean> {
+  return addRow("Categorias", { nombre: nombre.trim(), orden });
+}
+
+/** Renombra una categoría (arrastra el cambio a los productos). */
+export async function renameCategory(from: string, to: string): Promise<boolean> {
+  const r = await api("categoria_rename", { from, to: to.trim() });
+  return r.ok !== false;
+}
+
+/** Borra una categoría. */
+export async function deleteCategory(nombre: string): Promise<boolean> {
+  return deleteRow("Categorias", nombre);
 }

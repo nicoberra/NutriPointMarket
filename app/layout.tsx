@@ -5,6 +5,7 @@ import { SITE } from "@/lib/config";
 import { CartProvider } from "@/context/CartContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { ProductsProvider } from "@/context/ProductsContext";
+import { CategoriesProvider } from "@/context/CategoriesContext";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -59,9 +60,11 @@ export default function RootLayout({
     <html lang="es-AR" className={`${inter.variable} ${sora.variable}`}>
       <body>
         <AuthProvider>
-          <ProductsProvider>
-            <CartProvider>{children}</CartProvider>
-          </ProductsProvider>
+          <CategoriesProvider>
+            <ProductsProvider>
+              <CartProvider>{children}</CartProvider>
+            </ProductsProvider>
+          </CategoriesProvider>
         </AuthProvider>
       </body>
     </html>

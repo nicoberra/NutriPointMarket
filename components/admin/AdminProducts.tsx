@@ -3,10 +3,12 @@
 import { useMemo, useState } from "react";
 import type { Product } from "@/lib/types";
 import { useProducts } from "@/context/ProductsContext";
+import { useCategories } from "@/context/CategoriesContext";
 import { saveProduct, type ProductInput } from "@/lib/api";
 import { formatPrice, discountPercent } from "@/lib/format";
-import { categories, categoryMap } from "@/data/categories";
+import { categoryMap } from "@/data/categories";
 import { SearchIcon, CloseIcon, CheckIcon, PlusIcon } from "@/components/Icons";
+import { AdminCategories } from "./AdminCategories";
 
 /**
  * CRM · Productos. Cada producto es una tarjeta que se edita EN EL LUGAR:
@@ -24,11 +26,13 @@ type Changes = Partial<{
 
 export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
   const { products, refresh } = useProducts();
+  const { categories } = useCategories();
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<string>("");
   const [editing, setEditing] = useState<Product | null>(null);
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showCats, setShowCats] = useState(false);
 
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -73,17 +77,25 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
       ? categories
           .map((c) => ({ cat: c, list: filtered.filter((p) => p.category === c.slug) }))
           .filter((g) => g.list.length > 0)
-      : [{ cat: categoryMap[cat as keyof typeof categoryMap], list: filtered }];
+      : [{ cat: categoryMap[cat], list: filtered }];
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row-reverse sm:items-center">
-        <button
-          onClick={() => setAdding(true)}
-          className="btn btn-primary btn-md w-full sm:w-auto sm:shrink-0"
-        >
-          <PlusIcon className="h-5 w-5" /> Agregar producto
-        </button>
+        <div className="flex gap-2 sm:shrink-0">
+          <button
+            onClick={() => setShowCats(true)}
+            className="btn btn-outline btn-md flex-1 sm:flex-none"
+          >
+            Categorías
+          </button>
+          <button
+            onClick={() => setAdding(true)}
+            className="btn btn-primary btn-md flex-1 sm:flex-none"
+          >
+            <PlusIcon className="h-5 w-5" /> Agregar
+          </button>
+        </div>
         <div className="relative flex-1">
           <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
           <input
@@ -144,6 +156,14 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
             setAdding(false);
           }}
           onSave={handleFullSave}
+        />
+      )}
+
+      {showCats && (
+        <AdminCategories
+          onClose={() => setShowCats(false)}
+          onToast={onToast}
+          onChanged={() => refresh().catch(() => {})}
         />
       )}
     </div>
@@ -283,11 +303,14 @@ function ProductSheet({
   onClose: () => void;
   onSave: (row: ProductInput) => void;
 }) {
+  const { categories } = useCategories();
   const isEdit = !!product;
   const [nombre, setNombre] = useState(product?.name ?? "");
   const [marca, setMarca] = useState(product?.brand ?? "");
   const [categoria, setCategoria] = useState<string>(
-    product ? categoryMap[product.category]?.name ?? "Proteínas" : "Proteínas",
+    product
+      ? categoryMap[product.category]?.name ?? categories[0]?.name ?? ""
+      : categories[0]?.name ?? "",
   );
   const [precio, setPrecio] = useState<number>(product?.price ?? 0);
   const [precioML, setPrecioML] = useState<number | "">(product?.oldPrice ?? "");

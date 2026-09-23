@@ -1,13 +1,9 @@
-export type CategorySlug =
-  | "proteinas"
-  | "creatinas"
-  | "pre-entreno"
-  | "aminoacidos"
-  | "vitaminas"
-  | "minerales"
-  | "colageno"
-  | "barras-snacks"
-  | "combos";
+/**
+ * Slug de categoría. Antes era un enum fijo; ahora las categorías se cargan
+ * desde la planilla (editables desde el CRM), así que es un string libre
+ * (se genera con slugify del nombre).
+ */
+export type CategorySlug = string;
 
 export interface Category {
   slug: CategorySlug;

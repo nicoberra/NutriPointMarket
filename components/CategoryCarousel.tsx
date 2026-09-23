@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { categories } from "@/data/categories";
+import { useCategories } from "@/context/CategoriesContext";
 import { ProductVisual } from "./ProductVisual";
 
 /**
@@ -22,6 +22,7 @@ const SPEED = 0.6; // px por frame
 const CARD_W = 160; // ancho de cada tarjeta (coincide con la clase w-40)
 
 export function CategoryCarousel() {
+  const { categories } = useCategories();
   const wrapRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const prevRef = useRef<HTMLButtonElement>(null);
