@@ -134,5 +134,4 @@ export const FOOTER_LEGAL = [
   { label: "Términos y condiciones", href: "#" },
   { label: "Política de privacidad", href: "#" },
   { label: "Defensa de las y los consumidores", href: "#" },
-  { label: "Botón de arrepentimiento", href: "#" },
 ];

@@ -127,14 +127,8 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Botón de arrepentimiento + Defensa del consumidor (placeholders AR) */}
-          <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-            <Link
-              href="#"
-              className="inline-flex items-center gap-2 rounded-lg border border-white/20 px-4 py-2 text-xs font-semibold text-white/80 hover:border-accent hover:text-accent"
-            >
-              Botón de arrepentimiento
-            </Link>
+          {/* Defensa del consumidor (placeholder AR) */}
+          <div className="mt-6 flex justify-center">
             <span className="text-xs text-white/40">
               Defensa de las y los consumidores. Para reclamos ingresá acá.
             </span>
