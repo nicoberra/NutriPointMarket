@@ -11,26 +11,27 @@ import {
   PackageIcon,
   UserIcon,
   ClipboardIcon,
-  BellIcon,
   LogoutIcon,
   CheckIcon,
 } from "@/components/Icons";
 
 const AUTH_KEY = "npm-crm-auth-v1";
 
-type Section = "dashboard" | "productos" | "clientes" | "pedidos" | "seguimientos";
+type Section = "dashboard" | "productos" | "clientes" | "pedidos";
 
 const NAV: { id: Section; label: string; Icon: typeof GridIcon }[] = [
   { id: "dashboard", label: "Inicio", Icon: GridIcon },
   { id: "productos", label: "Productos", Icon: PackageIcon },
   { id: "clientes", label: "Clientes", Icon: UserIcon },
   { id: "pedidos", label: "Pedidos", Icon: ClipboardIcon },
-  { id: "seguimientos", label: "Recompra", Icon: BellIcon },
 ];
 
 const CLIENTES_CFG: RecordsConfig = {
   tab: "Clientes",
-  addLabel: "Agregar cliente",
+  addLabel: "Nuevo usuario",
+  segments: { mineLabel: "Mis usuarios", webLabel: "Usuarios web" },
+  searchable: true,
+  searchPlaceholder: "Buscar por nombre, email…",
   fields: [
     { key: "nombre", label: "Nombre", required: true },
     { key: "telefono", label: "Teléfono", type: "tel" },
@@ -58,22 +59,6 @@ const PEDIDOS_CFG: RecordsConfig = {
   primary: (r) => r.cliente,
   secondary: (r) =>
     [r.detalle, r.monto ? `$${r.monto}` : ""].filter(Boolean).join(" · "),
-  estado: true,
-};
-
-const SEGUIMIENTOS_CFG: RecordsConfig = {
-  tab: "Seguimientos",
-  addLabel: "Agregar recompra",
-  fields: [
-    { key: "cliente", label: "Cliente", required: true },
-    { key: "telefono", label: "Teléfono", type: "tel" },
-    { key: "motivo", label: "Motivo (ej: se le termina el bote)" },
-    { key: "fechaObjetivo", label: "Fecha objetivo", type: "date" },
-    { key: "notas", label: "Notas", type: "textarea" },
-  ],
-  primary: (r) => r.cliente,
-  secondary: (r) =>
-    [r.motivo, r.fechaObjetivo ? `→ ${r.fechaObjetivo}` : ""].filter(Boolean).join(" · "),
   estado: true,
 };
 
@@ -124,7 +109,6 @@ export function AdminApp() {
     productos: "Productos",
     clientes: "Clientes",
     pedidos: "Pedidos",
-    seguimientos: "Recompra",
   };
 
   return (
@@ -195,9 +179,6 @@ export function AdminApp() {
           )}
           {section === "pedidos" && (
             <AdminRecords config={PEDIDOS_CFG} onToast={setToast} />
-          )}
-          {section === "seguimientos" && (
-            <AdminRecords config={SEGUIMIENTOS_CFG} onToast={setToast} />
           )}
         </main>
       </div>

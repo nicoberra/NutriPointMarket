@@ -8,25 +8,18 @@ import {
   PackageIcon,
   UserIcon,
   ClipboardIcon,
-  BellIcon,
   ChevronRightIcon,
 } from "@/components/Icons";
 
-type Section = "productos" | "clientes" | "pedidos" | "seguimientos";
+type Section = "productos" | "clientes" | "pedidos";
 
 export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
   const { products } = useProducts();
-  const [counts, setCounts] = useState({ clientes: 0, pedidos: 0, seguimientos: 0 });
+  const [counts, setCounts] = useState({ clientes: 0, pedidos: 0 });
 
   useEffect(() => {
-    Promise.all([
-      listTable("Clientes"),
-      listTable("Pedidos"),
-      listTable("Seguimientos"),
-    ])
-      .then(([c, p, s]) =>
-        setCounts({ clientes: c.length, pedidos: p.length, seguimientos: s.length }),
-      )
+    Promise.all([listTable("Clientes"), listTable("Pedidos")])
+      .then(([c, p]) => setCounts({ clientes: c.length, pedidos: p.length }))
       .catch(() => {});
   }, []);
 
@@ -36,12 +29,11 @@ export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
     { id: "productos" as const, label: "Productos", value: products.length, Icon: PackageIcon },
     { id: "clientes" as const, label: "Clientes", value: counts.clientes, Icon: UserIcon },
     { id: "pedidos" as const, label: "Pedidos", value: counts.pedidos, Icon: ClipboardIcon },
-    { id: "seguimientos" as const, label: "Recompra", value: counts.seguimientos, Icon: BellIcon },
   ];
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {cards.map(({ id, label, value, Icon }) => (
           <button
             key={id}

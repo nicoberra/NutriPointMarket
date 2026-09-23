@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { listTable, addRow, updateRow } from "@/lib/api";
 import { whatsappLink } from "@/lib/config";
-import { CloseIcon, PlusIcon, WhatsappIcon, CheckIcon } from "@/components/Icons";
+import { CloseIcon, PlusIcon, WhatsappIcon, CheckIcon, SearchIcon } from "@/components/Icons";
 
 export interface FieldDef {
   key: string;
@@ -22,6 +22,18 @@ export interface RecordsConfig {
   secondary: (r: Record<string, string>) => string;
   /** Muestra estado Pendiente/Entregado con toggle (para Pedidos) */
   estado?: boolean;
+  /** Etiqueta opcional (ej: "Web" para clientes registrados desde la tienda) */
+  tag?: (r: Record<string, string>) => string | undefined;
+  /** Divide en dos solapas por origen web (para Clientes) */
+  segments?: { mineLabel: string; webLabel: string };
+  /** Muestra buscador */
+  searchable?: boolean;
+  searchPlaceholder?: string;
+}
+
+/** ¿La fila vino de un registro de la web? (origen === "web") */
+function isWebRow(r: Record<string, string>): boolean {
+  return String(r.origen ?? "").trim().toLowerCase() === "web";
 }
 
 type Row = Record<string, string>;
@@ -37,6 +49,8 @@ export function AdminRecords({
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [seg, setSeg] = useState<"mine" | "web">("mine");
+  const [q, setQ] = useState("");
 
   const load = () => {
     setLoading(true);
@@ -69,31 +83,98 @@ export function AdminRecords({
     await updateRow(config.tab, row.id, { estado: nuevo });
   };
 
+  // Solapas por origen (Mis usuarios / Usuarios web)
+  const mineRows = config.segments ? rows.filter((r) => !isWebRow(r)) : rows;
+  const webRows = config.segments ? rows.filter(isWebRow) : [];
+  const base = config.segments ? (seg === "web" ? webRows : mineRows) : rows;
+
+  // Buscador
+  const query = q.trim().toLowerCase();
+  const visible =
+    config.searchable && query
+      ? base.filter((r) =>
+          `${config.primary(r)} ${config.secondary(r)}`.toLowerCase().includes(query),
+        )
+      : base;
+
   return (
     <div className="space-y-3">
-      <button
-        onClick={() => setAdding(true)}
-        className="btn btn-primary btn-md w-full sm:w-auto"
-      >
-        <PlusIcon className="h-5 w-5" /> {config.addLabel}
-      </button>
+      {config.segments && (
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => setSeg("mine")}
+            className={`rounded-xl border px-3 py-2.5 text-sm font-bold transition-colors ${
+              seg === "mine"
+                ? "border-primary bg-primary text-white"
+                : "border-line bg-white text-muted"
+            }`}
+          >
+            {config.segments.mineLabel}{" "}
+            <span className={seg === "mine" ? "text-white/70" : "text-muted"}>
+              ({mineRows.length})
+            </span>
+          </button>
+          <button
+            onClick={() => setSeg("web")}
+            className={`rounded-xl border px-3 py-2.5 text-sm font-bold transition-colors ${
+              seg === "web"
+                ? "border-primary bg-primary text-white"
+                : "border-line bg-white text-muted"
+            }`}
+          >
+            {config.segments.webLabel}{" "}
+            <span className={seg === "web" ? "text-white/70" : "text-muted"}>
+              ({webRows.length})
+            </span>
+          </button>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-2 sm:flex-row-reverse sm:items-center">
+        <button
+          onClick={() => setAdding(true)}
+          className="btn btn-primary btn-md w-full sm:w-auto sm:shrink-0"
+        >
+          <PlusIcon className="h-5 w-5" /> {config.addLabel}
+        </button>
+        {config.searchable && (
+          <div className="relative flex-1">
+            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={config.searchPlaceholder ?? "Buscar…"}
+              className="input h-11 pl-9 text-base"
+            />
+          </div>
+        )}
+      </div>
 
       {loading ? (
         <p className="py-10 text-center text-sm text-muted">Cargando…</p>
-      ) : rows.length === 0 ? (
+      ) : visible.length === 0 ? (
         <div className="rounded-xl border border-dashed border-line bg-white py-12 text-center text-sm text-muted">
-          Todavía no hay registros.
+          {query
+            ? "No hay resultados para la búsqueda."
+            : config.segments && seg === "web"
+              ? "Todavía nadie se registró desde la web."
+              : "Todavía no hay registros."}
         </div>
       ) : (
         <ul className="space-y-2 sm:grid sm:grid-cols-2 sm:gap-2 sm:space-y-0 xl:grid-cols-3">
-          {rows.map((r, i) => (
+          {visible.map((r, i) => (
             <li
               key={r.id || i}
               className="flex items-center gap-3 rounded-xl border border-line bg-white p-3"
             >
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-ink">
-                  {config.primary(r) || "—"}
+                <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+                  <span className="truncate">{config.primary(r) || "—"}</span>
+                  {config.tag?.(r) && (
+                    <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-bold uppercase text-primary">
+                      {config.tag(r)}
+                    </span>
+                  )}
                 </p>
                 <p className="truncate text-xs text-muted">{config.secondary(r)}</p>
                 {config.estado && (
