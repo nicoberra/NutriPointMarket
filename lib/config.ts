@@ -20,7 +20,7 @@ export const SITE = {
   description:
     "Proteínas, creatinas, vitaminas, aminoácidos y suplementos deportivos. NutriPointMarket.",
   email: "hola@nutripointmarket.com", // placeholder
-  phone: "+54 9 11 0000-0000", // placeholder
+  phone: "+54 9 11 5164-0472",
   address: "Av. Siempre Activa 1234, Buenos Aires, Argentina", // placeholder
   instagram: "https://instagram.com/nutripointmarket", // placeholder
 };
@@ -33,8 +33,8 @@ export const SITE = {
 export const SHEETS_API_URL =
   "https://script.google.com/macros/s/AKfycbyYjIkAmdpAE7PS6Oa4AvKlfcE8EU09ePkIq1dS-TuCAykVy2GIy_sFQAzeuS1hkjMBSA/exec";
 
-/** Reemplazar por el número real (formato internacional sin +, ej: 5491100000000) */
-export const WHATSAPP_NUMBER = "5491100000000";
+/** Número real de WhatsApp (formato internacional sin +) */
+export const WHATSAPP_NUMBER = "5491151640472";
 export const WHATSAPP_MESSAGE = "Hola NutriPointMarket, quería consultar por…";
 
 export function whatsappLink(message: string = WHATSAPP_MESSAGE): string {
