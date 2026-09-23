@@ -3,13 +3,13 @@ import type { Metadata, Viewport } from "next";
 export const metadata: Metadata = {
   title: "CRM",
   robots: { index: false, follow: false }, // panel privado: no indexar
-  manifest: "/manifest.webmanifest",
+  manifest: "/NutriPointMarket/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "NutriPoint CRM",
   },
-  icons: { apple: "/icon.svg" },
+  icons: { apple: "/NutriPointMarket/icon.svg" },
 };
 
 export const viewport: Viewport = {
