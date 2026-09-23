@@ -7,11 +7,10 @@
 
 /**
  * Prefijo para assets estáticos (imágenes del logo, etc.).
- * En producción (GitHub Pages) el sitio vive bajo /NutriPointMarket; en dev, en la raíz.
- * Debe coincidir con `basePath` de next.config.mjs.
+ * Con dominio propio el sitio vive en la raíz "/", así que no lleva prefijo.
+ * Debe coincidir con `basePath` de next.config.mjs (hoy vacío).
  */
-export const ASSET_PREFIX =
-  process.env.NODE_ENV === "production" ? "/NutriPointMarket" : "";
+export const ASSET_PREFIX = "";
 
 export const SITE = {
   name: "NutriPointMarket",
