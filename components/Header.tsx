@@ -9,19 +9,12 @@ import { Logo } from "./Logo";
 import { Navbar } from "./Navbar";
 import { MobileMenu } from "./MobileMenu";
 import { SearchBar } from "./SearchBar";
-import {
-  HeartIcon,
-  MenuIcon,
-  SearchIcon,
-  UserIcon,
-  CloseIcon,
-} from "./Icons";
+import { HeartIcon, MenuIcon, UserIcon } from "./Icons";
 
 export function Header() {
   const { count, openCart, favorites } = useCart();
   const { user } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
 
   return (
     <header className="sticky top-0 z-50 bg-primary text-white shadow-md">
@@ -38,24 +31,18 @@ export function Header() {
             <MenuIcon className="h-6 w-6" />
           </button>
 
-          <Logo variant="dark" className="shrink-0" />
+          <Logo
+            variant="dark"
+            className="shrink-0"
+            wordmarkClassName="hidden lg:inline"
+          />
 
-          {/* Buscador (desktop) */}
-          <div className="mx-4 hidden max-w-2xl flex-1 md:block">
+          {/* Buscador (siempre visible, en el medio) */}
+          <div className="mx-1 flex max-w-2xl flex-1 sm:mx-4">
             <SearchBar />
           </div>
 
-          <div className="ml-auto flex items-center gap-1 sm:gap-2">
-            {/* Buscar (mobile toggle) */}
-            <button
-              type="button"
-              onClick={() => setSearchOpen((s) => !s)}
-              aria-label="Buscar"
-              className="grid h-10 w-10 place-items-center rounded-lg text-white/90 hover:bg-white/10 md:hidden"
-            >
-              {searchOpen ? <CloseIcon className="h-6 w-6" /> : <SearchIcon className="h-6 w-6" />}
-            </button>
-
+          <div className="flex items-center gap-1 sm:gap-2">
             {/* Mi cuenta */}
             <Link
               href="/cuenta"
@@ -109,13 +96,6 @@ export function Header() {
             </button>
           </div>
         </div>
-
-        {/* Buscador desplegable (mobile) */}
-        {searchOpen && (
-          <div className="pb-3 md:hidden">
-            <SearchBar autoFocus onNavigate={() => setSearchOpen(false)} />
-          </div>
-        )}
 
         {/* Fila de navegación (desktop) */}
         <div className="hidden border-t border-white/10 lg:block">

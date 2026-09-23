@@ -8,9 +8,12 @@ import { SITE, ASSET_PREFIX } from "@/lib/config";
 export function Logo({
   variant = "dark",
   className = "",
+  wordmarkClassName = "",
 }: {
   variant?: "dark" | "light";
   className?: string;
+  /** Clases extra para el texto del logo (ej. ocultarlo en mobile) */
+  wordmarkClassName?: string;
 }) {
   const baseColor = variant === "dark" ? "text-white" : "text-primary";
 
@@ -29,7 +32,7 @@ export function Logo({
         className="h-9 w-9 shrink-0 object-contain transition-transform group-hover:scale-105 sm:h-10 sm:w-10"
       />
       <span
-        className={`font-display text-lg font-extrabold leading-none tracking-tight sm:text-xl ${baseColor}`}
+        className={`font-display text-lg font-extrabold leading-none tracking-tight sm:text-xl ${baseColor} ${wordmarkClassName}`}
       >
         Nutri<span className="text-accent">Point</span>
         <span className={variant === "dark" ? "text-white/85" : "text-muted"}>
