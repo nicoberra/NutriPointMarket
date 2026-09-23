@@ -58,7 +58,7 @@ export function Hero() {
           <img
             src={`${ASSET_PREFIX}/logo.png`}
             alt="NutriPoint Market"
-            className="w-full max-w-sm object-contain lg:max-w-md"
+            className="w-full max-w-sm cursor-pointer object-contain transition-transform duration-300 ease-out hover:scale-105 lg:max-w-md"
           />
         </div>
       </div>
