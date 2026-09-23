@@ -9,12 +9,12 @@ import { Newsletter } from "@/components/Newsletter";
 export default function HomePage() {
   return (
     <>
+      <CategoryCarousel />
+
       <Hero />
       <TrustStrip />
 
       <HomeCarousel kind="onSale" />
-
-      <CategoryCarousel />
 
       <PromoBannerRow />
 
