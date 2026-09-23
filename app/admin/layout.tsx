@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "NutriPoint CRM",
   },
-  icons: { apple: "/icon.svg" },
+  icons: { apple: "/apple-icon.png" },
 };
 
 export const viewport: Viewport = {
