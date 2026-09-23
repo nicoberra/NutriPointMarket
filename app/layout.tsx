@@ -21,6 +21,8 @@ const sora = Sora({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://nutripointmarket.com.ar"),
+  alternates: { canonical: "/" },
   title: {
     default: `${SITE.name} | Suplementos deportivos`,
     template: `%s | ${SITE.name}`,
@@ -59,6 +61,22 @@ export default function RootLayout({
   return (
     <html lang="es-AR" className={`${inter.variable} ${sora.variable}`}>
       <body>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Store",
+              name: SITE.name,
+              description: SITE.description,
+              url: "https://nutripointmarket.com.ar",
+              image: "https://nutripointmarket.com.ar/logo.png",
+              telephone: "+5491151640472",
+              areaServed: "AR",
+              sameAs: [SITE.instagram],
+            }),
+          }}
+        />
         <AuthProvider>
           <CategoriesProvider>
             <ProductsProvider>
