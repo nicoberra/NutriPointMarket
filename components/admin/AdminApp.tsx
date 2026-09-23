@@ -128,44 +128,82 @@ export function AdminApp() {
   };
 
   return (
-    <div className="crm-app mx-auto flex min-h-screen max-w-lg flex-col">
-      {/* Top bar */}
-      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-line bg-primary px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] text-white">
-        <div>
+    <div className="crm-app min-h-screen bg-page-soft lg:flex lg:select-auto">
+      {/* Sidebar (solo desktop) */}
+      <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:w-60 lg:flex-col lg:border-r lg:border-white/10 lg:bg-primary lg:text-white">
+        <div className="px-5 py-6">
           <p className="text-[10px] uppercase tracking-widest text-white/50">
-            NutriPoint · CRM
+            NutriPoint
           </p>
-          <h1 className="font-display text-lg font-bold leading-tight">
-            {titles[section]}
-          </h1>
+          <p className="font-display text-2xl font-black leading-none">CRM</p>
         </div>
+        <nav className="flex-1 space-y-1 px-3">
+          {NAV.map(({ id, label, Icon }) => {
+            const active = section === id;
+            return (
+              <button
+                key={id}
+                onClick={() => setSection(id)}
+                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${
+                  active
+                    ? "bg-white/15 text-white"
+                    : "text-white/70 hover:bg-white/10"
+                }`}
+              >
+                <Icon className="h-5 w-5" />
+                {label}
+              </button>
+            );
+          })}
+        </nav>
         <button
           onClick={logout}
-          className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/10"
+          className="m-3 flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold text-white/70 transition-colors hover:bg-white/10"
         >
-          <LogoutIcon className="h-4.5 w-4.5" /> Salir
+          <LogoutIcon className="h-5 w-5" /> Salir
         </button>
-      </header>
+      </aside>
 
-      {/* Contenido */}
-      <main className="flex-1 p-4 pb-24">
-        {section === "dashboard" && (
-          <AdminDashboard onGo={(s) => setSection(s)} />
-        )}
-        {section === "productos" && <AdminProducts onToast={setToast} />}
-        {section === "clientes" && (
-          <AdminRecords config={CLIENTES_CFG} onToast={setToast} />
-        )}
-        {section === "pedidos" && (
-          <AdminRecords config={PEDIDOS_CFG} onToast={setToast} />
-        )}
-        {section === "seguimientos" && (
-          <AdminRecords config={SEGUIMIENTOS_CFG} onToast={setToast} />
-        )}
-      </main>
+      {/* Columna principal */}
+      <div className="flex min-h-screen flex-1 flex-col lg:pl-60">
+        {/* Top bar */}
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-primary px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] text-white lg:bg-white lg:px-8 lg:py-5">
+          <div>
+            <p className="text-[10px] uppercase tracking-widest text-white/50 lg:hidden">
+              NutriPoint · CRM
+            </p>
+            <h1 className="font-display text-lg font-bold leading-tight lg:text-2xl lg:text-primary">
+              {titles[section]}
+            </h1>
+          </div>
+          <button
+            onClick={logout}
+            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/10 lg:hidden"
+          >
+            <LogoutIcon className="h-4.5 w-4.5" /> Salir
+          </button>
+        </header>
 
-      {/* Bottom nav */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto flex max-w-lg items-stretch justify-around border-t border-line bg-white pb-[env(safe-area-inset-bottom)]">
+        {/* Contenido */}
+        <main className="mx-auto w-full max-w-5xl flex-1 p-4 pb-24 lg:p-8 lg:pb-10">
+          {section === "dashboard" && (
+            <AdminDashboard onGo={(s) => setSection(s)} />
+          )}
+          {section === "productos" && <AdminProducts onToast={setToast} />}
+          {section === "clientes" && (
+            <AdminRecords config={CLIENTES_CFG} onToast={setToast} />
+          )}
+          {section === "pedidos" && (
+            <AdminRecords config={PEDIDOS_CFG} onToast={setToast} />
+          )}
+          {section === "seguimientos" && (
+            <AdminRecords config={SEGUIMIENTOS_CFG} onToast={setToast} />
+          )}
+        </main>
+      </div>
+
+      {/* Bottom nav (solo mobile) */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto flex max-w-lg items-stretch justify-around border-t border-line bg-white pb-[env(safe-area-inset-bottom)] lg:hidden">
         {NAV.map(({ id, label, Icon }) => {
           const active = section === id;
           return (
@@ -185,7 +223,7 @@ export function AdminApp() {
 
       {/* Toast */}
       {toast && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-24 z-50 flex justify-center px-4">
+        <div className="pointer-events-none fixed inset-x-0 bottom-24 z-50 flex justify-center px-4 lg:bottom-8 lg:pl-60">
           <div className="flex animate-toast-in items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-drawer">
             <span className="grid h-6 w-6 place-items-center rounded-full bg-accent text-primary">
               <CheckIcon className="h-4 w-4" />

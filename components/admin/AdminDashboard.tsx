@@ -41,7 +41,7 @@ export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {cards.map(({ id, label, value, Icon }) => (
           <button
             key={id}
@@ -65,7 +65,7 @@ export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
             Todos los productos con stock 👍
           </p>
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-2 sm:grid sm:grid-cols-2 sm:gap-2 sm:space-y-0 lg:grid-cols-3">
             {sinStock.map((p) => (
               <li
                 key={p.id}

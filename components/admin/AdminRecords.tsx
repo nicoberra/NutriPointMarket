@@ -73,7 +73,7 @@ export function AdminRecords({
     <div className="space-y-3">
       <button
         onClick={() => setAdding(true)}
-        className="btn btn-primary btn-md w-full"
+        className="btn btn-primary btn-md w-full sm:w-auto"
       >
         <PlusIcon className="h-5 w-5" /> {config.addLabel}
       </button>
@@ -85,7 +85,7 @@ export function AdminRecords({
           Todavía no hay registros.
         </div>
       ) : (
-        <ul className="space-y-2">
+        <ul className="space-y-2 sm:grid sm:grid-cols-2 sm:gap-2 sm:space-y-0 xl:grid-cols-3">
           {rows.map((r, i) => (
             <li
               key={r.id || i}

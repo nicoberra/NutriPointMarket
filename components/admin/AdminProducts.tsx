@@ -42,18 +42,23 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
 
   return (
     <div className="space-y-4">
-      <button onClick={() => setAdding(true)} className="btn btn-primary btn-md w-full">
-        <PlusIcon className="h-5 w-5" /> Agregar producto
-      </button>
+      <div className="flex flex-col gap-3 sm:flex-row-reverse sm:items-center">
+        <button
+          onClick={() => setAdding(true)}
+          className="btn btn-primary btn-md w-full sm:w-auto sm:shrink-0"
+        >
+          <PlusIcon className="h-5 w-5" /> Agregar producto
+        </button>
 
-      <div className="relative">
-        <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar producto o marca"
-          className="input h-11 pl-9 text-base"
-        />
+        <div className="relative flex-1">
+          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar producto o marca"
+            className="input h-11 pl-9 text-base"
+          />
+        </div>
       </div>
 
       <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
@@ -74,7 +79,7 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
       ) : (
         <>
           <p className="text-xs text-muted">{filtered.length} productos</p>
-          <ul className="space-y-2">
+          <ul className="space-y-2 sm:grid sm:grid-cols-2 sm:gap-2 sm:space-y-0 xl:grid-cols-3">
             {filtered.map((p) => (
               <li key={p.id}>
                 <button
