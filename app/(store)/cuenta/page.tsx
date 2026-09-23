@@ -19,16 +19,19 @@ export default function CuentaPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const favProducts = products.filter((p) => favorites.includes(p.id));
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setLoading(true);
     const res =
       mode === "login"
-        ? login(email, password)
-        : register(name, email, password);
+        ? await login(email, password)
+        : await register(name, email, password);
+    setLoading(false);
     if (!res.ok) setError(res.error ?? "Ocurrió un error.");
   };
 
@@ -167,14 +170,21 @@ export default function CuentaPage() {
               <p className="rounded-lg bg-sale/10 px-3 py-2 text-sm text-sale">{error}</p>
             )}
 
-            <button type="submit" className="btn btn-primary btn-lg w-full">
-              {mode === "login" ? "Ingresar" : "Crear mi cuenta"}
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn btn-primary btn-lg w-full"
+            >
+              {loading
+                ? "Un momento…"
+                : mode === "login"
+                  ? "Ingresar"
+                  : "Crear mi cuenta"}
             </button>
           </form>
 
           <p className="mt-5 rounded-lg bg-page-soft px-3 py-2.5 text-center text-xs text-muted">
-            Demostración: las cuentas se guardan en tu navegador. Luego se conectará
-            al sistema real de NutriPointMarket.
+            Tus datos se guardan de forma segura. Nunca compartimos tu información.
           </p>
         </div>
       </div>

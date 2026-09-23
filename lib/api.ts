@@ -149,6 +149,69 @@ export async function fetchProducts(): Promise<Product[]> {
   return res.data.map(buildProduct).filter((p) => p.slug && p.name);
 }
 
+/* ======================= CUENTAS DE CLIENTES (tienda) ===================== */
+
+/** SHA-256 en hex del texto (para no mandar la contraseña en texto plano). */
+async function sha256Hex(text: string): Promise<string> {
+  const data = new TextEncoder().encode(text);
+  const buf = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+export interface AuthUser {
+  nombre: string;
+  email: string;
+}
+export interface AuthResult {
+  ok: boolean;
+  error?: string;
+  user?: AuthUser;
+}
+
+/**
+ * Registra un cliente en la planilla (pestaña Clientes). La contraseña se
+ * hashea en el navegador antes de viajar; el backend la vuelve a hashear.
+ */
+export async function registerUser(
+  nombre: string,
+  email: string,
+  password: string,
+  telefono = "",
+): Promise<AuthResult> {
+  try {
+    const pass = await sha256Hex(password);
+    const data = JSON.stringify({
+      nombre,
+      email: email.trim().toLowerCase(),
+      password: pass,
+      telefono,
+      origen: "web",
+    });
+    const r = (await api("registrar", { data })) as ApiResult & { user?: AuthUser };
+    if (r.ok === true) return { ok: true, user: r.user };
+    return { ok: false, error: r.error || "No se pudo crear la cuenta" };
+  } catch {
+    return { ok: false, error: "No se pudo conectar. Probá de nuevo." };
+  }
+}
+
+/** Valida email + contraseña contra la planilla. */
+export async function loginUser(email: string, password: string): Promise<AuthResult> {
+  try {
+    const pass = await sha256Hex(password);
+    const r = (await api("login", {
+      email: email.trim().toLowerCase(),
+      password: pass,
+    })) as ApiResult & { user?: AuthUser };
+    if (r.ok === true) return { ok: true, user: r.user };
+    return { ok: false, error: r.error || "No se pudo ingresar" };
+  } catch {
+    return { ok: false, error: "No se pudo conectar. Probá de nuevo." };
+  }
+}
+
 /* ============================ API DEL CRM ================================= */
 
 /** Login del CRM: valida el PIN contra el backend. */
