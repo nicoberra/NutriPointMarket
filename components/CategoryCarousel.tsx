@@ -188,14 +188,7 @@ export function CategoryCarousel() {
   const items = [...categories, ...categories];
 
   return (
-    <section className="py-10 sm:py-14">
-      <div className="container-page mb-6 text-center">
-        <p className="mb-1 text-sm font-bold uppercase tracking-wider text-primary">
-          Comprá por categoría
-        </p>
-        <h2 className="section-title">Categorías destacadas</h2>
-      </div>
-
+    <section className="py-8 sm:py-10">
       <div className="group/carousel relative">
         {/* Flecha anterior */}
         <button
