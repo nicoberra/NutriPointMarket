@@ -46,8 +46,8 @@ export function Hero() {
           </ul>
         </div>
 
-        {/* Logo */}
-        <div className="relative flex justify-center lg:justify-end">
+        {/* Logo (en celular se muestra arriba de las categorías) */}
+        <div className="relative hidden justify-center lg:flex lg:justify-end">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`${ASSET_PREFIX}/logo.png`}

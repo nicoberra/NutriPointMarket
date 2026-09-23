@@ -1,6 +1,7 @@
 import { Hero } from "@/components/Hero";
 import { TrustStrip } from "@/components/TrustStrip";
 import { CategoryCarousel } from "@/components/CategoryCarousel";
+import { ASSET_PREFIX } from "@/lib/config";
 import { HomeCarousel } from "@/components/HomeCarousel";
 import { PromoBannerRow } from "@/components/PromoBanner";
 import { BrandCarousel } from "@/components/BrandCarousel";
@@ -16,6 +17,15 @@ export default function HomePage() {
           <div className="absolute -bottom-24 left-1/4 h-80 w-80 rounded-full bg-secondary/30 blur-3xl" />
         </div>
         <div className="relative">
+          {/* Logo arriba de las categorías (solo en celular) */}
+          <div className="flex justify-center px-4 pt-6 lg:hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`${ASSET_PREFIX}/logo.png`}
+              alt="NutriPoint Market"
+              className="w-full max-w-[220px] object-contain"
+            />
+          </div>
           <CategoryCarousel />
           <Hero />
         </div>
