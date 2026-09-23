@@ -9,13 +9,7 @@ import { ArrowRightIcon, ShieldIcon, TruckIcon, CardIcon } from "./Icons";
  */
 export function Hero() {
   return (
-    <section className="relative overflow-hidden bg-page">
-      {/* Fondo decorativo */}
-      <div className="pointer-events-none absolute inset-0" aria-hidden>
-        <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-accent/25 blur-3xl" />
-        <div className="absolute -bottom-32 left-1/4 h-80 w-80 rounded-full bg-secondary/30 blur-3xl" />
-      </div>
-
+    <section className="relative">
       <div className="container-page relative grid items-center gap-8 py-12 sm:py-16 lg:grid-cols-2 lg:py-20">
         {/* Texto */}
         <div className="max-w-xl">
