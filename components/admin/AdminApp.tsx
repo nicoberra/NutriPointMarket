@@ -6,21 +6,24 @@ import { crmLogin } from "@/lib/api";
 import { AdminProducts } from "./AdminProducts";
 import { AdminRecords, type RecordsConfig } from "./AdminRecords";
 import { AdminDashboard } from "./AdminDashboard";
+import { AdminBilling } from "./AdminBilling";
 import {
   GridIcon,
   PackageIcon,
   UserIcon,
   ClipboardIcon,
+  ChartIcon,
   LogoutIcon,
   CheckIcon,
 } from "@/components/Icons";
 
 const AUTH_KEY = "npm-crm-auth-v1";
 
-type Section = "dashboard" | "productos" | "clientes" | "pedidos";
+type Section = "dashboard" | "facturacion" | "productos" | "clientes" | "pedidos";
 
 const NAV: { id: Section; label: string; Icon: typeof GridIcon }[] = [
   { id: "dashboard", label: "Inicio", Icon: GridIcon },
+  { id: "facturacion", label: "Facturación", Icon: ChartIcon },
   { id: "productos", label: "Productos", Icon: PackageIcon },
   { id: "clientes", label: "Clientes", Icon: UserIcon },
   { id: "pedidos", label: "Pedidos", Icon: ClipboardIcon },
@@ -106,6 +109,7 @@ export function AdminApp() {
 
   const titles: Record<Section, string> = {
     dashboard: "Panel",
+    facturacion: "Facturación",
     productos: "Productos",
     clientes: "Clientes",
     pedidos: "Pedidos",
@@ -173,6 +177,7 @@ export function AdminApp() {
           {section === "dashboard" && (
             <AdminDashboard onGo={(s) => setSection(s)} />
           )}
+          {section === "facturacion" && <AdminBilling />}
           {section === "productos" && <AdminProducts onToast={setToast} />}
           {section === "clientes" && (
             <AdminRecords config={CLIENTES_CFG} onToast={setToast} />

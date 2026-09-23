@@ -221,3 +221,12 @@ export const LogoutIcon = (p: IconProps) => (
     <path d="M10 17l-5-5 5-5M4.5 12H15" />
   </svg>
 );
+
+export const ChartIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M3 3v18h18" />
+    <rect x="7" y="12" width="3" height="5" rx="0.5" />
+    <rect x="12" y="8" width="3" height="9" rx="0.5" />
+    <rect x="17" y="5" width="3" height="12" rx="0.5" />
+  </svg>
+);
