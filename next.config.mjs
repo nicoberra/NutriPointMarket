@@ -1,10 +1,9 @@
 /** @type {import('next').NextConfig} */
 
-// Nombre del repositorio de GitHub. Como GitHub Pages publica el sitio en
-// https://<usuario>.github.io/<REPO>/ , necesitamos un "basePath" con ese nombre.
-// 👉 TEMPORAL: mientras propaga el dominio nutripointmarket.com.ar seguimos en
-// github.io/NutriPointMarket. Cuando el dominio resuelva, poné REPO = "".
-const REPO = "NutriPointMarket";
+// Con dominio propio (nutripointmarket.com.ar vía Cloudflare) el sitio se sirve
+// en la raíz "/", así que NO usamos basePath. Si algún día volvés a publicar en
+// https://<usuario>.github.io/<REPO>/ sin dominio, poné REPO = "NutriPointMarket".
+const REPO = "";
 const isProd = process.env.NODE_ENV === "production";
 
 const nextConfig = {

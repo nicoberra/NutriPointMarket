@@ -2,15 +2,15 @@
   "name": "NutriPoint CRM",
   "short_name": "NutriPoint",
   "description": "Panel de administración de NutriPointMarket",
-  "start_url": "/NutriPointMarket/admin/",
-  "scope": "/NutriPointMarket/admin/",
+  "start_url": "/admin/",
+  "scope": "/admin/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#2129E3",
   "theme_color": "#2129E3",
   "icons": [
     {
-      "src": "/NutriPointMarket/icon.svg",
+      "src": "/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
