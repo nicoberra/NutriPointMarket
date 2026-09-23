@@ -5,7 +5,7 @@ import { useState } from "react";
 import type { Product } from "@/lib/types";
 import { brandName } from "@/data/brands";
 import { categoryMap } from "@/data/categories";
-import { formatPrice, installment } from "@/lib/format";
+import { formatPrice } from "@/lib/format";
 import { useCart } from "@/context/CartContext";
 import { ProductVisual } from "./ProductVisual";
 import { FavoriteButton } from "./FavoriteButton";
@@ -77,11 +77,6 @@ export function ProductCard({ product }: { product: Product }) {
             </span>
           )}
         </div>
-        <p className="mt-0.5 text-xs text-muted">
-          12 cuotas de{" "}
-          <span className="font-semibold text-ink">{installment(product.price)}</span>
-        </p>
-
         {/* Selector de sabor */}
         {hasFlavors && (
           <label className="mt-3 block">

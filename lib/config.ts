@@ -44,8 +44,8 @@ export function whatsappLink(message: string = WHATSAPP_MESSAGE): string {
 /** Mensajes de la barra promocional superior (rotan en mobile) */
 export const PROMO_MESSAGES = [
   "✅ Productos 100% originales",
-  "🚚 Envíos a todo el país",
-  "💳 Todos los medios de pago · Hasta 12 cuotas",
+  "💵 Descuentos pagando en efectivo o transferencia",
+  "🏦 Aceptamos transferencia bancaria y efectivo",
 ];
 
 /** Beneficios de la franja de confianza */
@@ -56,19 +56,19 @@ export const TRUST_ITEMS = [
     text: "Trabajamos solo con distribuidores oficiales.",
   },
   {
-    icon: "truck",
-    title: "Envíos a todo el país",
-    text: "Recibí tus suplementos estés donde estés.",
+    icon: "percent",
+    title: "Descuento en efectivo / transferencia",
+    text: "Precio especial pagando de esas formas.",
   },
   {
     icon: "card",
-    title: "Todos los medios de pago",
-    text: "Tarjetas, transferencia y hasta 12 cuotas.",
+    title: "Transferencia y efectivo",
+    text: "Aceptamos transferencia bancaria y efectivo.",
   },
   {
-    icon: "store",
-    title: "Retiro en el local",
-    text: "Comprá online y retiralo sin costo.",
+    icon: "whatsapp",
+    title: "Coordinás por WhatsApp",
+    text: "Te asesoramos y coordinamos la entrega.",
   },
 ];
 

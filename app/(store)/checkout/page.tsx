@@ -113,23 +113,24 @@ export default function CheckoutPage() {
                 Medio de pago
               </legend>
               <div className="space-y-2">
-                {["Tarjeta de crédito/débito", "Transferencia bancaria", "Efectivo en el local"].map(
-                  (m, i) => (
-                    <label
-                      key={m}
-                      className="flex cursor-pointer items-center gap-3 rounded-lg border border-line p-3 text-sm hover:border-accent"
-                    >
-                      <input
-                        type="radio"
-                        name="pago"
-                        defaultChecked={i === 0}
-                        className="h-4 w-4 accent-[rgb(var(--color-accent))]"
-                      />
-                      {m}
-                    </label>
-                  ),
-                )}
+                {["Transferencia bancaria", "Efectivo"].map((m, i) => (
+                  <label
+                    key={m}
+                    className="flex cursor-pointer items-center gap-3 rounded-lg border border-line p-3 text-sm hover:border-accent"
+                  >
+                    <input
+                      type="radio"
+                      name="pago"
+                      defaultChecked={i === 0}
+                      className="h-4 w-4 accent-[rgb(var(--color-accent))]"
+                    />
+                    {m}
+                  </label>
+                ))}
               </div>
+              <p className="mt-2 text-xs font-semibold text-primary">
+                💵 Descuento pagando en efectivo o transferencia.
+              </p>
             </fieldset>
           </div>
 

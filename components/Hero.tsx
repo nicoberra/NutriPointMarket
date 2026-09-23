@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ASSET_PREFIX } from "@/lib/config";
-import { ArrowRightIcon, ShieldIcon, TruckIcon, CardIcon } from "./Icons";
+import { ArrowRightIcon, ShieldIcon, PercentIcon, CardIcon } from "./Icons";
 
 /**
  * Banner principal (hero). Fondo crema con el logo de NutriPoint.
@@ -38,10 +38,10 @@ export function Hero() {
               <ShieldIcon className="h-4 w-4 text-primary" /> 100% originales
             </li>
             <li className="flex items-center gap-1.5">
-              <TruckIcon className="h-4 w-4 text-primary" /> Envíos a todo el país
+              <PercentIcon className="h-4 w-4 text-primary" /> Descuento en efectivo/transferencia
             </li>
             <li className="flex items-center gap-1.5">
-              <CardIcon className="h-4 w-4 text-primary" /> Hasta 12 cuotas
+              <CardIcon className="h-4 w-4 text-primary" /> Transferencia y efectivo
             </li>
           </ul>
         </div>

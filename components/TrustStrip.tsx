@@ -1,11 +1,13 @@
 import { TRUST_ITEMS } from "@/lib/config";
-import { ShieldIcon, TruckIcon, CardIcon, StoreIcon } from "./Icons";
+import { ShieldIcon, TruckIcon, CardIcon, StoreIcon, PercentIcon, WhatsappIcon } from "./Icons";
 
 const ICONS = {
   shield: ShieldIcon,
   truck: TruckIcon,
   card: CardIcon,
   store: StoreIcon,
+  percent: PercentIcon,
+  whatsapp: WhatsappIcon,
 } as const;
 
 /** Franja de confianza (envíos, pagos, originales, retiro). */

@@ -64,10 +64,10 @@ export function PromoBannerRow() {
         />
         <PromoBanner
           variant="primary"
-          title="Envíos a todo el país"
-          text="Recibí tus suplementos estés donde estés, con seguimiento."
+          title="Descuento en efectivo o transferencia"
+          text="Pagando en efectivo o por transferencia bancaria tenés precio especial."
           ctaLabel="Cómo comprar"
-          ctaHref="/contacto#como-comprar"
+          ctaHref="/contacto#pagos"
         />
       </div>
     </section>

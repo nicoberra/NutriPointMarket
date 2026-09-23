@@ -222,6 +222,14 @@ export const LogoutIcon = (p: IconProps) => (
   </svg>
 );
 
+export const PercentIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M19 5 5 19" />
+    <circle cx="6.5" cy="6.5" r="2.5" />
+    <circle cx="17.5" cy="17.5" r="2.5" />
+  </svg>
+);
+
 export const ChartIcon = (p: IconProps) => (
   <svg {...base(p)}>
     <path d="M3 3v18h18" />

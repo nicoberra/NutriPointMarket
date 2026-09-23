@@ -6,7 +6,6 @@ import { PageBanner } from "@/components/PageBanner";
 import {
   WhatsappIcon,
   MailIcon,
-  MapPinIcon,
   InstagramIcon,
   CheckIcon,
   ChevronDownIcon,
@@ -25,21 +24,21 @@ const INFO = [
   {
     id: "envios",
     icon: TruckIcon,
-    title: "Envíos",
-    text: "Realizamos envíos a todo el país. El costo se calcula según el código postal. Envío gratis superando el monto mínimo.",
+    title: "Entregas",
+    text: "Coordinamos la entrega o el envío por WhatsApp según tu zona. Escribinos y lo arreglamos.",
   },
   {
     id: "pagos",
     icon: CardIcon,
     title: "Medios de pago",
-    text: "Aceptamos todas las tarjetas, transferencia bancaria y efectivo en el local. Hasta 12 cuotas según promociones vigentes.",
+    text: "Aceptamos transferencia bancaria y efectivo. Pagando de esas formas tenés un descuento especial.",
   },
 ];
 
 const FAQ = [
   { q: "¿Los productos son originales?", a: "Sí. Trabajamos únicamente con distribuidores oficiales de cada marca." },
-  { q: "¿Cuánto tarda el envío?", a: "Entre 2 y 5 días hábiles según la localidad. Recibís un código de seguimiento." },
-  { q: "¿Puedo retirar en el local?", a: "Sí, podés comprar online y retirar sin costo en nuestro local." },
+  { q: "¿Hay descuento por efectivo o transferencia?", a: "Sí, pagando en efectivo o por transferencia bancaria tenés un descuento. Consultanos por WhatsApp." },
+  { q: "¿Cómo recibo mi pedido?", a: "Coordinamos la entrega o el envío por WhatsApp según tu zona." },
   { q: "¿Puedo cambiar o devolver un producto?", a: "Sí, dentro de los plazos legales y con el producto cerrado. Escribinos y te ayudamos." },
 ];
 
@@ -99,15 +98,6 @@ export default function ContactoPage() {
                 <p className="text-sm text-muted">@nutripointmarket</p>
               </div>
             </a>
-            <div className="flex items-center gap-4 rounded-xl border border-line bg-white p-5">
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-accent-soft text-primary">
-                <MapPinIcon className="h-6 w-6" />
-              </span>
-              <div>
-                <p className="font-semibold text-ink">Local</p>
-                <p className="text-sm text-muted">{SITE.address}</p>
-              </div>
-            </div>
           </div>
 
           {/* Formulario */}

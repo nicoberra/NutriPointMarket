@@ -5,7 +5,7 @@ import { useState } from "react";
 import type { Product } from "@/lib/types";
 import { brandName } from "@/data/brands";
 import { categoryMap } from "@/data/categories";
-import { formatPrice, installment } from "@/lib/format";
+import { formatPrice } from "@/lib/format";
 import { useCart } from "@/context/CartContext";
 import { useProducts } from "@/context/ProductsContext";
 import { ProductVisual } from "./ProductVisual";
@@ -17,7 +17,8 @@ import {
   ShieldIcon,
   TruckIcon,
   CardIcon,
-  StoreIcon,
+  PercentIcon,
+  WhatsappIcon,
   ChevronDownIcon,
 } from "./Icons";
 
@@ -117,9 +118,8 @@ export function ProductDetail({ product: initial }: { product: Product }) {
                 </span>
               )}
             </div>
-            <p className="mt-1.5 text-sm text-muted">
-              Hasta 12 cuotas de{" "}
-              <span className="font-semibold text-ink">{installment(product.price)}</span>
+            <p className="mt-1.5 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
+              <PercentIcon className="h-4.5 w-4.5" /> Descuento en efectivo o transferencia
             </p>
             {product.freeShipping && (
               <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
@@ -214,13 +214,13 @@ export function ProductDetail({ product: initial }: { product: Product }) {
               <ShieldIcon className="h-5 w-5 text-primary" /> Producto original
             </li>
             <li className="flex items-center gap-2">
-              <CardIcon className="h-5 w-5 text-primary" /> Todos los medios de pago
+              <PercentIcon className="h-5 w-5 text-primary" /> Descuento efectivo/transferencia
             </li>
             <li className="flex items-center gap-2">
-              <TruckIcon className="h-5 w-5 text-primary" /> Envíos a todo el país
+              <CardIcon className="h-5 w-5 text-primary" /> Transferencia y efectivo
             </li>
             <li className="flex items-center gap-2">
-              <StoreIcon className="h-5 w-5 text-primary" /> Retiro en el local
+              <WhatsappIcon className="h-5 w-5 text-primary" /> Coordinás por WhatsApp
             </li>
           </ul>
         </div>
