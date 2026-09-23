@@ -42,6 +42,9 @@ export interface Product {
   inStock?: boolean;
   flavors: string[];
   presentations?: string[];
+  /** Costo (para calcular ganancia en el CRM). En la moneda de `costCurrency`. */
+  cost?: number;
+  costCurrency?: "USD" | "ARS";
   featured: boolean;
   bestSeller: boolean;
   freeShipping: boolean;

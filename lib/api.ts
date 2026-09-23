@@ -133,6 +133,8 @@ export function buildProduct(row: Record<string, unknown>): Product {
     inStock: row.stock === undefined || row.stock === "" ? true : toBool(row.stock),
     flavors: toList(row.variantes),
     presentations: [],
+    cost: toNum(row.costo),
+    costCurrency: String(row.costoMoneda ?? "").toUpperCase() === "USD" ? "USD" : "ARS",
     featured: toBool(row.destacado),
     bestSeller: false,
     freeShipping: false,
@@ -242,6 +244,8 @@ export interface ProductInput {
   variantes?: string;
   stock: boolean;
   destacado: boolean;
+  costo?: number;
+  costoMoneda?: "USD" | "ARS";
 }
 
 export async function saveProduct(row: ProductInput): Promise<boolean> {
@@ -254,6 +258,8 @@ export async function saveProduct(row: ProductInput): Promise<boolean> {
     variantes: row.variantes ?? "",
     stock: row.stock,
     destacado: row.destacado,
+    costo: row.costo ?? "",
+    costoMoneda: row.costoMoneda ?? "ARS",
   });
   const r = await api("productos_save", { data });
   return r.ok !== false;

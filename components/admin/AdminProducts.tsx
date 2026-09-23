@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Product } from "@/lib/types";
 import { useProducts } from "@/context/ProductsContext";
 import { useCategories } from "@/context/CategoriesContext";
@@ -22,11 +22,14 @@ type Changes = Partial<{
   precioML: number | undefined;
   stock: boolean;
   destacado: boolean;
+  costo: number;
+  costoMoneda: "USD" | "ARS";
 }>;
 
 export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
   const { products, refresh } = useProducts();
   const { categories } = useCategories();
+  const dollar = useDollar();
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<string>("");
   const [editing, setEditing] = useState<Product | null>(null);
@@ -55,6 +58,8 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
       variantes: p.flavors.join(", "),
       stock: ch.stock ?? p.inStock !== false,
       destacado: ch.destacado ?? p.featured,
+      costo: "costo" in ch ? ch.costo : p.cost,
+      costoMoneda: ch.costoMoneda ?? p.costCurrency ?? "ARS",
     };
     const ok = await saveProduct(row);
     onToast(ok ? "Guardado ✓" : "Guardado (verificá)");
@@ -138,6 +143,7 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
                 <ProductRow
                   key={p.id}
                   product={p}
+                  dollar={dollar}
                   onSave={saveInline}
                   onEdit={() => setEditing(p)}
                 />
@@ -151,6 +157,7 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
         <ProductSheet
           product={editing}
           saving={saving}
+          dollar={dollar}
           onClose={() => {
             setEditing(null);
             setAdding(false);
@@ -174,10 +181,12 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
 
 function ProductRow({
   product,
+  dollar,
   onSave,
   onEdit,
 }: {
   product: Product;
+  dollar: number;
   onSave: (p: Product, ch: Changes) => void;
   onEdit: () => void;
 }) {
@@ -185,8 +194,16 @@ function ProductRow({
   const [precioML, setPrecioML] = useState<number | "">(product.oldPrice ?? "");
   const [stock, setStock] = useState<boolean>(product.inStock !== false);
   const [destacado, setDestacado] = useState<boolean>(product.featured);
+  const [costo, setCosto] = useState<number | "">(product.cost || "");
+  const [moneda, setMoneda] = useState<"USD" | "ARS">(product.costCurrency ?? "ARS");
 
   const desc = discountPercent(precio, precioML ? Number(precioML) : undefined);
+  const costoNum = costo === "" ? 0 : Number(costo);
+  const costoPesos = costToPesos(costoNum, moneda, dollar);
+  const ganancia = precio - costoPesos;
+  const margen = precio > 0 ? Math.round((ganancia / precio) * 100) : 0;
+
+  const saveCosto = (m = moneda) => onSave(product, { costo: costoNum, costoMoneda: m });
 
   const savePrices = () => {
     const mlNum = precioML === "" ? undefined : Number(precioML);
@@ -246,6 +263,54 @@ function ProductRow({
         )}
       </p>
 
+      {/* Costo + moneda + ganancia */}
+      <div className="mt-3 rounded-lg bg-page-soft p-3">
+        <div className="flex items-end gap-2">
+          <label className="block flex-1">
+            <span className="mb-1 block text-xs font-semibold text-ink">Costo</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              value={costo}
+              onChange={(e) => setCosto(e.target.value ? Number(e.target.value) : "")}
+              onBlur={() => saveCosto()}
+              className="input h-11 text-base"
+            />
+          </label>
+          <div className="flex overflow-hidden rounded-lg border border-line">
+            {(["ARS", "USD"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => {
+                  setMoneda(m);
+                  saveCosto(m);
+                }}
+                className={`px-3 py-2.5 text-sm font-bold transition-colors ${
+                  moneda === m ? "bg-primary text-white" : "bg-white text-muted"
+                }`}
+              >
+                {m === "ARS" ? "$" : "US$"}
+              </button>
+            ))}
+          </div>
+        </div>
+        {costoNum > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+            {moneda === "USD" && dollar > 0 && (
+              <span className="text-muted">
+                ≈ {formatPrice(Math.round(costoPesos))} <span className="opacity-70">(dólar ${dollar})</span>
+              </span>
+            )}
+            {precio > 0 && costoPesos < precio && (
+              <span className="rounded-full bg-green-100 px-2 py-0.5 font-bold text-green-700">
+                Ganancia {formatPrice(Math.round(ganancia))} · {margen}%
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="mt-3 grid grid-cols-2 gap-3">
         <Toggle
           label="En stock"
@@ -295,11 +360,13 @@ function Chip({
 function ProductSheet({
   product,
   saving,
+  dollar,
   onClose,
   onSave,
 }: {
   product: Product | null;
   saving: boolean;
+  dollar: number;
   onClose: () => void;
   onSave: (row: ProductInput) => void;
 }) {
@@ -317,8 +384,13 @@ function ProductSheet({
   const [variantes, setVariantes] = useState(product?.flavors.join(", ") ?? "");
   const [stock, setStock] = useState<boolean>(product?.inStock !== false);
   const [destacado, setDestacado] = useState<boolean>(product?.featured ?? false);
+  const [costo, setCosto] = useState<number | "">(product?.cost || "");
+  const [moneda, setMoneda] = useState<"USD" | "ARS">(product?.costCurrency ?? "ARS");
 
   const desc = discountPercent(precio, precioML ? Number(precioML) : undefined);
+  const costoNum = costo === "" ? 0 : Number(costo);
+  const costoPesos = costToPesos(costoNum, moneda, dollar);
+  const ganancia = precio - costoPesos;
 
   const submit = () => {
     if (!nombre.trim()) return;
@@ -331,6 +403,8 @@ function ProductSheet({
       variantes: variantes.trim(),
       stock,
       destacado,
+      costo: costoNum,
+      costoMoneda: moneda,
     });
   };
 
@@ -418,6 +492,48 @@ function ProductSheet({
             />
           </Field>
 
+          <Field label="Costo (para calcular ganancia)">
+            <div className="flex items-stretch gap-2">
+              <input
+                type="number"
+                inputMode="numeric"
+                value={costo}
+                onChange={(e) => setCosto(e.target.value ? Number(e.target.value) : "")}
+                className="input h-11 flex-1 text-base"
+              />
+              <div className="flex overflow-hidden rounded-lg border border-line">
+                {(["ARS", "USD"] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setMoneda(m)}
+                    className={`px-3 text-sm font-bold transition-colors ${
+                      moneda === m ? "bg-primary text-white" : "bg-white text-muted"
+                    }`}
+                  >
+                    {m === "ARS" ? "$" : "US$"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </Field>
+
+          {costoNum > 0 && (
+            <p className="text-xs">
+              {moneda === "USD" && dollar > 0 && (
+                <span className="text-muted">
+                  ≈ {formatPrice(Math.round(costoPesos))} (dólar ${dollar}) ·{" "}
+                </span>
+              )}
+              {precio > 0 && costoPesos < precio && (
+                <span className="font-semibold text-green-600">
+                  Ganancia {formatPrice(Math.round(ganancia))} ·{" "}
+                  {Math.round((ganancia / precio) * 100)}%
+                </span>
+              )}
+            </p>
+          )}
+
           <p className="text-xs text-muted">
             {desc > 0 ? `Se mostrará ${desc}% OFF` : "Sin descuento"}
           </p>
@@ -447,6 +563,42 @@ function ProductSheet({
       </div>
     </div>
   );
+}
+
+/** Cotización del dólar blue (Argentina), en vivo, con caché de 3 h. */
+function useDollar(): number {
+  const [rate, setRate] = useState<number>(0);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("npm-dollar-blue");
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (d && d.rate && Date.now() - d.t < 3 * 3600 * 1000) setRate(d.rate);
+      }
+    } catch {
+      /* ignore */
+    }
+    fetch("https://dolarapi.com/v1/dolares/blue")
+      .then((r) => r.json())
+      .then((d) => {
+        const v = Number(d?.venta) || 0;
+        if (v > 0) {
+          setRate(v);
+          try {
+            localStorage.setItem("npm-dollar-blue", JSON.stringify({ rate: v, t: Date.now() }));
+          } catch {
+            /* ignore */
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+  return rate;
+}
+
+/** Convierte un costo a pesos según su moneda. */
+function costToPesos(costo: number, moneda: "USD" | "ARS", dollar: number): number {
+  return moneda === "USD" ? costo * dollar : costo;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

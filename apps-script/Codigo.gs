@@ -35,6 +35,8 @@ var TABLES = {
       ["variantes", "Variantes"],
       ["stock", "Stock"],
       ["destacado", "Destacado"],
+      ["costo", "Costo"],
+      ["costoMoneda", "Costo moneda"],
     ],
     idField: "nombre",
   },
@@ -344,6 +346,8 @@ function listProductos() {
       variantes: String(row[5] || "").trim(),
       stock: row[6] === "" || row[6] == null ? true : parseSiNo(row[6]),
       destacado: parseSiNo(row[7]),
+      costo: row[8] === "" || row[8] == null ? 0 : Number(row[8]) || 0,
+      costoMoneda: String(row[9] || "").trim().toUpperCase() === "USD" ? "USD" : "ARS",
     });
   }
   return list;
