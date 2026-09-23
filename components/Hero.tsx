@@ -14,7 +14,7 @@ export function Hero() {
         {/* Texto */}
         <div className="max-w-xl">
           <span className="badge mb-4 bg-primary/10 text-primary">
-            Nueva temporada · Envío a todo el país
+            Nueva temporada · Descuentos en efectivo y transferencia
           </span>
           <h1 className="font-display text-4xl font-black leading-[1.05] tracking-tight text-primary sm:text-5xl lg:text-6xl">
             Alcanzá tu <span className="text-secondary">mejor versión</span>

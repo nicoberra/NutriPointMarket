@@ -2,11 +2,19 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { NAV, SITE } from "@/lib/config";
+import { SITE } from "@/lib/config";
 import { useAuth } from "@/context/AuthContext";
+import { useCategories } from "@/context/CategoriesContext";
 import { Logo } from "./Logo";
 import { SearchBar } from "./SearchBar";
 import { ChevronDownIcon, CloseIcon, UserIcon } from "./Icons";
+
+const SIMPLE = [
+  { label: "Marcas", href: "/marcas" },
+  { label: "Combos", href: "/productos?categoria=combos" },
+  { label: "Ofertas", href: "/ofertas", highlight: true },
+  { label: "Contacto", href: "/contacto" },
+];
 
 export function MobileMenu({
   open,
@@ -16,9 +24,9 @@ export function MobileMenu({
   onClose: () => void;
 }) {
   const { user } = useAuth();
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const { categories } = useCategories();
+  const [prodOpen, setProdOpen] = useState(false);
 
-  // Bloquear scroll del body cuando está abierto
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
     return () => {
@@ -28,7 +36,6 @@ export function MobileMenu({
 
   return (
     <>
-      {/* Overlay */}
       <div
         onClick={onClose}
         className={`fixed inset-0 z-[60] bg-black/50 transition-opacity duration-300 lg:hidden ${
@@ -37,7 +44,6 @@ export function MobileMenu({
         aria-hidden
       />
 
-      {/* Panel */}
       <div
         className={`fixed left-0 top-0 z-[70] flex h-full w-[86%] max-w-sm flex-col bg-white shadow-drawer transition-transform duration-300 lg:hidden ${
           open ? "translate-x-0" : "-translate-x-full"
@@ -64,74 +70,71 @@ export function MobileMenu({
 
         <nav className="flex-1 overflow-y-auto p-2" aria-label="Navegación mobile">
           <ul>
-            {NAV.map((item) => {
-              const isExpanded = expanded === item.label;
-              return (
-                <li key={item.label} className="border-b border-line/60 last:border-0">
-                  {item.children ? (
-                    <>
-                      <div className="flex items-center">
-                        <Link
-                          href={item.href}
-                          onClick={onClose}
-                          className={`flex-1 px-3 py-3 text-[15px] font-semibold ${
-                            item.highlight ? "text-primary" : "text-ink"
-                          }`}
-                        >
-                          {item.label}
-                        </Link>
-                        <button
-                          type="button"
-                          aria-label={`Desplegar ${item.label}`}
-                          onClick={() => setExpanded(isExpanded ? null : item.label)}
-                          className="grid h-11 w-11 place-items-center text-muted"
-                        >
-                          <ChevronDownIcon
-                            className={`h-5 w-5 transition-transform ${
-                              isExpanded ? "rotate-180" : ""
-                            }`}
-                          />
-                        </button>
-                      </div>
-                      {isExpanded && (
-                        <ul className="pb-2 pl-3">
-                          {item.children.map((child) => (
-                            <li key={child.label}>
-                              <Link
-                                href={child.href}
-                                onClick={onClose}
-                                className="block rounded-md px-3 py-2 text-sm text-muted hover:bg-page-soft hover:text-primary"
-                              >
-                                {child.label}
-                              </Link>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </>
-                  ) : (
+            {/* Productos (desplegable con categorías) */}
+            <li className="border-b border-line/60">
+              <div className="flex items-center">
+                <Link
+                  href="/productos"
+                  onClick={onClose}
+                  className="flex-1 px-3 py-3 text-[15px] font-semibold text-ink"
+                >
+                  Productos
+                </Link>
+                <button
+                  type="button"
+                  aria-label="Desplegar Productos"
+                  onClick={() => setProdOpen((v) => !v)}
+                  className="grid h-11 w-11 place-items-center text-muted"
+                >
+                  <ChevronDownIcon
+                    className={`h-5 w-5 transition-transform ${prodOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+              </div>
+              {prodOpen && (
+                <ul className="pb-2 pl-3">
+                  {categories.map((c) => (
+                    <li key={c.slug}>
+                      <Link
+                        href={`/productos?categoria=${c.slug}`}
+                        onClick={onClose}
+                        className="block rounded-md px-3 py-2 text-sm text-muted hover:bg-page-soft hover:text-primary"
+                      >
+                        {c.name}
+                      </Link>
+                    </li>
+                  ))}
+                  <li>
                     <Link
-                      href={item.href}
+                      href="/productos"
                       onClick={onClose}
-                      className={`block px-3 py-3 text-[15px] font-semibold ${
-                        item.highlight ? "text-primary" : "text-ink"
-                      }`}
+                      className="block rounded-md px-3 py-2 text-sm font-semibold text-primary hover:bg-page-soft"
                     >
-                      {item.label}
+                      Ver todos los productos
                     </Link>
-                  )}
-                </li>
-              );
-            })}
+                  </li>
+                </ul>
+              )}
+            </li>
+
+            {SIMPLE.map((item) => (
+              <li key={item.label} className="border-b border-line/60 last:border-0">
+                <Link
+                  href={item.href}
+                  onClick={onClose}
+                  className={`block px-3 py-3 text-[15px] font-semibold ${
+                    item.highlight ? "text-primary" : "text-ink"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              </li>
+            ))}
           </ul>
         </nav>
 
         <div className="border-t border-line p-4">
-          <Link
-            href="/cuenta"
-            onClick={onClose}
-            className="btn btn-outline btn-md w-full"
-          >
+          <Link href="/cuenta" onClick={onClose} className="btn btn-outline btn-md w-full">
             <UserIcon className="h-4.5 w-4.5" />
             {user ? `Hola, ${user.name.split(" ")[0]}` : "Mi cuenta"}
           </Link>

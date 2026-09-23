@@ -300,8 +300,8 @@ function ProductTabs({ product }: { product: Product }) {
             <p>Sí, trabajamos solo con distribuidores oficiales.</p>
           </li>
           <li>
-            <p className="font-semibold text-ink">¿Hacen envíos?</p>
-            <p>Enviamos a todo el país. También podés retirar en el local.</p>
+            <p className="font-semibold text-ink">¿Cómo lo recibo?</p>
+            <p>Coordinamos la entrega o el envío por WhatsApp según tu zona.</p>
           </li>
         </ul>
       ),
