@@ -10,7 +10,7 @@ export default function robots(): MetadataRoute.Robots {
       allow: "/",
       disallow: "/admin",
     },
-    sitemap: "https://suplemarket.com.ar/sitemap.xml",
-    host: "https://suplemarket.com.ar",
+    sitemap: "https://nutripointmarket.com.ar/sitemap.xml",
+    host: "https://nutripointmarket.com.ar",
   };
 }
