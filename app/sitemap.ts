@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 export const dynamic = "force-static";
 
-const BASE = "https://nutripointmarket.com.ar";
+const BASE = "https://suplemarket.com.ar";
 
 /** sitemap.xml con las páginas principales de la tienda. */
 export default function sitemap(): MetadataRoute.Sitemap {
