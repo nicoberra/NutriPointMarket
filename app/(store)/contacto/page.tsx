@@ -95,7 +95,7 @@ export default function ContactoPage() {
               </span>
               <div>
                 <p className="font-semibold text-ink">Instagram</p>
-                <p className="text-sm text-muted">@suplemarket</p>
+                <p className="text-sm text-muted">@suplemarket.ar</p>
               </div>
             </a>
           </div>
