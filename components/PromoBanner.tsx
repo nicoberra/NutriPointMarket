@@ -57,7 +57,7 @@ export function PromoBannerRow() {
       <div className="grid gap-4 lg:grid-cols-2">
         <PromoBanner
           variant="accent"
-          title="Combos NutriPoint"
+          title="Combos Suple Market"
           text="Combiná proteína + creatina y obtené un mejor precio."
           ctaLabel="Ver combos"
           ctaHref="/productos?categoria=combos"

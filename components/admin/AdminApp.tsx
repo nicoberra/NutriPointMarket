@@ -122,7 +122,7 @@ export function AdminApp() {
       <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:w-60 lg:flex-col lg:border-r lg:border-white/10 lg:bg-primary lg:text-white">
         <div className="px-5 py-6">
           <p className="text-[10px] uppercase tracking-widest text-white/50">
-            NutriPoint
+            Suple Market
           </p>
           <p className="font-display text-2xl font-black leading-none">CRM</p>
         </div>
@@ -159,7 +159,7 @@ export function AdminApp() {
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-primary px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] text-white lg:bg-white lg:px-8 lg:py-5">
           <div>
             <p className="text-[10px] uppercase tracking-widest text-white/50 lg:hidden">
-              NutriPoint · CRM
+              Suple Market · CRM
             </p>
             <h1 className="font-display text-lg font-bold leading-tight lg:text-2xl lg:text-primary">
               {titles[section]}
@@ -248,7 +248,7 @@ function Login({ onOk }: { onOk: () => void }) {
             N
           </span>
           <h1 className="font-display text-xl font-extrabold text-primary">
-            NutriPoint <span className="text-primary">CRM</span>
+            Suple Market <span className="text-primary">CRM</span>
           </h1>
           <p className="mt-1 text-sm text-muted">Panel privado. Ingresá tu PIN.</p>
         </div>

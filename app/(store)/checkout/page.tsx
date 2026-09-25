@@ -41,7 +41,7 @@ export default function CheckoutPage() {
               WhatsApp para finalizar tu pedido.
             </p>
             <a
-              href={whatsappLink("Hola NutriPointMarket, acabo de hacer un pedido y quería coordinar el pago y envío.")}
+              href={whatsappLink("Hola Suple Market, acabo de hacer un pedido y quería coordinar el pago y envío.")}
               target="_blank"
               rel="noopener noreferrer"
               className="btn btn-md mt-5 w-full bg-[#25D366] text-white hover:brightness-105"

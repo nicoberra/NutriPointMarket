@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     "pre entreno",
     "vitaminas",
     "aminoácidos",
-    "NutriPointMarket",
+    "Suple Market",
     "Argentina",
   ],
   openGraph: {

@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "NutriPoint CRM",
+    title: "Suple Market CRM",
   },
   icons: { apple: "/apple-icon.png" },
 };

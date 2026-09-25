@@ -19,12 +19,14 @@ export default function HomePage() {
         <div className="relative">
           {/* Logo arriba de las categorías (solo en celular) */}
           <div className="flex justify-center px-4 pt-6 lg:hidden">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`${ASSET_PREFIX}/logo.png`}
-              alt="NutriPoint Market"
-              className="w-full max-w-[220px] object-contain"
-            />
+            <div className="overflow-hidden rounded-2xl bg-black shadow-card ring-1 ring-primary/20">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`${ASSET_PREFIX}/logo.png`}
+                alt="Suple Market"
+                className="w-full max-w-[280px] object-contain"
+              />
+            </div>
           </div>
           <CategoryCarousel />
           <Hero />

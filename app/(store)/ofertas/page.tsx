@@ -5,7 +5,7 @@ import { PageBanner } from "@/components/PageBanner";
 
 export const metadata: Metadata = {
   title: "Ofertas",
-  description: "Todas las ofertas y descuentos de NutriPointMarket.",
+  description: "Todas las ofertas y descuentos de Suple Market.",
 };
 
 export default function OfertasPage() {

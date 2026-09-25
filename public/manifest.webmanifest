@@ -1,7 +1,7 @@
 {
-  "name": "NutriPoint CRM",
-  "short_name": "NutriPoint",
-  "description": "Panel de administración de NutriPointMarket",
+  "name": "Suple Market CRM",
+  "short_name": "Suple Market",
+  "description": "Panel de administración de Suple Market",
   "start_url": "/admin/",
   "scope": "/admin/",
   "display": "standalone",

@@ -13,16 +13,16 @@
 export const ASSET_PREFIX = "";
 
 export const SITE = {
-  name: "NutriPointMarket",
+  name: "Suple Market",
   /** Se resalta esta palabra en el logotipo tipográfico */
-  nameHighlight: "Point",
+  nameHighlight: "Market",
   tagline: "Suplementos deportivos, nutrición y rendimiento.",
   description:
-    "Proteínas, creatinas, vitaminas, aminoácidos y suplementos deportivos. NutriPointMarket.",
-  email: "hola@nutripointmarket.com", // placeholder
+    "Proteínas, creatinas, vitaminas, aminoácidos y suplementos deportivos. Suple Market.",
+  email: "hola@suplemarket.com.ar", // placeholder
   phone: "+54 9 11 5164-0472",
-  address: "Av. Siempre Activa 1234, Buenos Aires, Argentina", // placeholder
-  instagram: "https://instagram.com/nutripointmarket", // placeholder
+  address: "Buenos Aires, Argentina", // placeholder
+  instagram: "https://instagram.com/suplemarket", // placeholder
 };
 
 /**
@@ -35,7 +35,7 @@ export const SHEETS_API_URL =
 
 /** Número real de WhatsApp (formato internacional sin +) */
 export const WHATSAPP_NUMBER = "5491151640472";
-export const WHATSAPP_MESSAGE = "Hola NutriPointMarket, quería consultar por…";
+export const WHATSAPP_MESSAGE = "Hola Suple Market, quería consultar por…";
 
 export function whatsappLink(message: string = WHATSAPP_MESSAGE): string {
   return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;

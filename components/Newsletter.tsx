@@ -20,7 +20,7 @@ export function Newsletter() {
             <MailIcon className="h-6 w-6" />
           </span>
           <h2 className="font-display text-2xl font-extrabold sm:text-3xl">
-            Sumate a NutriPoint
+            Sumate a Suple Market
           </h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-white/80">
             Recibí novedades, lanzamientos y descuentos exclusivos.

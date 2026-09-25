@@ -34,10 +34,7 @@ export function Logo({
       <span
         className={`font-display text-lg font-extrabold leading-none tracking-tight sm:text-xl ${baseColor} ${wordmarkClassName}`}
       >
-        Nutri<span className="text-accent">Point</span>
-        <span className={variant === "dark" ? "text-white/85" : "text-muted"}>
-          Market
-        </span>
+        Suple<span className="text-accent"> Market</span>
       </span>
     </Link>
   );

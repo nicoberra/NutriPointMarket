@@ -6,7 +6,7 @@ import { PageBanner } from "@/components/PageBanner";
 export const metadata: Metadata = {
   title: "Productos",
   description:
-    "Todo el catálogo de NutriPointMarket: proteínas, creatinas, pre entrenos, vitaminas, aminoácidos y más.",
+    "Todo el catálogo de Suple Market: proteínas, creatinas, pre entrenos, vitaminas, aminoácidos y más.",
 };
 
 export default function ProductosPage() {
