@@ -48,14 +48,12 @@ export function Hero() {
 
         {/* Logo (en celular se muestra arriba de las categorías) */}
         <div className="relative hidden justify-center lg:flex lg:justify-end">
-          <div className="overflow-hidden rounded-3xl bg-black shadow-card-hover ring-1 ring-primary/20 transition-transform duration-300 ease-out hover:scale-[1.02]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`${ASSET_PREFIX}/logo.png`}
-              alt="Suple Market"
-              className="w-full max-w-sm object-contain lg:max-w-md"
-            />
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`${ASSET_PREFIX}/logo.png`}
+            alt="Suple Market"
+            className="w-full max-w-md object-contain transition-transform duration-300 ease-out hover:scale-105 lg:max-w-lg"
+          />
         </div>
       </div>
     </section>

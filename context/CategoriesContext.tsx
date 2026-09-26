@@ -35,24 +35,9 @@ function sync(list: Category[]) {
 }
 
 export function CategoriesProvider({ children }: { children: ReactNode }) {
-  const [categories, setCategories] = useState<Category[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const raw = localStorage.getItem(CACHE_KEY);
-        if (raw) {
-          const cached = JSON.parse(raw) as Category[];
-          if (Array.isArray(cached) && cached.length) {
-            sync(cached);
-            return cached;
-          }
-        }
-      } catch {
-        /* ignore */
-      }
-    }
-    sync(defaultCategories);
-    return defaultCategories;
-  });
+  // Arranca SIEMPRE con las por defecto (mismo HTML en server y cliente → sin
+  // hydration mismatch). El caché y la planilla se cargan después de montar.
+  const [categories, setCategories] = useState<Category[]>(defaultCategories);
 
   const refresh = useCallback(async () => {
     try {
@@ -72,6 +57,19 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Pinta desde caché (ya hidratado, no rompe el SSR) y luego refresca.
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (raw) {
+        const cached = JSON.parse(raw) as Category[];
+        if (Array.isArray(cached) && cached.length) {
+          sync(cached);
+          setCategories(cached);
+        }
+      }
+    } catch {
+      /* ignore */
+    }
     refresh();
   }, [refresh]);
 
