@@ -21,7 +21,7 @@ const sora = Sora({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://nutripointmarket.com.ar"),
+  metadataBase: new URL("https://suplemarket.com.ar"),
   alternates: { canonical: "/" },
   title: {
     default: `${SITE.name} | Suplementos deportivos`,
@@ -69,8 +69,8 @@ export default function RootLayout({
               "@type": "Store",
               name: SITE.name,
               description: SITE.description,
-              url: "https://nutripointmarket.com.ar",
-              image: "https://nutripointmarket.com.ar/logo.png",
+              url: "https://suplemarket.com.ar",
+              image: "https://suplemarket.com.ar/logo.png",
               telephone: "+5491151640472",
               areaServed: "AR",
               sameAs: [SITE.instagram],
