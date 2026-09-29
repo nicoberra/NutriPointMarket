@@ -227,6 +227,7 @@ export function AdminApp() {
 
 function Login({ onOk }: { onOk: () => void }) {
   const [pin, setPin] = useState("");
+  const [showPin, setShowPin] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -253,15 +254,37 @@ function Login({ onOk }: { onOk: () => void }) {
           <p className="mt-1 text-sm text-muted">Panel privado. Ingresá tu PIN.</p>
         </div>
         <form onSubmit={submit} className="space-y-3">
-          <input
-            type="password"
-            inputMode="numeric"
-            autoFocus
-            value={pin}
-            onChange={(e) => setPin(e.target.value)}
-            placeholder="••••••"
-            className="input h-12 text-center text-lg tracking-[0.5em]"
-          />
+          <div className="relative">
+            <input
+              type={showPin ? "text" : "password"}
+              inputMode="numeric"
+              autoFocus
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              placeholder="••••••"
+              className="input h-12 pr-11 text-center text-lg tracking-[0.5em]"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPin((v) => !v)}
+              aria-label={showPin ? "Ocultar PIN" : "Ver PIN"}
+              title={showPin ? "Ocultar PIN" : "Ver PIN"}
+              className="absolute inset-y-0 right-0 grid w-11 place-items-center text-muted hover:text-primary"
+            >
+              {showPin ? (
+                <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 3l18 18" />
+                  <path d="M10.6 10.6a2 2 0 002.8 2.8" />
+                  <path d="M9.4 5.2A9.5 9.5 0 0112 5c5 0 9 4.5 9 7a12 12 0 01-2.2 3.1M6.2 6.2A12.4 12.4 0 003 12c0 2.5 4 7 9 7a9.4 9.4 0 004-.9" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              )}
+            </button>
+          </div>
           {error && (
             <p className="rounded-lg bg-sale/10 px-3 py-2 text-center text-sm text-sale">
               {error}
