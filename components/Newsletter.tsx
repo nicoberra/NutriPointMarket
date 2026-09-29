@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ASSET_PREFIX } from "@/lib/config";
 import { MailIcon, CheckIcon } from "./Icons";
 
 /** Bloque de newsletter antes del footer. */
@@ -10,11 +11,15 @@ export function Newsletter() {
 
   return (
     <section className="container-page py-10 sm:py-14">
-      <div className="relative overflow-hidden rounded-2xl bg-primary px-6 py-10 text-white sm:px-12 sm:py-14">
-        <div
-          className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-accent/20 blur-3xl"
-          aria-hidden
-        />
+      <div
+        className="relative overflow-hidden rounded-2xl bg-primary px-6 py-10 text-white sm:px-12 sm:py-14"
+        style={{
+          backgroundImage: `url(${ASSET_PREFIX}/fondo.jpg)`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+      >
+        <div className="pointer-events-none absolute inset-0 bg-primary/35" aria-hidden />
         <div className="relative mx-auto max-w-xl text-center">
           <span className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full bg-accent text-primary">
             <MailIcon className="h-6 w-6" />
