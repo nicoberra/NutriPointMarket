@@ -12,6 +12,9 @@ import { CheckIcon, WhatsappIcon } from "@/components/Icons";
 
 type Metodo = "Transferencia" | "Efectivo" | "Mercado Pago";
 
+// Descuento por pagar en efectivo o transferencia (sobre los productos).
+const DESCUENTO_EF_TR = 0.15;
+
 interface DoneInfo {
   metodo: Metodo;
   id: string;
@@ -28,6 +31,11 @@ export default function CheckoutPage() {
 
   const shipping = subtotal >= 60000 || subtotal === 0 ? 0 : 4500;
   const total = subtotal + shipping;
+
+  // Descuento por pagar en efectivo o transferencia (no aplica a Mercado Pago).
+  const pagaConDescuento = method === "Transferencia" || method === "Efectivo";
+  const descuento = pagaConDescuento ? Math.round(subtotal * DESCUENTO_EF_TR) : 0;
+  const totalFinal = total - descuento;
 
   const confirm = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -46,6 +54,10 @@ export default function CheckoutPage() {
     const detalle = items.map((i) => `${i.quantity}x ${i.product.name}`).join(" | ");
     const id = "ped" + Date.now();
 
+    // Total según el método: efectivo/transferencia con 15% off; MP sin descuento.
+    const desc = metodo === "Mercado Pago" ? 0 : Math.round(subtotal * DESCUENTO_EF_TR);
+    const montoFinal = total - desc;
+
     setLoading(true);
     try {
       await createOrder({
@@ -54,7 +66,7 @@ export default function CheckoutPage() {
         telefono,
         email,
         detalle,
-        monto: total,
+        monto: montoFinal,
         montoEnvio: shipping,
         envio: direccion,
         metodo,
@@ -63,7 +75,7 @@ export default function CheckoutPage() {
       if (metodo === "Mercado Pago") {
         const link = await mpCreatePreference({
           pedido: id,
-          monto: total,
+          monto: montoFinal,
           titulo: `Pedido Suple Market (${count} art.)`,
           email,
         });
@@ -78,7 +90,7 @@ export default function CheckoutPage() {
 
       // Efectivo / Transferencia
       clear();
-      setDone({ metodo, id, total });
+      setDone({ metodo, id, total: montoFinal });
     } catch {
       setError("No se pudo confirmar el pedido. Revisá tu conexión e intentá de nuevo.");
       setLoading(false);
@@ -170,8 +182,8 @@ export default function CheckoutPage() {
   }
 
   const metodos: { v: Metodo; label: string; hint?: string }[] = [
-    { v: "Transferencia", label: "Transferencia bancaria", hint: "Con descuento. Enviás el comprobante por WhatsApp." },
-    { v: "Efectivo", label: "Efectivo", hint: "Con descuento. Coordinás la entrega por WhatsApp." },
+    { v: "Transferencia", label: "Transferencia bancaria", hint: "15% de descuento. Enviás el comprobante por WhatsApp." },
+    { v: "Efectivo", label: "Efectivo", hint: "15% de descuento. Coordinás la entrega por WhatsApp." },
     { v: "Mercado Pago", label: "Mercado Pago", hint: "Dinero en cuenta, débito o crédito. Te lleva a Mercado Pago." },
   ];
 
@@ -264,13 +276,24 @@ export default function CheckoutPage() {
                     {shipping === 0 ? "Gratis" : formatPrice(shipping)}
                   </dd>
                 </div>
+                {descuento > 0 && (
+                  <div className="flex justify-between text-secondary">
+                    <dt className="font-semibold">Descuento {method.toLowerCase()} (15%)</dt>
+                    <dd className="font-semibold">− {formatPrice(descuento)}</dd>
+                  </div>
+                )}
               </dl>
               <div className="mt-4 flex items-center justify-between border-t border-line pt-4">
                 <span className="font-semibold text-ink">Total</span>
                 <span className="font-display text-2xl font-black text-primary">
-                  {formatPrice(total)}
+                  {formatPrice(totalFinal)}
                 </span>
               </div>
+              {descuento > 0 && (
+                <p className="mt-1 text-right text-xs font-semibold text-secondary">
+                  ¡Ahorrás {formatPrice(descuento)} pagando con {method.toLowerCase()}!
+                </p>
+              )}
 
               {error && (
                 <p className="mt-4 rounded-lg bg-sale/10 px-3 py-2 text-center text-sm text-sale">

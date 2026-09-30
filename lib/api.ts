@@ -83,10 +83,11 @@ type ApiResult<T = unknown> = { ok?: boolean; error?: string; data?: T; [k: stri
 export function api<T = unknown>(
   action: string,
   params: Record<string, string | number | boolean> = {},
+  timeoutMs = 8000,
 ): Promise<ApiResult<T>> {
   const qs = new URLSearchParams({ action });
   for (const [k, v] of Object.entries(params)) qs.set(k, String(v));
-  return jsonp<ApiResult<T>>(`${SHEETS_API_URL}?${qs.toString()}`);
+  return jsonp<ApiResult<T>>(`${SHEETS_API_URL}?${qs.toString()}`, timeoutMs);
 }
 
 /* =========================== PRODUCTOS (planilla) ========================= */
@@ -316,20 +317,27 @@ export interface OrderInput {
   metodo: string; // "Efectivo" | "Transferencia" | "Mercado Pago"
 }
 
-/** Guarda un pedido en la planilla (pestaña Pedidos). */
+/**
+ * Guarda un pedido en la planilla (pestaña Pedidos). Timeout largo (18s) porque
+ * en 4G/WiFi lento el guardado tarda. NO se reintenta para no duplicar pedidos.
+ */
 export async function createOrder(o: OrderInput): Promise<boolean> {
   const estado = o.metodo === "Mercado Pago" ? "pendiente de pago" : "nuevo";
-  return addRow("Pedidos", {
-    id: o.id,
-    cliente: o.cliente,
-    telefono: o.telefono,
-    detalle: o.detalle,
-    monto: o.monto,
-    estado,
-    notas: `Pago: ${o.metodo}. Email: ${o.email}`,
-    envio: o.envio,
-    montoEnvio: o.montoEnvio,
-  });
+  const r = await api("add", {
+    tab: "Pedidos",
+    data: JSON.stringify({
+      id: o.id,
+      cliente: o.cliente,
+      telefono: o.telefono,
+      detalle: o.detalle,
+      monto: o.monto,
+      estado,
+      notas: `Pago: ${o.metodo}. Email: ${o.email}`,
+      envio: o.envio,
+      montoEnvio: o.montoEnvio,
+    }),
+  }, 18000);
+  return r.ok !== false;
 }
 
 /**
@@ -342,13 +350,22 @@ export async function mpCreatePreference(args: {
   titulo: string;
   email: string;
 }): Promise<string | null> {
-  const r = (await api("mp_crear_pref", {
-    pedido: args.pedido,
-    monto: args.monto,
-    titulo: args.titulo,
-    email: args.email,
-  })) as ApiResult & { init_point?: string };
-  return r.ok && r.init_point ? r.init_point : null;
+  // Reintenta ante fallas de red (crear una preferencia extra es inofensivo).
+  for (let i = 0; i < 3; i++) {
+    try {
+      const r = (await api("mp_crear_pref", {
+        pedido: args.pedido,
+        monto: args.monto,
+        titulo: args.titulo,
+        email: args.email,
+      }, 18000)) as ApiResult & { init_point?: string };
+      if (r.ok && r.init_point) return r.init_point;
+      if (r.ok === false) return null; // el backend respondió con un error real
+    } catch {
+      if (i === 2) return null; // se agotaron los reintentos
+    }
+  }
+  return null;
 }
 
 /* ----------------------------- Categorías -------------------------------- */
