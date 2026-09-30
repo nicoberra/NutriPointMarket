@@ -333,15 +333,23 @@ export default function CheckoutPage() {
                   </div>
                 )}
               </dl>
-              <div className="mt-4 flex items-center justify-between border-t border-line pt-4">
+              <div className="mt-4 flex items-center justify-between gap-2 border-t border-line pt-4">
                 <span className="font-semibold text-ink">Total</span>
-                <span className="font-display text-2xl font-black text-primary">
-                  {formatPrice(totalFinal)}
+                <span className="flex items-baseline gap-2">
+                  {descuento > 0 && (
+                    <span className="text-base font-semibold text-muted line-through">
+                      {formatPrice(total)}
+                    </span>
+                  )}
+                  <span className="font-display text-2xl font-black text-primary">
+                    {formatPrice(totalFinal)}
+                  </span>
                 </span>
               </div>
               {descuento > 0 && (
                 <p className="mt-1 text-right text-xs font-semibold text-secondary">
-                  ¡Ahorrás {formatPrice(descuento)} pagando con {method.toLowerCase()}!
+                  Precio con 15% off pagando con {method.toLowerCase()} · ahorrás{" "}
+                  {formatPrice(descuento)}
                 </p>
               )}
 
