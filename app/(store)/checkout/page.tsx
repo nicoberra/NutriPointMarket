@@ -26,10 +26,12 @@ export default function CheckoutPage() {
   const { user } = useAuth();
   const [done, setDone] = useState<DoneInfo | null>(null);
   const [method, setMethod] = useState<Metodo>("Transferencia");
+  const [entrega, setEntrega] = useState<"envio" | "retiro">("envio");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const shipping = subtotal >= 60000 || subtotal === 0 ? 0 : 4500;
+  const shipping =
+    entrega === "retiro" || subtotal >= 60000 || subtotal === 0 ? 0 : 4500;
   const total = subtotal + shipping;
 
   // Descuento por pagar en efectivo o transferencia (no aplica a Mercado Pago).
@@ -47,10 +49,13 @@ export default function CheckoutPage() {
     const cliente = String(fd.get("nombre") || "").trim();
     const email = String(fd.get("email") || "").trim();
     const telefono = String(fd.get("telefono") || "").trim();
-    const direccion = [fd.get("direccion"), fd.get("ciudad"), fd.get("provincia"), fd.get("cp")]
-      .map((v) => String(v || "").trim())
-      .filter(Boolean)
-      .join(", ");
+    const direccion =
+      entrega === "retiro"
+        ? "Retiro / coordina por WhatsApp"
+        : [fd.get("direccion"), fd.get("ciudad"), fd.get("provincia"), fd.get("cp")]
+            .map((v) => String(v || "").trim())
+            .filter(Boolean)
+            .join(", ");
     const detalle = items.map((i) => `${i.quantity}x ${i.product.name}`).join(" | ");
     const id = "ped" + Date.now();
 
@@ -207,15 +212,56 @@ export default function CheckoutPage() {
             </fieldset>
 
             <fieldset className="rounded-xl border border-line bg-white p-5">
-              <legend className="px-2 font-display text-base font-bold text-primary">Envío</legend>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                  <Field name="direccion" label="Dirección" required />
-                </div>
-                <Field name="ciudad" label="Ciudad" required />
-                <Field name="provincia" label="Provincia" required />
-                <Field name="cp" label="Código postal" required />
+              <legend className="px-2 font-display text-base font-bold text-primary">Entrega</legend>
+              <div className="space-y-2">
+                <label
+                  className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm hover:border-accent ${
+                    entrega === "envio" ? "border-accent bg-accent/5" : "border-line"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="entrega"
+                    checked={entrega === "envio"}
+                    onChange={() => setEntrega("envio")}
+                    className="mt-0.5 h-4 w-4 accent-[rgb(var(--color-accent))]"
+                  />
+                  <span>
+                    <span className="font-semibold text-ink">Envío a domicilio</span>
+                    <span className="block text-xs text-muted">
+                      {formatPrice(4500)} · gratis en compras desde {formatPrice(60000)}.
+                    </span>
+                  </span>
+                </label>
+                <label
+                  className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm hover:border-accent ${
+                    entrega === "retiro" ? "border-accent bg-accent/5" : "border-line"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="entrega"
+                    checked={entrega === "retiro"}
+                    onChange={() => setEntrega("retiro")}
+                    className="mt-0.5 h-4 w-4 accent-[rgb(var(--color-accent))]"
+                  />
+                  <span>
+                    <span className="font-semibold text-ink">Retiro / lo coordino por WhatsApp</span>
+                    <span className="block text-xs text-muted">Sin costo de envío.</span>
+                  </span>
+                </label>
               </div>
+
+              {entrega === "envio" && (
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <Field name="direccion" label="Dirección" required />
+                  </div>
+                  <Field name="ciudad" label="Ciudad" required />
+                  <Field name="provincia" label="Provincia" required />
+                  <Field name="cp" label="Código postal" required />
+                </div>
+              )}
             </fieldset>
 
             <fieldset className="rounded-xl border border-line bg-white p-5">
@@ -271,9 +317,13 @@ export default function CheckoutPage() {
                   <dd className="font-medium text-ink">{formatPrice(subtotal)}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-muted">Envío</dt>
+                  <dt className="text-muted">{entrega === "retiro" ? "Entrega" : "Envío"}</dt>
                   <dd className="font-medium text-ink">
-                    {shipping === 0 ? "Gratis" : formatPrice(shipping)}
+                    {entrega === "retiro"
+                      ? "Retiro / WhatsApp"
+                      : shipping === 0
+                        ? "Gratis"
+                        : formatPrice(shipping)}
                   </dd>
                 </div>
                 {descuento > 0 && (
