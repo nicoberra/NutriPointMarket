@@ -305,7 +305,7 @@ export default function CheckoutPage() {
                 {loading
                   ? "Procesando…"
                   : method === "Mercado Pago"
-                    ? "Pagar con Mercado Pago"
+                    ? "Pago seguro"
                     : "Confirmar pedido"}
               </button>
             </div>
