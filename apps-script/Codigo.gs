@@ -672,6 +672,15 @@ function writeHeader(sh, tab) {
   sh.autoResizeColumns(1, titles.length);
 }
 
+// Ejecutá esta función UNA vez y aceptá el permiso "Conectarse a un servicio
+// externo". Sirve para autorizar los pedidos a internet (Mercado Pago, GitHub).
+// Después republicá: Implementar → Administrar implementaciones → Versión nueva.
+function autorizar() {
+  var r = UrlFetchApp.fetch("https://api.mercadopago.com/", { muteHttpExceptions: true });
+  Logger.log("Autorización OK. Respuesta de Mercado Pago: " + r.getResponseCode());
+  return r.getResponseCode();
+}
+
 // Función opcional para setear el PIN del CRM y NO dejarlo en el código.
 // Cambiá el valor, ejecutala UNA vez, y después volvé a poner "" para no dejarlo.
 function setCrmPin() {
