@@ -8,8 +8,10 @@ import { CloseIcon, PlusIcon, WhatsappIcon, CheckIcon, SearchIcon } from "@/comp
 export interface FieldDef {
   key: string;
   label: string;
-  type?: "text" | "tel" | "number" | "date" | "textarea";
+  type?: "text" | "tel" | "number" | "date" | "textarea" | "select";
   required?: boolean;
+  /** Opciones para type "select" */
+  options?: string[];
 }
 
 export interface RecordsConfig {
@@ -276,6 +278,20 @@ function AddSheet({
                   onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}
                   className="input min-h-20 py-2 text-base"
                 />
+              ) : f.type === "select" ? (
+                <select
+                  required={f.required}
+                  value={form[f.key] ?? ""}
+                  onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}
+                  className="input h-11 text-base"
+                >
+                  <option value="">Elegí una opción…</option>
+                  {(f.options ?? []).map((op) => (
+                    <option key={op} value={op}>
+                      {op}
+                    </option>
+                  ))}
+                </select>
               ) : (
                 <input
                   type={f.type ?? "text"}

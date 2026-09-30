@@ -335,9 +335,10 @@ export async function createOrder(o: OrderInput): Promise<boolean> {
       detalle: o.detalle,
       monto: o.monto,
       estado,
-      notas: `Pago: ${o.metodo}. Email: ${o.email}`,
+      notas: `Email: ${o.email}`,
       envio: o.envio,
       montoEnvio: o.montoEnvio,
+      pago: o.metodo,
     }),
   }, 18000);
   return r.ok !== false;

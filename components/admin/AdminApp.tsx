@@ -57,12 +57,18 @@ const PEDIDOS_CFG: RecordsConfig = {
     { key: "detalle", label: "Detalle", type: "textarea" },
     { key: "monto", label: "Monto (precio de venta)", type: "number" },
     { key: "costo", label: "Costo (lo que te costó)", type: "number" },
+    {
+      key: "pago",
+      label: "Forma de pago",
+      type: "select",
+      options: ["Efectivo", "Transferencia", "Mercado Pago", "Otro"],
+    },
     { key: "envio", label: "Envío (dirección/forma)" },
     { key: "notas", label: "Notas", type: "textarea" },
   ],
   primary: (r) => r.cliente,
   secondary: (r) =>
-    [r.detalle, r.monto ? `$${r.monto}` : ""].filter(Boolean).join(" · "),
+    [r.detalle, r.monto ? `$${r.monto}` : "", r.pago].filter(Boolean).join(" · "),
   estado: true,
 };
 
