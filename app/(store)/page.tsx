@@ -11,7 +11,7 @@ export default function HomePage() {
   return (
     <>
       {/* Fondo decorativo compartido: arranca desde las categorías y baja al hero */}
-      <div className="relative overflow-hidden bg-page">
+      <div className="relative overflow-hidden">
         <div className="pointer-events-none absolute inset-0" aria-hidden>
           <div className="absolute -right-24 top-0 h-[28rem] w-[28rem] rounded-full bg-accent/25 blur-3xl" />
           <div className="absolute -bottom-24 left-1/4 h-80 w-80 rounded-full bg-secondary/30 blur-3xl" />

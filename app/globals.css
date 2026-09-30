@@ -73,8 +73,18 @@
   }
 
   body {
-    @apply bg-page text-ink font-sans antialiased;
+    @apply text-ink font-sans antialiased;
     text-rendering: optimizeLegibility;
+    background-color: rgb(var(--color-page));
+    /* Fondo con los doodles de la marca en toda la página. El velo crema encima
+       lo suaviza para que los textos y las tarjetas se sigan leyendo bien. */
+    background-image:
+      linear-gradient(rgb(var(--color-page) / 0.84), rgb(var(--color-page) / 0.84)),
+      url("/fondo.jpg");
+    background-repeat: repeat, no-repeat;
+    background-size: auto, cover;
+    background-position: center, center;
+    background-attachment: fixed;
   }
 
   h1, h2, h3, h4 {
