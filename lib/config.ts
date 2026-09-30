@@ -19,7 +19,7 @@ export const SITE = {
   tagline: "Suplementos deportivos, nutrición y rendimiento.",
   description:
     "Proteínas, creatinas, vitaminas, aminoácidos y suplementos deportivos. Suple Market.",
-  email: "hola@suplemarket.com.ar", // placeholder
+  email: "suplemarketargentina@gmail.com",
   phone: "+54 9 11 5164-0472",
   address: "Buenos Aires, Argentina", // placeholder
   instagram: "https://instagram.com/suplemarket.ar",
