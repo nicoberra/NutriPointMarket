@@ -42,7 +42,7 @@ export const TRANSFER = {
  * Si redeployás con URL nueva, cambiala acá.
  */
 export const SHEETS_API_URL =
-  "https://script.google.com/macros/s/AKfycbyYjIkAmdpAE7PS6Oa4AvKlfcE8EU09ePkIq1dS-TuCAykVy2GIy_sFQAzeuS1hkjMBSA/exec";
+  "https://script.google.com/macros/s/AKfycbxLxwZdBzKzo3lUH5XDI6-0l-c1Lv7b4bTiqBNsqxEIfeQdC3bvdGm95910jjp_o86atw/exec";
 
 /** Número real de WhatsApp (formato internacional sin +) */
 export const WHATSAPP_NUMBER = "5491151640472";
