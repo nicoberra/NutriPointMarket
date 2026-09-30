@@ -30,9 +30,9 @@ export const SITE = {
  * la web al cliente cuando elige transferencia).
  */
 export const TRANSFER = {
-  alias: "SUPLE.MARKET", // ← poné tu alias real
-  cbu: "", // ← opcional: tu CBU/CVU
-  titular: "Suple Market", // ← titular de la cuenta
+  alias: "sanou.arg", // ← alias (se puede cambiar cuando quieras)
+  cvu: "0000003100097800400358", // CVU/CBU
+  titular: "Nicolas Thiago Berra", // titular de la cuenta
   banco: "", // ← opcional: banco / billetera (Mercado Pago, Ualá, etc.)
 };
 

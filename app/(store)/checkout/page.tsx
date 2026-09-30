@@ -111,7 +111,7 @@ export default function CheckoutPage() {
                   <p className="font-semibold text-primary">Datos para transferir</p>
                   <dl className="mt-2 space-y-1">
                     <Row k="Alias" v={TRANSFER.alias} />
-                    {TRANSFER.cbu && <Row k="CBU/CVU" v={TRANSFER.cbu} />}
+                    {TRANSFER.cvu && <Row k="CVU" v={TRANSFER.cvu} />}
                     {TRANSFER.titular && <Row k="Titular" v={TRANSFER.titular} />}
                     {TRANSFER.banco && <Row k="Banco" v={TRANSFER.banco} />}
                     <Row k="Importe" v={formatPrice(done.total)} />
