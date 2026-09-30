@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Product } from "@/lib/types";
 import { useProducts } from "@/context/ProductsContext";
 import { useCategories } from "@/context/CategoriesContext";
-import { saveProduct, type ProductInput } from "@/lib/api";
+import { saveProduct, uploadProductImage, type ProductInput } from "@/lib/api";
 import { formatPrice, discountPercent } from "@/lib/format";
 import { categoryMap } from "@/data/categories";
 import { SearchIcon, CloseIcon, CheckIcon, PlusIcon } from "@/components/Icons";
@@ -66,6 +66,18 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
     const ok = await saveProduct(row);
     onToast(ok ? "Guardado ✓" : "Guardado (verificá)");
     setTimeout(() => refresh().catch(() => {}), 1000);
+  };
+
+  // Sube la foto de un producto a GitHub (vía backend) y refresca.
+  const handleUpload = async (p: Product, file: File) => {
+    onToast("Subiendo foto… ⏳");
+    try {
+      await uploadProductImage(p.name, file);
+      onToast("Foto subida ✓ (puede tardar unos segundos en verse)");
+      setTimeout(() => refresh().catch(() => {}), 3000);
+    } catch {
+      onToast("No se pudo subir la foto");
+    }
   };
 
   const handleFullSave = async (row: ProductInput) => {
@@ -148,6 +160,7 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
                   dollar={dollar}
                   onSave={saveInline}
                   onEdit={() => setEditing(p)}
+                  onUpload={handleUpload}
                 />
               ))}
             </div>
@@ -186,12 +199,15 @@ function ProductRow({
   dollar,
   onSave,
   onEdit,
+  onUpload,
 }: {
   product: Product;
   dollar: number;
   onSave: (p: Product, ch: Changes) => void;
   onEdit: () => void;
+  onUpload: (p: Product, file: File) => Promise<void>;
 }) {
+  const [uploading, setUploading] = useState(false);
   const [precio, setPrecio] = useState<number>(product.price);
   const [precioML, setPrecioML] = useState<number | "">(product.oldPrice ?? "");
   const [stock, setStock] = useState<boolean>(product.inStock !== false);
@@ -229,6 +245,35 @@ function ProductRow({
         >
           Editar
         </button>
+      </div>
+
+      {/* Foto del producto */}
+      <div className="mb-3 flex items-center gap-3">
+        <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-lg border border-line bg-page-soft">
+          {product.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+          ) : (
+            <span className="text-[10px] text-muted">Sin foto</span>
+          )}
+        </div>
+        <label className="cursor-pointer rounded-lg border border-line px-3 py-2 text-xs font-semibold text-primary hover:bg-page-soft">
+          {uploading ? "Subiendo…" : product.image ? "Cambiar foto" : "Subir foto"}
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            disabled={uploading}
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (!file) return;
+              setUploading(true);
+              await onUpload(product, file);
+              setUploading(false);
+            }}
+          />
+        </label>
       </div>
 
       <div className="grid grid-cols-2 gap-3">

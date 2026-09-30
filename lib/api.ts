@@ -129,6 +129,7 @@ export function buildProduct(row: Record<string, unknown>): Product {
     price: precio,
     oldPrice,
     discount: discountPercent(precio, oldPrice),
+    image: String(row.imagen ?? "").trim() || undefined,
     images: [],
     stock: 0,
     inStock: row.stock === undefined || row.stock === "" ? true : toBool(row.stock),
@@ -304,6 +305,61 @@ export async function updateRow(
 export async function deleteRow(tab: string, id: string): Promise<boolean> {
   const r = await api("delete", { tab, id });
   return r.ok !== false;
+}
+
+/* ============================== IMÁGENES ================================= */
+
+/**
+ * Redimensiona una imagen (canvas) y la devuelve como base64 JPEG (sin el
+ * prefijo data:). Achica para que no pese mucho al subir a GitHub.
+ */
+export function resizeImageToBase64(file: File, max = 1000, quality = 0.82): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width >= height && width > max) {
+        height = Math.round((height * max) / width);
+        width = max;
+      } else if (height > width && height > max) {
+        width = Math.round((width * max) / height);
+        height = max;
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("No se pudo procesar la imagen"));
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL("image/jpeg", quality);
+      resolve(dataUrl.split(",")[1] || "");
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("No se pudo leer la imagen"));
+    };
+    img.src = url;
+  });
+}
+
+/**
+ * Sube la foto de un producto: la redimensiona y la manda al backend (que la
+ * guarda en GitHub y escribe el link en la columna Imagen del producto).
+ * Se usa POST no-cors con text/plain porque el payload (base64) es grande.
+ * La respuesta es opaca; luego hay que refrescar los productos para ver la foto.
+ */
+export async function uploadProductImage(nombre: string, file: File): Promise<void> {
+  const data = await resizeImageToBase64(file, 1000, 0.82);
+  await fetch(SHEETS_API_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action: "subir_imagen", nombre, data }),
+  });
 }
 
 /* ========================== PEDIDOS / PAGOS ============================== */

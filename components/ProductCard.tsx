@@ -45,13 +45,22 @@ export function ProductCard({ product }: { product: Product }) {
           className="block bg-page-soft"
           aria-label={product.name}
         >
-          <ProductVisual
-            shape={shape}
-            brandLabel={
-              product.brand ? product.brand.split(" ")[0].toUpperCase().slice(0, 7) : undefined
-            }
-            className="aspect-square w-full transition-transform duration-500 group-hover:scale-[1.06]"
-          />
+          {product.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={product.image}
+              alt={product.name}
+              className="aspect-square w-full object-cover transition-transform duration-500 group-hover:scale-[1.06]"
+            />
+          ) : (
+            <ProductVisual
+              shape={shape}
+              brandLabel={
+                product.brand ? product.brand.split(" ")[0].toUpperCase().slice(0, 7) : undefined
+              }
+              className="aspect-square w-full transition-transform duration-500 group-hover:scale-[1.06]"
+            />
+          )}
         </Link>
       </div>
 

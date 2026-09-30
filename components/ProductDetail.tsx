@@ -62,14 +62,23 @@ export function ProductDetail({ product: initial }: { product: Product }) {
               </span>
             )}
             <FavoriteButton id={product.id} className="absolute right-4 top-4 z-10 h-11 w-11" />
-            <ProductVisual
-              shape={shape}
-              brandLabel={
-                product.brand ? product.brand.split(" ")[0].toUpperCase().slice(0, 7) : undefined
-              }
-              accent={gallery[activeThumb]}
-              className="aspect-square w-full"
-            />
+            {product.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={product.image}
+                alt={product.name}
+                className="aspect-square w-full object-cover"
+              />
+            ) : (
+              <ProductVisual
+                shape={shape}
+                brandLabel={
+                  product.brand ? product.brand.split(" ")[0].toUpperCase().slice(0, 7) : undefined
+                }
+                accent={gallery[activeThumb]}
+                className="aspect-square w-full"
+              />
+            )}
           </div>
           <div className="mt-3 flex gap-3">
             {gallery.map((c, i) => (
