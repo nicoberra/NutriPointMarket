@@ -35,8 +35,14 @@ export default function CheckoutPage() {
   const total = subtotal + shipping;
 
   // Descuento por pagar en efectivo o transferencia (no aplica a Mercado Pago).
+  // El 15% se calcula sobre CADA producto y se suma (redondeo por producto),
+  // nunca sobre el envío.
+  const descuentoProductos = items.reduce(
+    (acc, i) => acc + Math.round(i.product.price * i.quantity * DESCUENTO_EF_TR),
+    0,
+  );
   const pagaConDescuento = method === "Transferencia" || method === "Efectivo";
-  const descuento = pagaConDescuento ? Math.round(subtotal * DESCUENTO_EF_TR) : 0;
+  const descuento = pagaConDescuento ? descuentoProductos : 0;
   const totalFinal = total - descuento;
 
   const confirm = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -59,8 +65,9 @@ export default function CheckoutPage() {
     const detalle = items.map((i) => `${i.quantity}x ${i.product.name}`).join(" | ");
     const id = "ped" + Date.now();
 
-    // Total según el método: efectivo/transferencia con 15% off; MP sin descuento.
-    const desc = metodo === "Mercado Pago" ? 0 : Math.round(subtotal * DESCUENTO_EF_TR);
+    // Total según el método: efectivo/transferencia con 15% off (por producto);
+    // Mercado Pago sin descuento.
+    const desc = metodo === "Mercado Pago" ? 0 : descuentoProductos;
     const montoFinal = total - desc;
 
     setLoading(true);
