@@ -235,9 +235,11 @@ function Login({ onOk }: { onOk: () => void }) {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const ok = await crmLogin(pin);
+    const res = await crmLogin(pin);
     setLoading(false);
-    if (ok) onOk();
+    if (res.ok) onOk();
+    else if (res.reason === "conn")
+      setError("No se pudo conectar. Revisá tu internet y probá de nuevo (tu PIN puede estar bien).");
     else setError("PIN incorrecto. Probá de nuevo.");
   };
 

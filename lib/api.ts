@@ -218,14 +218,29 @@ export async function loginUser(email: string, password: string): Promise<AuthRe
 
 /* ============================ API DEL CRM ================================= */
 
-/** Login del CRM: valida el PIN contra el backend. */
-export async function crmLogin(pin: string): Promise<boolean> {
-  try {
-    const r = await api("crm_login", { pin });
-    return r.ok === true;
-  } catch {
-    return false;
+export type CrmLoginResult = { ok: true } | { ok: false; reason: "pin" | "conn" };
+
+/**
+ * Login del CRM: valida el PIN contra el backend. Distingue "PIN incorrecto" de
+ * "no se pudo conectar" (antes cualquier falla de red se mostraba como PIN mal).
+ * Reintenta ante fallas de red/JSONP (típico en 4G o WiFi lento).
+ */
+export async function crmLogin(pin: string): Promise<CrmLoginResult> {
+  const intentos = 3;
+  for (let i = 0; i < intentos; i++) {
+    try {
+      const r = await api("crm_login", { pin });
+      if (r.ok === true) return { ok: true };
+      // El backend respondió: si es un problema de configuración, es de conexión
+      // para el usuario, no un PIN mal.
+      if (r.error && /no configurado/i.test(String(r.error))) return { ok: false, reason: "conn" };
+      return { ok: false, reason: "pin" }; // respuesta clara: PIN incorrecto
+    } catch {
+      // Falla de red/JSONP → reintenta; si se agotan, es problema de conexión.
+      if (i === intentos - 1) return { ok: false, reason: "conn" };
+    }
   }
+  return { ok: false, reason: "conn" };
 }
 
 /** Lista filas de una pestaña (Clientes, Pedidos, Seguimientos). */
