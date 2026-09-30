@@ -376,6 +376,7 @@ function listProductos() {
       costo: row[8] === "" || row[8] == null ? 0 : Number(row[8]) || 0,
       costoMoneda: String(row[9] || "").trim().toUpperCase() === "USD" ? "USD" : "ARS",
       imagen: String(row[10] || "").trim(),
+      cantidad: row[11] === "" || row[11] == null ? 0 : Number(row[11]) || 0,
     });
   }
   return list;
