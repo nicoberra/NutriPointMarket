@@ -18,7 +18,7 @@ export default function PagoErrorPage() {
           <h2 className="font-display text-xl font-bold text-primary">No se completó el pago</h2>
           <p className="mt-2 text-sm text-muted">
             El pago no se pudo procesar o fue cancelado. No te preocupes: no se te cobró
-            nada. Podés intentar de nuevo o pagar por transferencia/efectivo.
+            nada. Podés intentar de nuevo o pagar por transferencia.
           </p>
           <Link href="/checkout" className="btn btn-primary btn-md mt-5 w-full">
             Volver a intentar

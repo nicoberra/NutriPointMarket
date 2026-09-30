@@ -14,7 +14,7 @@ export function Hero() {
         {/* Texto */}
         <div className="max-w-xl">
           <span className="badge mb-4 bg-primary/10 text-primary">
-            Nueva temporada · Descuentos en efectivo y transferencia
+            Nueva temporada · 15% de descuento por transferencia
           </span>
           <h1 className="font-display text-4xl font-black leading-[1.05] tracking-tight text-primary sm:text-5xl lg:text-6xl">
             Alcanzá tu <span className="text-secondary">mejor versión</span>
@@ -38,10 +38,10 @@ export function Hero() {
               <ShieldIcon className="h-4 w-4 text-primary" /> 100% originales
             </li>
             <li className="flex items-center gap-1.5">
-              <PercentIcon className="h-4 w-4 text-primary" /> Descuento en efectivo/transferencia
+              <PercentIcon className="h-4 w-4 text-primary" /> 15% de descuento por transferencia
             </li>
             <li className="flex items-center gap-1.5">
-              <CardIcon className="h-4 w-4 text-primary" /> Transferencia y efectivo
+              <CardIcon className="h-4 w-4 text-primary" /> Pago seguro
             </li>
           </ul>
         </div>

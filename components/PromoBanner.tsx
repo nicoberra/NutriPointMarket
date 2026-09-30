@@ -64,8 +64,8 @@ export function PromoBannerRow() {
         />
         <PromoBanner
           variant="primary"
-          title="Descuento en efectivo o transferencia"
-          text="Pagando en efectivo o por transferencia bancaria tenés precio especial."
+          title="Descuento por transferencia"
+          text="Pagando por transferencia bancaria tenés 15% de descuento."
           ctaLabel="Cómo comprar"
           ctaHref="/contacto#pagos"
         />

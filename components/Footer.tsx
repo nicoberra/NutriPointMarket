@@ -11,7 +11,6 @@ import {
   WhatsappIcon,
   InstagramIcon,
   MailIcon,
-  MapPinIcon,
 } from "./Icons";
 
 export function Footer() {
@@ -101,10 +100,6 @@ export function Footer() {
                 <a href={`mailto:${SITE.email}`} className="hover:text-accent">
                   {SITE.email}
                 </a>
-              </li>
-              <li className="flex items-start gap-2.5">
-                <MapPinIcon className="mt-0.5 h-4.5 w-4.5 shrink-0 text-accent" />
-                <span>{SITE.address}</span>
               </li>
             </ul>
           </div>

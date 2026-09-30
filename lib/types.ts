@@ -40,6 +40,8 @@ export interface Product {
   stock: number;
   /** Hay stock (viene de la planilla: Stock sí/no). Por defecto true. */
   inStock?: boolean;
+  /** Cantidad de unidades en stock (columna Cantidad de la planilla). */
+  stockQty?: number;
   flavors: string[];
   presentations?: string[];
   /** Costo (para calcular ganancia en el CRM). En la moneda de `costCurrency`. */

@@ -31,13 +31,13 @@ const INFO = [
     id: "pagos",
     icon: CardIcon,
     title: "Medios de pago",
-    text: "Aceptamos transferencia bancaria y efectivo. Pagando de esas formas tenés un descuento especial.",
+    text: "Aceptamos transferencia bancaria y Mercado Pago. Pagando por transferencia tenés 15% de descuento.",
   },
 ];
 
 const FAQ = [
   { q: "¿Los productos son originales?", a: "Sí. Trabajamos únicamente con distribuidores oficiales de cada marca." },
-  { q: "¿Hay descuento por efectivo o transferencia?", a: "Sí, pagando en efectivo o por transferencia bancaria tenés un descuento. Consultanos por WhatsApp." },
+  { q: "¿Hay descuento por transferencia?", a: "Sí, pagando por transferencia bancaria tenés un 15% de descuento. Consultanos por WhatsApp." },
   { q: "¿Cómo recibo mi pedido?", a: "Coordinamos la entrega o el envío por WhatsApp según tu zona." },
   { q: "¿Puedo cambiar o devolver un producto?", a: "Sí, dentro de los plazos legales y con el producto cerrado. Escribinos y te ayudamos." },
 ];
@@ -151,8 +151,23 @@ export default function ContactoPage() {
           ))}
         </div>
 
-        {/* Devoluciones (anchor) + FAQ */}
-        <div id="devoluciones" className="mt-12 scroll-mt-40" />
+        {/* Cambios y devoluciones */}
+        <div id="devoluciones" className="mt-12 scroll-mt-40">
+          <h2 className="mb-3 font-display text-xl font-bold text-primary">
+            Cambios y devoluciones
+          </h2>
+          <div className="rounded-xl border border-line bg-white p-5 text-sm text-muted">
+            <p>
+              Solo aceptamos cambios o devoluciones si el pedido{" "}
+              <b className="text-ink">todavía no fue enviado</b>. Una vez que el pedido
+              fue despachado, no realizamos cambios ni devoluciones.
+            </p>
+            <p className="mt-2">
+              Si tu pedido aún no salió y necesitás modificarlo, escribinos lo antes
+              posible por WhatsApp y lo vemos.
+            </p>
+          </div>
+        </div>
         <div id="faq" className="mt-4 scroll-mt-40">
           <h2 className="mb-5 font-display text-xl font-bold text-primary">
             Preguntas frecuentes

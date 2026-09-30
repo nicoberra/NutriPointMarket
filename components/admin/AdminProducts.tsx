@@ -24,6 +24,7 @@ type Changes = Partial<{
   destacado: boolean;
   costo: number;
   costoMoneda: "USD" | "ARS";
+  cantidad: number;
 }>;
 
 export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
@@ -60,6 +61,7 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
       destacado: ch.destacado ?? p.featured,
       costo: "costo" in ch ? ch.costo : p.cost,
       costoMoneda: ch.costoMoneda ?? p.costCurrency ?? "ARS",
+      cantidad: ch.cantidad ?? p.stockQty ?? 0,
     };
     const ok = await saveProduct(row);
     onToast(ok ? "Guardado ✓" : "Guardado (verificá)");
@@ -196,6 +198,7 @@ function ProductRow({
   const [destacado, setDestacado] = useState<boolean>(product.featured);
   const [costo, setCosto] = useState<number | "">(product.cost || "");
   const [moneda, setMoneda] = useState<"USD" | "ARS">(product.costCurrency ?? "ARS");
+  const [cantidad, setCantidad] = useState<number | "">(product.stockQty ?? "");
 
   const desc = discountPercent(precio, precioML ? Number(precioML) : undefined);
   const costoNum = costo === "" ? 0 : Number(costo);
@@ -311,6 +314,23 @@ function ProductRow({
         )}
       </div>
 
+      <label className="mt-3 block">
+        <span className="mb-1 block text-xs font-semibold text-ink">Cantidad en stock</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          value={cantidad}
+          onChange={(e) => setCantidad(e.target.value === "" ? "" : Number(e.target.value))}
+          onBlur={() => {
+            const n = cantidad === "" ? 0 : Number(cantidad);
+            setStock(n > 0);
+            onSave(product, { cantidad: n, stock: n > 0 });
+          }}
+          className="input h-11 text-base"
+          placeholder="0"
+        />
+      </label>
+
       <div className="mt-3 grid grid-cols-2 gap-3">
         <Toggle
           label="En stock"
@@ -386,6 +406,7 @@ function ProductSheet({
   const [destacado, setDestacado] = useState<boolean>(product?.featured ?? false);
   const [costo, setCosto] = useState<number | "">(product?.cost || "");
   const [moneda, setMoneda] = useState<"USD" | "ARS">(product?.costCurrency ?? "ARS");
+  const [cantidad, setCantidad] = useState<number | "">(product?.stockQty ?? "");
 
   const desc = discountPercent(precio, precioML ? Number(precioML) : undefined);
   const costoNum = costo === "" ? 0 : Number(costo);
@@ -394,6 +415,7 @@ function ProductSheet({
 
   const submit = () => {
     if (!nombre.trim()) return;
+    const cantNum = cantidad === "" ? 0 : Number(cantidad);
     onSave({
       nombre: nombre.trim(),
       marca: marca.trim(),
@@ -401,10 +423,11 @@ function ProductSheet({
       precio,
       precioML: precioML ? Number(precioML) : undefined,
       variantes: variantes.trim(),
-      stock,
+      stock: cantidad === "" ? stock : cantNum > 0,
       destacado,
       costo: costoNum,
       costoMoneda: moneda,
+      cantidad: cantNum,
     });
   };
 
@@ -489,6 +512,17 @@ function ProductSheet({
               onChange={(e) => setVariantes(e.target.value)}
               className="input h-11 text-base"
               placeholder="Vainilla, Chocolate, Frutilla"
+            />
+          </Field>
+
+          <Field label="Cantidad en stock">
+            <input
+              type="number"
+              inputMode="numeric"
+              value={cantidad}
+              onChange={(e) => setCantidad(e.target.value === "" ? "" : Number(e.target.value))}
+              className="input h-11 text-base"
+              placeholder="0"
             />
           </Field>
 

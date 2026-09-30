@@ -132,6 +132,7 @@ export function buildProduct(row: Record<string, unknown>): Product {
     images: [],
     stock: 0,
     inStock: row.stock === undefined || row.stock === "" ? true : toBool(row.stock),
+    stockQty: toNum(row.cantidad),
     flavors: toList(row.variantes),
     presentations: [],
     cost: toNum(row.costo),
@@ -262,6 +263,7 @@ export interface ProductInput {
   destacado: boolean;
   costo?: number;
   costoMoneda?: "USD" | "ARS";
+  cantidad?: number;
 }
 
 export async function saveProduct(row: ProductInput): Promise<boolean> {
@@ -276,6 +278,7 @@ export async function saveProduct(row: ProductInput): Promise<boolean> {
     destacado: row.destacado,
     costo: row.costo ?? "",
     costoMoneda: row.costoMoneda ?? "ARS",
+    cantidad: row.cantidad ?? "",
   });
   const r = await api("productos_save", { data });
   return r.ok !== false;

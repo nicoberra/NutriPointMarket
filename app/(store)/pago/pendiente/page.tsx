@@ -17,8 +17,8 @@ export default function PagoPendientePage() {
           </span>
           <h2 className="font-display text-xl font-bold text-primary">Tu pago está pendiente</h2>
           <p className="mt-2 text-sm text-muted">
-            Mercado Pago todavía está procesando el pago (por ejemplo, pagos en efectivo o
-            que tardan en acreditar). Cuando se confirme, preparamos tu pedido. Si tenés
+            Mercado Pago todavía está procesando el pago (a veces tarda unos minutos en
+            acreditar). Cuando se confirme, preparamos tu pedido. Si tenés
             dudas, escribinos.
           </p>
           <a

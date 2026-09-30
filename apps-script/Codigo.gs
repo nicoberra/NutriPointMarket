@@ -46,6 +46,7 @@ var TABLES = {
       ["costo", "Costo"],
       ["costoMoneda", "Costo moneda"],
       ["imagen", "Imagen"],
+      ["cantidad", "Cantidad"],
     ],
     idField: "nombre",
   },

@@ -55,8 +55,8 @@ export function whatsappLink(message: string = WHATSAPP_MESSAGE): string {
 /** Mensajes de la barra promocional superior (rotan en mobile) */
 export const PROMO_MESSAGES = [
   "✅ Productos 100% originales",
-  "💵 Descuentos pagando en efectivo o transferencia",
-  "🏦 Aceptamos transferencia bancaria y efectivo",
+  "💰 15% de descuento pagando por transferencia",
+  "🏦 Aceptamos transferencia bancaria y Mercado Pago",
 ];
 
 /** Beneficios de la franja de confianza */
@@ -68,13 +68,13 @@ export const TRUST_ITEMS = [
   },
   {
     icon: "percent",
-    title: "Descuento en efectivo / transferencia",
-    text: "Precio especial pagando de esas formas.",
+    title: "Descuento por transferencia",
+    text: "15% de descuento pagando por transferencia.",
   },
   {
     icon: "card",
-    title: "Transferencia y efectivo",
-    text: "Aceptamos transferencia bancaria y efectivo.",
+    title: "Pago seguro",
+    text: "Transferencia bancaria y Mercado Pago.",
   },
   {
     icon: "whatsapp",

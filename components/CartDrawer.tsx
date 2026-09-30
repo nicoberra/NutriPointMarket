@@ -11,7 +11,7 @@ import { ProductVisual } from "./ProductVisual";
 import { QuantitySelector } from "./QuantitySelector";
 import { CartIcon, CloseIcon, TrashIcon, TruckIcon, ArrowRightIcon } from "./Icons";
 
-const FREE_SHIPPING_THRESHOLD = 60000;
+const FREE_SHIPPING_THRESHOLD = 120000;
 
 export function CartDrawer() {
   const { items, isOpen, closeCart, subtotal, setQuantity, removeItem, count } =
