@@ -20,6 +20,14 @@
 var SHEET_ID = "12paAzW6OcSgYv4u6L7QVI4tpvrEx1yqnujW0OjcieMc";
 var API_VERSION = "v2";
 
+// Repo de GitHub donde se guardan las fotos de productos (en public/productos/).
+// El token NO va acá: se guarda en Propiedades del script como GITHUB_TOKEN.
+var GITHUB_REPO = "nicoberra/NutriPointMarket";
+var GITHUB_BRANCH = "main";
+
+// Dominio del sitio (para las páginas de retorno de Mercado Pago).
+var SITE_URL = "https://suplemarket.com.ar";
+
 /* ----------------------------- ESQUEMA DE TABLAS -------------------------- */
 
 var TABLES = {
@@ -37,6 +45,7 @@ var TABLES = {
       ["destacado", "Destacado"],
       ["costo", "Costo"],
       ["costoMoneda", "Costo moneda"],
+      ["imagen", "Imagen"],
     ],
     idField: "nombre",
   },
@@ -128,6 +137,13 @@ function doPost(e) {
 
 function handle(e) {
   var p = (e && e.parameter) || {};
+  // Subidas de imagen llegan por POST con el JSON en el cuerpo.
+  if (e && e.postData && e.postData.contents) {
+    try {
+      var body = JSON.parse(e.postData.contents);
+      for (var k in body) p[k] = body[k];
+    } catch (err) {}
+  }
   var action = p.action || "version";
   var out;
   try {
@@ -155,6 +171,15 @@ function handle(e) {
         break;
       case "categoria_rename":
         out = { ok: true, data: categoriaRename(p.from, p.to) };
+        break;
+      case "subir_imagen":
+        out = subirImagen(p);
+        break;
+      case "mp_crear_pref":
+        out = mpCrearPreferencia(p);
+        break;
+      case "mp_webhook":
+        out = mpWebhook(p, e);
         break;
       case "registrar":
         out = registrar(parseData(p));
@@ -348,6 +373,7 @@ function listProductos() {
       destacado: parseSiNo(row[7]),
       costo: row[8] === "" || row[8] == null ? 0 : Number(row[8]) || 0,
       costoMoneda: String(row[9] || "").trim().toUpperCase() === "USD" ? "USD" : "ARS",
+      imagen: String(row[10] || "").trim(),
     });
   }
   return list;
@@ -359,6 +385,142 @@ function saveProducto(obj) {
   var n = findRowById("Productos", obj.nombre);
   if (n > 0) return updateRow("Productos", obj.nombre, obj);
   return addRow("Productos", obj);
+}
+
+/* ------------------------------ Imágenes --------------------------------- */
+
+// Sube una imagen (base64) al repo de GitHub en public/productos/ y guarda el
+// link en la columna "imagen" del producto. El token va en Propiedades del
+// script como GITHUB_TOKEN (NO en el código).
+function subirImagen(p) {
+  if (!p.nombre || !p.data) return { ok: false, error: "Faltan datos" };
+  var token = PropertiesService.getScriptProperties().getProperty("GITHUB_TOKEN");
+  if (!token) return { ok: false, error: "Falta GITHUB_TOKEN en Propiedades del script" };
+  var path = "public/productos/" + slugImagen(p.nombre) + "-" + Date.now() + ".jpg";
+  var api = "https://api.github.com/repos/" + GITHUB_REPO + "/contents/" + path;
+  var res = UrlFetchApp.fetch(api, {
+    method: "put",
+    contentType: "application/json",
+    headers: {
+      Authorization: "Bearer " + token,
+      Accept: "application/vnd.github+json",
+      "User-Agent": "suplemarket-crm",
+    },
+    payload: JSON.stringify({
+      message: "foto: " + p.nombre,
+      content: p.data, // ya viene en base64
+      branch: GITHUB_BRANCH,
+    }),
+    muteHttpExceptions: true,
+  });
+  var code = res.getResponseCode();
+  if (code < 200 || code >= 300) {
+    return { ok: false, error: "GitHub " + code + ": " + res.getContentText().slice(0, 180) };
+  }
+  var url =
+    "https://raw.githubusercontent.com/" + GITHUB_REPO + "/" + GITHUB_BRANCH + "/" + path;
+  var n = findRowById("Productos", p.nombre);
+  if (n > 0) updateRowByNumber("Productos", n, { imagen: url });
+  else addRow("Productos", { nombre: p.nombre, imagen: url });
+  return { ok: true, url: url };
+}
+
+function slugImagen(s) {
+  return (
+    String(s)
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 40) || "producto"
+  );
+}
+
+/* ----------------------------- Mercado Pago ------------------------------ */
+
+// Crea una preferencia de pago (Checkout Pro) y devuelve el link (init_point).
+// El Access Token va en Propiedades del script como MP_ACCESS_TOKEN (NO en el
+// código ni en la web).
+function mpCrearPreferencia(p) {
+  var token = PropertiesService.getScriptProperties().getProperty("MP_ACCESS_TOKEN");
+  if (!token) return { ok: false, error: "Falta MP_ACCESS_TOKEN en Propiedades del script" };
+  var monto = Number(p.monto) || 0;
+  if (monto <= 0) return { ok: false, error: "Monto inválido" };
+  var exec = "";
+  try { exec = ScriptApp.getService().getUrl(); } catch (e0) {}
+
+  var pref = {
+    items: [
+      {
+        title: String(p.titulo || "Pedido Suple Market"),
+        quantity: 1,
+        unit_price: monto,
+        currency_id: "ARS",
+      },
+    ],
+    external_reference: String(p.pedido || ""),
+    back_urls: {
+      success: SITE_URL + "/pago/exito/",
+      failure: SITE_URL + "/pago/error/",
+      pending: SITE_URL + "/pago/pendiente/",
+    },
+    auto_return: "approved",
+  };
+  if (exec) pref.notification_url = exec + "?action=mp_webhook";
+  if (p.email) pref.payer = { email: String(p.email) };
+
+  var res = UrlFetchApp.fetch("https://api.mercadopago.com/checkout/preferences", {
+    method: "post",
+    contentType: "application/json",
+    headers: { Authorization: "Bearer " + token },
+    payload: JSON.stringify(pref),
+    muteHttpExceptions: true,
+  });
+  var code = res.getResponseCode();
+  var body = {};
+  try { body = JSON.parse(res.getContentText()); } catch (e1) {}
+  if (code < 200 || code >= 300) {
+    return { ok: false, error: "MP " + code + ": " + res.getContentText().slice(0, 180) };
+  }
+  return { ok: true, init_point: body.init_point, id: body.id };
+}
+
+// Webhook de Mercado Pago: cuando un pago se aprueba, marca el pedido como
+// "pagado" en la planilla. MP manda el id del pago por query (?data.id=) o en
+// el cuerpo. Consultamos el pago para leer el estado y el nº de pedido.
+function mpWebhook(p, e) {
+  try {
+    var token = PropertiesService.getScriptProperties().getProperty("MP_ACCESS_TOKEN");
+    if (!token) return { ok: false };
+
+    var type = p.type || p.topic || "";
+    if (type && String(type).indexOf("payment") === -1) return { ok: true }; // solo pagos
+
+    var payId = p["data.id"] || p.id || "";
+    if (!payId && e && e.postData && e.postData.contents) {
+      try {
+        var b = JSON.parse(e.postData.contents);
+        payId = (b.data && b.data.id) || b.id || "";
+      } catch (er) {}
+    }
+    if (!payId) return { ok: true };
+
+    var r = UrlFetchApp.fetch("https://api.mercadopago.com/v1/payments/" + payId, {
+      headers: { Authorization: "Bearer " + token },
+      muteHttpExceptions: true,
+    });
+    var pay = {};
+    try { pay = JSON.parse(r.getContentText()); } catch (er2) {}
+
+    var ref = pay.external_reference;
+    if (pay.status === "approved" && ref) {
+      var n = findRowById("Pedidos", ref);
+      if (n > 0) updateRowByNumber("Pedidos", n, { estado: "pagado" });
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
 }
 
 /* ------------------------------ Categorías ------------------------------- */

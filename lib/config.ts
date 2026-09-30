@@ -26,6 +26,17 @@ export const SITE = {
 };
 
 /**
+ * Datos para pagos por TRANSFERENCIA. Reemplazá por los reales (te los muestra
+ * la web al cliente cuando elige transferencia).
+ */
+export const TRANSFER = {
+  alias: "SUPLE.MARKET", // ← poné tu alias real
+  cbu: "", // ← opcional: tu CBU/CVU
+  titular: "Suple Market", // ← titular de la cuenta
+  banco: "", // ← opcional: banco / billetera (Mercado Pago, Ualá, etc.)
+};
+
+/**
  * URL de la API (Google Apps Script) que lee/escribe la planilla de Google Sheets.
  * Es la "base de datos" de NutriPointMarket. Se lee desde la web con JSONP.
  * Si redeployás con URL nueva, cambiala acá.

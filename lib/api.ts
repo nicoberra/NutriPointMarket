@@ -287,6 +287,55 @@ export async function deleteRow(tab: string, id: string): Promise<boolean> {
   return r.ok !== false;
 }
 
+/* ========================== PEDIDOS / PAGOS ============================== */
+
+export interface OrderInput {
+  id: string;
+  cliente: string;
+  telefono: string;
+  email: string;
+  detalle: string;
+  monto: number;
+  montoEnvio: number;
+  envio: string; // dirección
+  metodo: string; // "Efectivo" | "Transferencia" | "Mercado Pago"
+}
+
+/** Guarda un pedido en la planilla (pestaña Pedidos). */
+export async function createOrder(o: OrderInput): Promise<boolean> {
+  const estado = o.metodo === "Mercado Pago" ? "pendiente de pago" : "nuevo";
+  return addRow("Pedidos", {
+    id: o.id,
+    cliente: o.cliente,
+    telefono: o.telefono,
+    detalle: o.detalle,
+    monto: o.monto,
+    estado,
+    notas: `Pago: ${o.metodo}. Email: ${o.email}`,
+    envio: o.envio,
+    montoEnvio: o.montoEnvio,
+  });
+}
+
+/**
+ * Crea una preferencia de pago en Mercado Pago (vía backend, que tiene el
+ * Access Token) y devuelve el link (init_point) al que hay que redirigir.
+ */
+export async function mpCreatePreference(args: {
+  pedido: string;
+  monto: number;
+  titulo: string;
+  email: string;
+}): Promise<string | null> {
+  const r = (await api("mp_crear_pref", {
+    pedido: args.pedido,
+    monto: args.monto,
+    titulo: args.titulo,
+    email: args.email,
+  })) as ApiResult & { init_point?: string };
+  return r.ok && r.init_point ? r.init_point : null;
+}
+
 /* ----------------------------- Categorías -------------------------------- */
 
 export interface CategoryRow {

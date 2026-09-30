@@ -5,25 +5,92 @@ import { useState } from "react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { formatPrice } from "@/lib/format";
-import { whatsappLink } from "@/lib/config";
+import { whatsappLink, TRANSFER } from "@/lib/config";
+import { createOrder, mpCreatePreference } from "@/lib/api";
 import { PageBanner } from "@/components/PageBanner";
 import { CheckIcon, WhatsappIcon } from "@/components/Icons";
+
+type Metodo = "Transferencia" | "Efectivo" | "Mercado Pago";
+
+interface DoneInfo {
+  metodo: Metodo;
+  id: string;
+  total: number;
+}
 
 export default function CheckoutPage() {
   const { items, subtotal, count, clear } = useCart();
   const { user } = useAuth();
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState<DoneInfo | null>(null);
+  const [method, setMethod] = useState<Metodo>("Transferencia");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const shipping = subtotal >= 60000 || subtotal === 0 ? 0 : 4500;
   const total = subtotal + shipping;
 
-  const confirm = (e: React.FormEvent) => {
+  const confirm = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setDone(true);
-    clear();
+    if (loading) return;
+    setError(null);
+
+    const fd = new FormData(e.currentTarget);
+    const metodo = (String(fd.get("pago") || "Transferencia") as Metodo);
+    const cliente = String(fd.get("nombre") || "").trim();
+    const email = String(fd.get("email") || "").trim();
+    const telefono = String(fd.get("telefono") || "").trim();
+    const direccion = [fd.get("direccion"), fd.get("ciudad"), fd.get("provincia"), fd.get("cp")]
+      .map((v) => String(v || "").trim())
+      .filter(Boolean)
+      .join(", ");
+    const detalle = items.map((i) => `${i.quantity}x ${i.product.name}`).join(" | ");
+    const id = "ped" + Date.now();
+
+    setLoading(true);
+    try {
+      await createOrder({
+        id,
+        cliente,
+        telefono,
+        email,
+        detalle,
+        monto: total,
+        montoEnvio: shipping,
+        envio: direccion,
+        metodo,
+      });
+
+      if (metodo === "Mercado Pago") {
+        const link = await mpCreatePreference({
+          pedido: id,
+          monto: total,
+          titulo: `Pedido Suple Market (${count} art.)`,
+          email,
+        });
+        if (!link) {
+          setError("No se pudo iniciar el pago con Mercado Pago. Probá de nuevo o elegí otro medio.");
+          setLoading(false);
+          return;
+        }
+        window.location.href = link; // redirige a Mercado Pago
+        return;
+      }
+
+      // Efectivo / Transferencia
+      clear();
+      setDone({ metodo, id, total });
+    } catch {
+      setError("No se pudo confirmar el pedido. Revisá tu conexión e intentá de nuevo.");
+      setLoading(false);
+    }
   };
 
+  /* ----------------------------- Confirmado ------------------------------ */
   if (done) {
+    const esTransfer = done.metodo === "Transferencia";
+    const waMsg = esTransfer
+      ? `Hola Suple Market, hice el pedido ${done.id} por ${formatPrice(done.total)} con transferencia. Te paso el comprobante.`
+      : `Hola Suple Market, hice el pedido ${done.id} por ${formatPrice(done.total)} (pago en efectivo). Quería coordinar el envío.`;
     return (
       <>
         <PageBanner title="Pedido confirmado" crumbs={[{ label: "Checkout" }]} />
@@ -32,22 +99,53 @@ export default function CheckoutPage() {
             <span className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full bg-accent text-primary">
               <CheckIcon className="h-8 w-8" />
             </span>
-            <h2 className="font-display text-xl font-bold text-primary">
-              ¡Gracias por tu compra!
-            </h2>
-            <p className="mt-2 text-sm text-muted">
-              Este es un checkout de demostración. En la versión final vas a poder
-              pagar online y coordinar el envío. Mientras tanto, escribinos por
-              WhatsApp para finalizar tu pedido.
+            <h2 className="font-display text-xl font-bold text-primary">¡Gracias por tu compra!</h2>
+            <p className="mt-1 text-sm text-muted">
+              Pedido <span className="font-semibold text-ink">{done.id}</span> ·{" "}
+              {formatPrice(done.total)}
             </p>
-            <a
-              href={whatsappLink("Hola Suple Market, acabo de hacer un pedido y quería coordinar el pago y envío.")}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-md mt-5 w-full bg-[#25D366] text-white hover:brightness-105"
-            >
-              <WhatsappIcon className="h-5 w-5" /> Coordinar por WhatsApp
-            </a>
+
+            {esTransfer ? (
+              <>
+                <div className="mt-5 rounded-xl border border-line bg-page-soft p-4 text-left text-sm">
+                  <p className="font-semibold text-primary">Datos para transferir</p>
+                  <dl className="mt-2 space-y-1">
+                    <Row k="Alias" v={TRANSFER.alias} />
+                    {TRANSFER.cbu && <Row k="CBU/CVU" v={TRANSFER.cbu} />}
+                    {TRANSFER.titular && <Row k="Titular" v={TRANSFER.titular} />}
+                    {TRANSFER.banco && <Row k="Banco" v={TRANSFER.banco} />}
+                    <Row k="Importe" v={formatPrice(done.total)} />
+                  </dl>
+                  <p className="mt-3 text-xs text-muted">
+                    Hacé la transferencia y enviá el <b>comprobante</b> por WhatsApp para
+                    confirmar tu pedido. 👇
+                  </p>
+                </div>
+                <a
+                  href={whatsappLink(waMsg)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-md mt-4 w-full bg-[#25D366] text-white hover:brightness-105"
+                >
+                  <WhatsappIcon className="h-5 w-5" /> Enviar comprobante por WhatsApp
+                </a>
+              </>
+            ) : (
+              <>
+                <p className="mt-3 text-sm text-muted">
+                  Coordiná el pago en efectivo y el envío por WhatsApp.
+                </p>
+                <a
+                  href={whatsappLink(waMsg)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-md mt-4 w-full bg-[#25D366] text-white hover:brightness-105"
+                >
+                  <WhatsappIcon className="h-5 w-5" /> Coordinar por WhatsApp
+                </a>
+              </>
+            )}
+
             <Link href="/productos" className="btn btn-outline btn-md mt-3 w-full">
               Seguir comprando
             </Link>
@@ -71,13 +169,15 @@ export default function CheckoutPage() {
     );
   }
 
+  const metodos: { v: Metodo; label: string; hint?: string }[] = [
+    { v: "Transferencia", label: "Transferencia bancaria", hint: "Con descuento. Enviás el comprobante por WhatsApp." },
+    { v: "Efectivo", label: "Efectivo", hint: "Con descuento. Coordinás la entrega por WhatsApp." },
+    { v: "Mercado Pago", label: "Mercado Pago", hint: "Dinero en cuenta, débito o crédito. Te lleva a Mercado Pago." },
+  ];
+
   return (
     <>
-      <PageBanner
-        title="Finalizar compra"
-        subtitle="Checkout de demostración — no se realiza ningún cobro real."
-        crumbs={[{ label: "Checkout" }]}
-      />
+      <PageBanner title="Finalizar compra" crumbs={[{ label: "Checkout" }]} />
       <div className="container-page py-10">
         <form onSubmit={confirm} className="grid gap-8 lg:grid-cols-[1fr_360px]">
           {/* Datos */}
@@ -87,24 +187,22 @@ export default function CheckoutPage() {
                 Datos de contacto
               </legend>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Nombre y apellido" defaultValue={user?.name} required />
-                <Field label="Email" type="email" defaultValue={user?.email} required />
-                <Field label="Teléfono" type="tel" required />
-                <Field label="DNI" />
+                <Field name="nombre" label="Nombre y apellido" defaultValue={user?.name} required />
+                <Field name="email" label="Email" type="email" defaultValue={user?.email} required />
+                <Field name="telefono" label="Teléfono" type="tel" required />
+                <Field name="dni" label="DNI" />
               </div>
             </fieldset>
 
             <fieldset className="rounded-xl border border-line bg-white p-5">
-              <legend className="px-2 font-display text-base font-bold text-primary">
-                Envío
-              </legend>
+              <legend className="px-2 font-display text-base font-bold text-primary">Envío</legend>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">
-                  <Field label="Dirección" required />
+                  <Field name="direccion" label="Dirección" required />
                 </div>
-                <Field label="Ciudad" required />
-                <Field label="Provincia" required />
-                <Field label="Código postal" required />
+                <Field name="ciudad" label="Ciudad" required />
+                <Field name="provincia" label="Provincia" required />
+                <Field name="cp" label="Código postal" required />
               </div>
             </fieldset>
 
@@ -113,24 +211,28 @@ export default function CheckoutPage() {
                 Medio de pago
               </legend>
               <div className="space-y-2">
-                {["Transferencia bancaria", "Efectivo"].map((m, i) => (
+                {metodos.map((m, i) => (
                   <label
-                    key={m}
-                    className="flex cursor-pointer items-center gap-3 rounded-lg border border-line p-3 text-sm hover:border-accent"
+                    key={m.v}
+                    className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm hover:border-accent ${
+                      method === m.v ? "border-accent bg-accent/5" : "border-line"
+                    }`}
                   >
                     <input
                       type="radio"
                       name="pago"
+                      value={m.v}
                       defaultChecked={i === 0}
-                      className="h-4 w-4 accent-[rgb(var(--color-accent))]"
+                      onChange={() => setMethod(m.v)}
+                      className="mt-0.5 h-4 w-4 accent-[rgb(var(--color-accent))]"
                     />
-                    {m}
+                    <span>
+                      <span className="font-semibold text-ink">{m.label}</span>
+                      {m.hint && <span className="block text-xs text-muted">{m.hint}</span>}
+                    </span>
                   </label>
                 ))}
               </div>
-              <p className="mt-2 text-xs font-semibold text-primary">
-                💵 Descuento pagando en efectivo o transferencia.
-              </p>
             </fieldset>
           </div>
 
@@ -169,12 +271,24 @@ export default function CheckoutPage() {
                   {formatPrice(total)}
                 </span>
               </div>
-              <button type="submit" className="btn btn-primary btn-lg mt-5 w-full">
-                Confirmar pedido
+
+              {error && (
+                <p className="mt-4 rounded-lg bg-sale/10 px-3 py-2 text-center text-sm text-sale">
+                  {error}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn btn-primary btn-lg mt-5 w-full disabled:opacity-60"
+              >
+                {loading
+                  ? "Procesando…"
+                  : method === "Mercado Pago"
+                    ? "Pagar con Mercado Pago"
+                    : "Confirmar pedido"}
               </button>
-              <p className="mt-2 text-center text-[11px] text-muted">
-                Demostración — no se procesa ningún pago real.
-              </p>
             </div>
           </aside>
         </form>
@@ -183,12 +297,23 @@ export default function CheckoutPage() {
   );
 }
 
+function Row({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex justify-between gap-3">
+      <dt className="text-muted">{k}</dt>
+      <dd className="font-semibold text-ink">{v}</dd>
+    </div>
+  );
+}
+
 function Field({
+  name,
   label,
   type = "text",
   defaultValue,
   required,
 }: {
+  name: string;
   label: string;
   type?: string;
   defaultValue?: string;
@@ -200,6 +325,7 @@ function Field({
         {label} {required && <span className="text-sale">*</span>}
       </span>
       <input
+        name={name}
         type={type}
         defaultValue={defaultValue}
         required={required}
