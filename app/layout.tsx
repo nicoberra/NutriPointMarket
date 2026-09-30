@@ -6,6 +6,7 @@ import { CartProvider } from "@/context/CartContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { ProductsProvider } from "@/context/ProductsContext";
 import { CategoriesProvider } from "@/context/CategoriesContext";
+import { PWARegister } from "@/components/PWARegister";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -23,6 +24,13 @@ const sora = Sora({
 export const metadata: Metadata = {
   metadataBase: new URL("https://suplemarket.com.ar"),
   alternates: { canonical: "/" },
+  manifest: "/manifest.webmanifest",
+  applicationName: SITE.name,
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: SITE.name,
+  },
   title: {
     default: `${SITE.name} | Suplementos deportivos`,
     template: `%s | ${SITE.name}`,
@@ -77,6 +85,7 @@ export default function RootLayout({
             }),
           }}
         />
+        <PWARegister />
         <AuthProvider>
           <CategoriesProvider>
             <ProductsProvider>

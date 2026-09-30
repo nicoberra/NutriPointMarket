@@ -1,12 +1,12 @@
 {
-  "name": "Suple Market CRM",
+  "id": "/",
+  "name": "Suple Market",
   "short_name": "Suple Market",
-  "description": "Panel de administración de Suple Market",
-  "start_url": "/admin/",
-  "scope": "/admin/",
+  "description": "Tienda de suplementos deportivos — Suple Market",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#2129E3",
+  "background_color": "#ffffff",
   "theme_color": "#2129E3",
   "icons": [
     {
