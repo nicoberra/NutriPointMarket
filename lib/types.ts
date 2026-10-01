@@ -45,6 +45,8 @@ export interface Product {
   /** Cantidad de unidades en stock (columna Cantidad de la planilla). */
   stockQty?: number;
   flavors: string[];
+  /** Variantes con su stock (null = sin seguimiento de stock para esa variante). */
+  variants?: { name: string; qty: number | null }[];
   presentations?: string[];
   /** Costo (para calcular ganancia en el CRM). En la moneda de `costCurrency`. */
   cost?: number;

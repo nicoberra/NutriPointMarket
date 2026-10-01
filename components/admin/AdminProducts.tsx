@@ -480,7 +480,11 @@ function ProductSheet({
       ? product.oldPrice - product.price
       : "",
   );
-  const [variantes, setVariantes] = useState(product?.flavors.join(", ") ?? "");
+  const [variantRows, setVariantRows] = useState<{ name: string; qty: string }[]>(
+    product?.variants && product.variants.length
+      ? product.variants.map((v) => ({ name: v.name, qty: v.qty == null ? "" : String(v.qty) }))
+      : [],
+  );
   const [stock, setStock] = useState<boolean>(product?.inStock !== false);
   const [destacado, setDestacado] = useState<boolean>(product?.featured ?? false);
   const [costo, setCosto] = useState<number | "">(product?.cost || "");
@@ -495,21 +499,34 @@ function ProductSheet({
   const costoPesos = costToPesos(costoNum, moneda, dollar);
   const ganancia = precioFinal - costoPesos;
 
+  // Serializa las variantes a "Rojo:5, Azul:3" (o "Rojo" si no lleva stock).
+  const variantesStr = variantRows
+    .filter((r) => r.name.trim())
+    .map((r) => (r.qty.trim() === "" ? r.name.trim() : `${r.name.trim()}:${Number(r.qty) || 0}`))
+    .join(", ");
+  const hasVariantStock = variantRows.some((r) => r.name.trim() && r.qty.trim() !== "");
+  const variantTotal = variantRows.reduce(
+    (a, r) => a + (r.qty.trim() === "" ? 0 : Number(r.qty) || 0),
+    0,
+  );
+
   const submit = () => {
     if (!nombre.trim()) return;
     const cantNum = cantidad === "" ? 0 : Number(cantidad);
+    // Si las variantes tienen stock, el total sale de la suma de ellas.
+    const totalStock = hasVariantStock ? variantTotal : cantNum;
     onSave({
       nombre: nombre.trim(),
       marca: marca.trim(),
       categoria,
       precio: precioFinal,
       precioML: descPesos > 0 ? precioNormal : undefined,
-      variantes: variantes.trim(),
-      stock: cantidad === "" ? stock : cantNum > 0,
+      variantes: variantesStr,
+      stock: hasVariantStock ? variantTotal > 0 : cantidad === "" ? stock : cantNum > 0,
       destacado,
       costo: costoNum,
       costoMoneda: moneda,
-      cantidad: cantNum,
+      cantidad: totalStock,
     });
   };
 
@@ -605,25 +622,72 @@ function ProductSheet({
             </Field>
           </div>
 
-          <Field label="Variantes / sabores (separados por coma)">
-            <input
-              value={variantes}
-              onChange={(e) => setVariantes(e.target.value)}
-              className="input h-11 text-base"
-              placeholder="Vainilla, Chocolate, Frutilla"
-            />
-          </Field>
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-ink">
+              Variantes (color / sabor) y stock de cada una
+            </span>
+            <div className="space-y-2">
+              {variantRows.map((row, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input
+                    value={row.name}
+                    onChange={(e) =>
+                      setVariantRows((rs) =>
+                        rs.map((r, j) => (j === i ? { ...r, name: e.target.value } : r)),
+                      )
+                    }
+                    className="input h-11 flex-1 text-base"
+                    placeholder="Ej: Rojo"
+                  />
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={row.qty}
+                    onChange={(e) =>
+                      setVariantRows((rs) =>
+                        rs.map((r, j) => (j === i ? { ...r, qty: e.target.value } : r)),
+                      )
+                    }
+                    className="input h-11 w-24 text-base"
+                    placeholder="Stock"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setVariantRows((rs) => rs.filter((_, j) => j !== i))}
+                    aria-label="Quitar variante"
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-muted hover:bg-page-soft"
+                  >
+                    <CloseIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setVariantRows((rs) => [...rs, { name: "", qty: "" }])}
+              className="mt-2 text-sm font-semibold text-primary hover:underline"
+            >
+              + Agregar variante
+            </button>
+            {hasVariantStock && (
+              <p className="mt-1 text-[11px] text-muted">
+                Stock total (suma de variantes): <b>{variantTotal}</b>
+              </p>
+            )}
+          </div>
 
-          <Field label="Cantidad en stock">
-            <input
-              type="number"
-              inputMode="numeric"
-              value={cantidad}
-              onChange={(e) => setCantidad(e.target.value === "" ? "" : Number(e.target.value))}
-              className="input h-11 text-base"
-              placeholder="0"
-            />
-          </Field>
+          {!hasVariantStock && (
+            <Field label="Cantidad en stock">
+              <input
+                type="number"
+                inputMode="numeric"
+                value={cantidad}
+                onChange={(e) => setCantidad(e.target.value === "" ? "" : Number(e.target.value))}
+                className="input h-11 text-base"
+                placeholder="0"
+              />
+            </Field>
+          )}
 
           <Field label="Costo (para calcular ganancia)">
             <div className="flex items-stretch gap-2">

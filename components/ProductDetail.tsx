@@ -30,10 +30,23 @@ export function ProductDetail({ product: initial }: { product: Product }) {
   const product = getBySlug(initial.slug) ?? initial;
   const shape = categoryMap[product.category]?.shape ?? "tub";
 
-  const [flavor, setFlavor] = useState(product.flavors[0] ?? "");
+  const variantQty = (name: string): number | null => {
+    const v = product.variants?.find((x) => x.name === name);
+    return v ? v.qty : null;
+  };
+  const [flavor, setFlavor] = useState(() => {
+    const avail = product.flavors.find((f) => {
+      const q = variantQty(f);
+      return q == null || q > 0;
+    });
+    return avail ?? product.flavors[0] ?? "";
+  });
   const [presentation, setPresentation] = useState(product.presentations?.[0] ?? "");
   const [qty, setQty] = useState(1);
   const [activeThumb, setActiveThumb] = useState(0);
+
+  const selQty = variantQty(flavor);
+  const soldOut = product.inStock === false || (selQty !== null && selQty <= 0);
 
   // Variaciones de color para simular una galería (placeholder)
   const gallery = ["rgb(var(--color-accent))", "rgb(var(--color-secondary))", "rgb(var(--color-primary-soft))"];
@@ -142,22 +155,30 @@ export function ProductDetail({ product: initial }: { product: Product }) {
             {product.flavors.length > 0 && (
               <div>
                 <p className="mb-2 text-sm font-bold text-ink">
-                  Sabor: <span className="font-normal text-muted">{flavor}</span>
+                  Variante: <span className="font-normal text-muted">{flavor}</span>
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {product.flavors.map((f) => (
-                    <button
-                      key={f}
-                      onClick={() => setFlavor(f)}
-                      className={`rounded-lg border px-3.5 py-2 text-sm font-medium transition-colors ${
-                        flavor === f
-                          ? "border-accent bg-accent-soft text-primary"
-                          : "border-line bg-white text-muted hover:border-accent"
-                      }`}
-                    >
-                      {f}
-                    </button>
-                  ))}
+                  {product.flavors.map((f) => {
+                    const q = variantQty(f);
+                    const out = q !== null && q <= 0;
+                    return (
+                      <button
+                        key={f}
+                        onClick={() => !out && setFlavor(f)}
+                        disabled={out}
+                        className={`rounded-lg border px-3.5 py-2 text-sm font-medium transition-colors ${
+                          out
+                            ? "cursor-not-allowed border-line bg-page-soft text-muted line-through opacity-50"
+                            : flavor === f
+                              ? "border-accent bg-accent-soft text-primary"
+                              : "border-line bg-white text-muted hover:border-accent"
+                        }`}
+                      >
+                        {f}
+                        {out ? " · sin stock" : ""}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -200,19 +221,11 @@ export function ProductDetail({ product: initial }: { product: Product }) {
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <button
-              onClick={add}
-              disabled={product.inStock === false}
-              className="btn btn-primary btn-lg"
-            >
+            <button onClick={add} disabled={soldOut} className="btn btn-primary btn-lg">
               <CartIcon className="h-5 w-5" />
-              {product.inStock === false ? "Sin stock" : "Agregar al carrito"}
+              {soldOut ? "Sin stock" : "Agregar al carrito"}
             </button>
-            <button
-              onClick={buyNow}
-              disabled={product.inStock === false}
-              className="btn btn-secondary btn-lg"
-            >
+            <button onClick={buyNow} disabled={soldOut} className="btn btn-secondary btn-lg">
               Comprar ahora
             </button>
           </div>

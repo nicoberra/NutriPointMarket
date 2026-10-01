@@ -553,14 +553,16 @@ function aprobarPedido(id) {
   var items = [];
   try { items = JSON.parse(row[iItems] || "[]"); } catch (e) {}
   for (var i = 0; i < items.length; i++) {
-    descontarProducto(items[i].n, Number(items[i].q) || 0);
+    descontarProducto(items[i].n, Number(items[i].q) || 0, items[i].v);
   }
   updateRowByNumber("Pedidos", n, { estado: "pagado", descontado: "sí" });
   return { ok: true, descontados: items.length };
 }
 
-// Baja la cantidad de un producto (por nombre) y, si llega a 0, lo marca sin stock.
-function descontarProducto(nombre, cant) {
+// Baja la cantidad de un producto (por nombre). Si se indica la variante, baja
+// el stock de esa variante en el texto "Rojo:5, Azul:3". Si el total llega a 0,
+// marca el producto sin stock.
+function descontarProducto(nombre, cant, variante) {
   if (!nombre || !cant || cant <= 0) return;
   var n = findRowById("Productos", nombre);
   if (n < 0) return;
@@ -568,6 +570,24 @@ function descontarProducto(nombre, cant) {
   var keys = keysOf("Productos");
   var iCant = keys.indexOf("cantidad");
   var iStock = keys.indexOf("stock");
+  var iVar = keys.indexOf("variantes");
+
+  // Descontar de la variante específica (si corresponde).
+  if (variante) {
+    var raw = String(sh.getRange(n, iVar + 1).getValue() || "");
+    var parts = raw.split(",").map(function (s) { return s.trim(); }).filter(String);
+    for (var i = 0; i < parts.length; i++) {
+      var idx = parts[i].lastIndexOf(":");
+      var vname = idx > 0 ? parts[i].slice(0, idx).trim() : parts[i];
+      if (vname.toLowerCase() === String(variante).trim().toLowerCase() && idx > 0) {
+        var q = Number(parts[i].slice(idx + 1).trim()) || 0;
+        parts[i] = vname + ":" + Math.max(0, q - cant);
+      }
+    }
+    sh.getRange(n, iVar + 1).setValue(parts.join(", "));
+  }
+
+  // Descontar del total.
   var actual = Number(sh.getRange(n, iCant + 1).getValue()) || 0;
   var nuevo = Math.max(0, actual - cant);
   sh.getRange(n, iCant + 1).setValue(nuevo);

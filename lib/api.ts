@@ -110,6 +110,27 @@ function toList(v: unknown): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Parsea el texto de variantes. Soporta "Rojo:5, Azul:3" (con stock) y
+ * "Rojo, Azul" (sin seguimiento de stock → qty null).
+ */
+export function parseVariants(raw: unknown): { name: string; qty: number | null }[] {
+  return String(raw ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const idx = part.lastIndexOf(":");
+      if (idx > 0) {
+        const name = part.slice(0, idx).trim();
+        const qtyStr = part.slice(idx + 1).trim();
+        return { name, qty: qtyStr === "" ? null : Number(qtyStr) || 0 };
+      }
+      return { name: part, qty: null };
+    })
+    .filter((v) => v.name);
+}
+
 /** Convierte una fila cruda de la planilla en un Product de la tienda. */
 export function buildProduct(row: Record<string, unknown>): Product {
   const nombre = String(row.nombre ?? "").trim();
@@ -134,7 +155,8 @@ export function buildProduct(row: Record<string, unknown>): Product {
     stock: 0,
     inStock: row.stock === undefined || row.stock === "" ? true : toBool(row.stock),
     stockQty: toNum(row.cantidad),
-    flavors: toList(row.variantes),
+    flavors: parseVariants(row.variantes).map((v) => v.name),
+    variants: parseVariants(row.variantes),
     presentations: [],
     cost: toNum(row.costo),
     costCurrency: String(row.costoMoneda ?? "").toUpperCase() === "USD" ? "USD" : "ARS",
