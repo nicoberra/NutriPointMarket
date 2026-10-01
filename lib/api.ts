@@ -375,7 +375,8 @@ export function resizeImageToBase64(file: File, max = 1000, quality = 0.82): Pro
  * La respuesta es opaca; luego hay que refrescar los productos para ver la foto.
  */
 export async function uploadProductImage(nombre: string, file: File): Promise<void> {
-  const data = await resizeImageToBase64(file, 1000, 0.82);
+  // Alta calidad: hasta 1600px y 92% (nítidas, pero sin que la web se vuelva lenta).
+  const data = await resizeImageToBase64(file, 1600, 0.92);
   await fetch(SHEETS_API_URL, {
     method: "POST",
     mode: "no-cors",
