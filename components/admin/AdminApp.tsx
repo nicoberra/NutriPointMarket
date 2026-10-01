@@ -82,7 +82,13 @@ export function AdminApp() {
 
   useEffect(() => {
     try {
-      if (sessionStorage.getItem(AUTH_KEY) === "1") setAuthed(true);
+      // Sesión persistente (sobrevive a cerrar la app). Vence a los 30 días.
+      const raw = localStorage.getItem(AUTH_KEY);
+      if (raw) {
+        const exp = Number(raw);
+        if (exp && Date.now() < exp) setAuthed(true);
+        else localStorage.removeItem(AUTH_KEY);
+      }
     } catch {
       /* ignore */
     }
@@ -97,7 +103,8 @@ export function AdminApp() {
 
   const login = () => {
     try {
-      sessionStorage.setItem(AUTH_KEY, "1");
+      // Guarda la sesión por 30 días.
+      localStorage.setItem(AUTH_KEY, String(Date.now() + 30 * 24 * 60 * 60 * 1000));
     } catch {
       /* ignore */
     }
@@ -106,7 +113,7 @@ export function AdminApp() {
 
   const logout = () => {
     try {
-      sessionStorage.removeItem(AUTH_KEY);
+      localStorage.removeItem(AUTH_KEY);
     } catch {
       /* ignore */
     }
