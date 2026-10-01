@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Product } from "@/lib/types";
 import { brandName } from "@/data/brands";
 import { categoryMap } from "@/data/categories";
@@ -48,6 +48,25 @@ export function ProductDetail({ product: initial }: { product: Product }) {
   const selQty = variantQty(flavor);
   const soldOut = product.inStock === false || (selQty !== null && selQty <= 0);
 
+  // Galería: fotos del producto + fotos de variantes (sin repetir).
+  const allPhotos = useMemo(
+    () =>
+      Array.from(
+        new Set([...(product.images ?? []), ...Object.values(product.variantImages ?? {})]),
+      ),
+    [product.images, product.variantImages],
+  );
+  const mainImage = allPhotos[activeThumb] ?? product.image;
+
+  // Al elegir una variante que tiene foto, saltar a esa foto.
+  useEffect(() => {
+    const vp = product.variantImages?.[flavor];
+    if (vp) {
+      const i = allPhotos.indexOf(vp);
+      if (i >= 0) setActiveThumb(i);
+    }
+  }, [flavor, allPhotos, product.variantImages]);
+
   // Variaciones de color para simular una galería (placeholder)
   const gallery = ["rgb(var(--color-accent))", "rgb(var(--color-secondary))", "rgb(var(--color-primary-soft))"];
 
@@ -75,10 +94,10 @@ export function ProductDetail({ product: initial }: { product: Product }) {
               </span>
             )}
             <FavoriteButton id={product.id} className="absolute right-4 top-4 z-10 h-11 w-11" />
-            {product.image ? (
+            {mainImage ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={product.image}
+                src={mainImage}
                 alt={product.name}
                 className="aspect-square w-full object-cover"
               />
@@ -88,25 +107,28 @@ export function ProductDetail({ product: initial }: { product: Product }) {
                 brandLabel={
                   product.brand ? product.brand.split(" ")[0].toUpperCase().slice(0, 7) : undefined
                 }
-                accent={gallery[activeThumb]}
+                accent={gallery[activeThumb % gallery.length]}
                 className="aspect-square w-full"
               />
             )}
           </div>
-          <div className="mt-3 flex gap-3">
-            {gallery.map((c, i) => (
-              <button
-                key={i}
-                onClick={() => setActiveThumb(i)}
-                aria-label={`Vista ${i + 1}`}
-                className={`overflow-hidden rounded-lg border-2 transition-colors ${
-                  activeThumb === i ? "border-accent" : "border-line"
-                }`}
-              >
-                <ProductVisual shape={shape} accent={c} className="h-20 w-20" />
-              </button>
-            ))}
-          </div>
+          {allPhotos.length > 1 && (
+            <div className="mt-3 flex flex-wrap gap-3">
+              {allPhotos.map((src, i) => (
+                <button
+                  key={src}
+                  onClick={() => setActiveThumb(i)}
+                  aria-label={`Foto ${i + 1}`}
+                  className={`overflow-hidden rounded-lg border-2 transition-colors ${
+                    activeThumb === i ? "border-accent" : "border-line"
+                  }`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={src} alt="" className="h-20 w-20 object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Info */}

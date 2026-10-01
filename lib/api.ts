@@ -132,8 +132,22 @@ export function parseVariants(raw: unknown): { name: string; qty: number | null 
 }
 
 /** Convierte una fila cruda de la planilla en un Product de la tienda. */
+/** Parsea el JSON de fotos por variante { "Rojo": "url" }. */
+export function parseVariantImages(raw: unknown): Record<string, string> {
+  try {
+    const o = JSON.parse(String(raw ?? "") || "{}");
+    return o && typeof o === "object" ? (o as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
 export function buildProduct(row: Record<string, unknown>): Product {
   const nombre = String(row.nombre ?? "").trim();
+  const imgs = String(row.imagen ?? "")
+    .split("|")
+    .map((s) => s.trim())
+    .filter(Boolean);
   const precio = toNum(row.precio);
   const precioML = toNum(row.precioML);
   const oldPrice = precioML > precio ? precioML : undefined;
@@ -150,8 +164,9 @@ export function buildProduct(row: Record<string, unknown>): Product {
     price: precio,
     oldPrice,
     discount: discountPercent(precio, oldPrice),
-    image: String(row.imagen ?? "").trim() || undefined,
-    images: [],
+    image: imgs[0],
+    images: imgs,
+    variantImages: parseVariantImages(row.variantesFotos),
     stock: 0,
     inStock: row.stock === undefined || row.stock === "" ? true : toBool(row.stock),
     stockQty: toNum(row.cantidad),
@@ -374,15 +389,32 @@ export function resizeImageToBase64(file: File, max = 1000, quality = 0.82): Pro
  * Se usa POST no-cors con text/plain porque el payload (base64) es grande.
  * La respuesta es opaca; luego hay que refrescar los productos para ver la foto.
  */
-export async function uploadProductImage(nombre: string, file: File): Promise<void> {
+export async function uploadProductImage(
+  nombre: string,
+  file: File,
+  variante?: string,
+): Promise<void> {
   // Alta calidad: hasta 1600px y 92% (nítidas, pero sin que la web se vuelva lenta).
   const data = await resizeImageToBase64(file, 1600, 0.92);
   await fetch(SHEETS_API_URL, {
     method: "POST",
     mode: "no-cors",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action: "subir_imagen", nombre, data }),
+    body: JSON.stringify({ action: "subir_imagen", nombre, data, variante: variante ?? "" }),
   });
+}
+
+/** Borra la referencia a una foto (de la galería por url, o de una variante). */
+export async function deleteProductImage(
+  nombre: string,
+  opts: { url?: string; variante?: string },
+): Promise<boolean> {
+  const r = await api("borrar_imagen", {
+    nombre,
+    url: opts.url ?? "",
+    variante: opts.variante ?? "",
+  });
+  return r.ok !== false;
 }
 
 /* ========================== PEDIDOS / PAGOS ============================== */

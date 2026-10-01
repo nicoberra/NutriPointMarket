@@ -37,8 +37,10 @@ export interface Product {
   discount: number;
   /** Nombres de imágenes / referencias. Como aún no hay fotos, usamos visuales generados. */
   images: string[];
-  /** Foto real del producto (URL de GitHub), cargada desde el CRM. */
+  /** Foto principal (primera de la galería). */
   image?: string;
+  /** Foto por variante: { "Rojo": "url", "Azul": "url" }. */
+  variantImages?: Record<string, string>;
   stock: number;
   /** Hay stock (viene de la planilla: Stock sí/no). Por defecto true. */
   inStock?: boolean;

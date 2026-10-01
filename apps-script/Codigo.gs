@@ -47,6 +47,7 @@ var TABLES = {
       ["costoMoneda", "Costo moneda"],
       ["imagen", "Imagen"],
       ["cantidad", "Cantidad"],
+      ["variantesFotos", "Variantes fotos"],
     ],
     idField: "nombre",
   },
@@ -178,6 +179,9 @@ function handle(e) {
         break;
       case "subir_imagen":
         out = subirImagen(p);
+        break;
+      case "borrar_imagen":
+        out = borrarImagen(p);
         break;
       case "mp_crear_pref":
         out = mpCrearPreferencia(p);
@@ -382,6 +386,7 @@ function listProductos() {
       costoMoneda: String(row[9] || "").trim().toUpperCase() === "USD" ? "USD" : "ARS",
       imagen: String(row[10] || "").trim(),
       cantidad: row[11] === "" || row[11] == null ? 0 : Number(row[11]) || 0,
+      variantesFotos: String(row[12] || "").trim(),
     });
   }
   return list;
@@ -428,9 +433,58 @@ function subirImagen(p) {
   var url =
     "https://raw.githubusercontent.com/" + GITHUB_REPO + "/" + GITHUB_BRANCH + "/" + path;
   var n = findRowById("Productos", p.nombre);
-  if (n > 0) updateRowByNumber("Productos", n, { imagen: url });
-  else addRow("Productos", { nombre: p.nombre, imagen: url });
+  if (n < 0) {
+    // Producto nuevo: lo crea con la primera foto.
+    if (p.variante) addRow("Productos", { nombre: p.nombre, variantesFotos: JSON.stringify(mapVar(p.variante, url)) });
+    else addRow("Productos", { nombre: p.nombre, imagen: url });
+    return { ok: true, url: url };
+  }
+  var sh = sheetFor("Productos");
+  var keys = keysOf("Productos");
+  if (p.variante) {
+    // Foto de una variante puntual.
+    var iVF = keys.indexOf("variantesFotos");
+    var vf = {};
+    try { vf = JSON.parse(sh.getRange(n, iVF + 1).getValue() || "{}"); } catch (e1) {}
+    vf[p.variante] = url;
+    sh.getRange(n, iVF + 1).setValue(JSON.stringify(vf));
+  } else {
+    // Galería del producto: agrega a la lista (separada por "|").
+    var iImg = keys.indexOf("imagen");
+    var cur = String(sh.getRange(n, iImg + 1).getValue() || "").trim();
+    sh.getRange(n, iImg + 1).setValue(cur ? cur + "|" + url : url);
+  }
   return { ok: true, url: url };
+}
+
+function mapVar(k, v) {
+  var o = {};
+  o[k] = v;
+  return o;
+}
+
+// Borra la referencia a una foto (no borra el archivo de GitHub).
+function borrarImagen(p) {
+  if (!p.nombre) return { ok: false, error: "Falta el producto" };
+  var n = findRowById("Productos", p.nombre);
+  if (n < 0) return { ok: false, error: "Producto no encontrado" };
+  var sh = sheetFor("Productos");
+  var keys = keysOf("Productos");
+  if (p.variante) {
+    var iVF = keys.indexOf("variantesFotos");
+    var vf = {};
+    try { vf = JSON.parse(sh.getRange(n, iVF + 1).getValue() || "{}"); } catch (e2) {}
+    delete vf[p.variante];
+    sh.getRange(n, iVF + 1).setValue(JSON.stringify(vf));
+  } else if (p.url) {
+    var iImg = keys.indexOf("imagen");
+    var list = String(sh.getRange(n, iImg + 1).getValue() || "")
+      .split("|")
+      .map(function (s) { return s.trim(); })
+      .filter(function (u) { return u && u !== p.url; });
+    sh.getRange(n, iImg + 1).setValue(list.join("|"));
+  }
+  return { ok: true };
 }
 
 function slugImagen(s) {
