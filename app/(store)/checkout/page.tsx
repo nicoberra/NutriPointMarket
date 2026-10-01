@@ -6,7 +6,7 @@ import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { formatPrice } from "@/lib/format";
 import { whatsappLink, TRANSFER } from "@/lib/config";
-import { createOrder, mpCreatePreference } from "@/lib/api";
+import { createOrder, mpCreatePreference, uploadComprobante } from "@/lib/api";
 import { PageBanner } from "@/components/PageBanner";
 import { CheckIcon, WhatsappIcon } from "@/components/Icons";
 
@@ -28,6 +28,7 @@ export default function CheckoutPage() {
   const [method, setMethod] = useState<Metodo>("Transferencia");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [compUp, setCompUp] = useState<"idle" | "up" | "done">("idle");
 
   const shipping = subtotal >= 120000 || subtotal === 0 ? 0 : 4500;
   const total = subtotal + shipping;
@@ -137,17 +138,47 @@ export default function CheckoutPage() {
                 <Row k="Importe" v={formatPrice(done.total)} />
               </dl>
               <p className="mt-3 text-xs text-muted">
-                Hacé la transferencia y enviá el <b>comprobante</b> por WhatsApp para
-                confirmar tu pedido. 👇
+                Hacé la transferencia y <b>subí el comprobante acá abajo</b> para que
+                confirmemos tu pedido. 👇
               </p>
             </div>
+
+            {compUp === "done" ? (
+              <div className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-accent/15 px-4 py-3 text-sm font-semibold text-primary">
+                <CheckIcon className="h-5 w-5" /> ¡Comprobante recibido! Te confirmamos
+                el pedido a la brevedad.
+              </div>
+            ) : (
+              <label className="btn btn-primary btn-lg mt-4 w-full cursor-pointer">
+                {compUp === "up" ? "Subiendo…" : "📎 Subir comprobante"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={compUp === "up"}
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    if (!f) return;
+                    setCompUp("up");
+                    try {
+                      await uploadComprobante(done.id, f);
+                      setCompUp("done");
+                    } catch {
+                      setCompUp("idle");
+                    }
+                  }}
+                />
+              </label>
+            )}
+
             <a
               href={whatsappLink(waMsg)}
               target="_blank"
               rel="noopener noreferrer"
-              className="btn btn-md mt-4 w-full bg-[#25D366] text-white hover:brightness-105"
+              className="btn btn-md mt-3 w-full bg-[#25D366] text-white hover:brightness-105"
             >
-              <WhatsappIcon className="h-5 w-5" /> Enviar comprobante por WhatsApp
+              <WhatsappIcon className="h-5 w-5" /> O avisanos por WhatsApp
             </a>
 
             <Link href="/productos" className="btn btn-outline btn-md mt-3 w-full">

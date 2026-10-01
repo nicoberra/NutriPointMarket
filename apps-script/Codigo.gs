@@ -105,6 +105,7 @@ var TABLES = {
       ["pago", "Pago"],
       ["items", "Items"],
       ["descontado", "Descontado"],
+      ["comprobante", "Comprobante"],
     ],
     idField: "id",
   },
@@ -194,6 +195,9 @@ function handle(e) {
         break;
       case "borrar_imagen":
         out = borrarImagen(p);
+        break;
+      case "subir_comprobante":
+        out = subirComprobante(p);
         break;
       case "mp_crear_pref":
         out = mpCrearPreferencia(p);
@@ -538,6 +542,35 @@ function slugImagen(s) {
       .replace(/^-+|-+$/g, "")
       .slice(0, 40) || "producto"
   );
+}
+
+// Sube el comprobante de transferencia de un pedido a GitHub y guarda el link
+// en la columna Comprobante del pedido.
+function subirComprobante(p) {
+  if (!p.pedido || !p.data) return { ok: false, error: "Faltan datos" };
+  var token = PropertiesService.getScriptProperties().getProperty("GITHUB_TOKEN");
+  if (!token) return { ok: false, error: "Falta GITHUB_TOKEN en Propiedades del script" };
+  var path = "public/comprobantes/" + slugImagen(p.pedido) + "-" + Date.now() + ".jpg";
+  var api = "https://api.github.com/repos/" + GITHUB_REPO + "/contents/" + path;
+  var res = UrlFetchApp.fetch(api, {
+    method: "put",
+    contentType: "application/json",
+    headers: {
+      Authorization: "Bearer " + token,
+      Accept: "application/vnd.github+json",
+      "User-Agent": "suplemarket-crm",
+    },
+    payload: JSON.stringify({ message: "comprobante: " + p.pedido, content: p.data, branch: GITHUB_BRANCH }),
+    muteHttpExceptions: true,
+  });
+  var code = res.getResponseCode();
+  if (code < 200 || code >= 300) {
+    return { ok: false, error: "GitHub " + code + ": " + res.getContentText().slice(0, 180) };
+  }
+  var url = "https://raw.githubusercontent.com/" + GITHUB_REPO + "/" + GITHUB_BRANCH + "/" + path;
+  var n = findRowById("Pedidos", p.pedido);
+  if (n > 0) updateRowByNumber("Pedidos", n, { comprobante: url });
+  return { ok: true, url: url };
 }
 
 /* ----------------------------- Mercado Pago ------------------------------ */

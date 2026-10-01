@@ -238,18 +238,30 @@ export function AdminRecords({
                   </button>
                 )}
                 {config.aprobar &&
-                  (r.descontado === "sí" ? (
-                    <span className="ml-1.5 mt-1.5 inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-bold text-green-700">
-                      <CheckIcon className="h-3.5 w-3.5" /> Pago aprobado
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => aprobarPago(r)}
-                      className="ml-1.5 mt-1.5 inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-xs font-bold text-white hover:brightness-110"
-                    >
-                      Aprobar pago
-                    </button>
-                  ))}
+                  (() => {
+                    const esTransfer = (r.pago || "").toLowerCase().includes("transfer");
+                    const faltaComprobante = esTransfer && !r.comprobante;
+                    if (r.descontado === "sí")
+                      return (
+                        <span className="ml-1.5 mt-1.5 inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-bold text-green-700">
+                          <CheckIcon className="h-3.5 w-3.5" /> Pago aprobado
+                        </span>
+                      );
+                    if (faltaComprobante)
+                      return (
+                        <span className="ml-1.5 mt-1.5 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700">
+                          Falta comprobante
+                        </span>
+                      );
+                    return (
+                      <button
+                        onClick={() => aprobarPago(r)}
+                        className="ml-1.5 mt-1.5 inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-xs font-bold text-white hover:brightness-110"
+                      >
+                        {esTransfer ? "Comprobante ✓ · Aprobar" : "Aprobar pago"}
+                      </button>
+                    );
+                  })()}
               </div>
               {r.telefono && (
                 <a
@@ -360,6 +372,25 @@ function DetailSheet({ row, onClose }: { row: Row; onClose: () => void }) {
               </p>
             )}
           </DetailBox>
+
+          {esTransfer && (
+            <DetailBox title="Comprobante de transferencia">
+              {row.comprobante ? (
+                <a href={row.comprobante} target="_blank" rel="noopener noreferrer">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={row.comprobante}
+                    alt="Comprobante"
+                    className="w-full rounded-lg border border-line"
+                  />
+                </a>
+              ) : (
+                <p className="font-semibold text-sale">
+                  ⚠️ Todavía no subió el comprobante.
+                </p>
+              )}
+            </DetailBox>
+          )}
 
           {row.notas && (
             <DetailBox title="Notas">

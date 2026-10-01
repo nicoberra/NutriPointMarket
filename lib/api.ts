@@ -455,6 +455,17 @@ export async function subscribeEmail(email: string): Promise<boolean> {
   return addRow("Suscriptores", { email: email.trim().toLowerCase() });
 }
 
+/** Sube el comprobante de transferencia de un pedido (se guarda en GitHub). */
+export async function uploadComprobante(pedido: string, file: File): Promise<void> {
+  const data = await resizeImageToBase64(file, 1400, 0.88);
+  await fetch(SHEETS_API_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action: "subir_comprobante", pedido, data }),
+  });
+}
+
 /* ========================== PEDIDOS / PAGOS ============================== */
 
 export interface OrderInput {
