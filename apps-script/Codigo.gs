@@ -90,6 +90,8 @@ var TABLES = {
       ["montoEnvio", "Monto envío"],
       ["costo", "Costo"],
       ["pago", "Pago"],
+      ["items", "Items"],
+      ["descontado", "Descontado"],
     ],
     idField: "id",
   },
@@ -182,6 +184,9 @@ function handle(e) {
         break;
       case "mp_webhook":
         out = mpWebhook(p, e);
+        break;
+      case "aprobar_pedido":
+        out = aprobarPedido(p.id);
         break;
       case "registrar":
         out = registrar(parseData(p));
@@ -524,6 +529,49 @@ function mpWebhook(p, e) {
   } catch (err) {
     return { ok: false, error: String(err) };
   }
+}
+
+/* ------------------------------ Stock / ventas --------------------------- */
+
+// Aprueba el pago de un pedido: descuenta el stock de sus productos (una sola
+// vez) y lo marca como pagado. Idempotente: si ya se descontó, no vuelve a bajar.
+function aprobarPedido(id) {
+  if (!id) return { ok: false, error: "Falta el id del pedido" };
+  var n = findRowById("Pedidos", id);
+  if (n < 0) return { ok: false, error: "Pedido no encontrado" };
+  var sh = sheetFor("Pedidos");
+  var keys = keysOf("Pedidos");
+  var row = sh.getRange(n, 1, 1, keys.length).getValues()[0];
+  var iDesc = keys.indexOf("descontado");
+  var iItems = keys.indexOf("items");
+
+  if (String(row[iDesc] || "").trim().toLowerCase() === "sí") {
+    updateRowByNumber("Pedidos", n, { estado: "pagado" });
+    return { ok: true, yaDescontado: true };
+  }
+
+  var items = [];
+  try { items = JSON.parse(row[iItems] || "[]"); } catch (e) {}
+  for (var i = 0; i < items.length; i++) {
+    descontarProducto(items[i].n, Number(items[i].q) || 0);
+  }
+  updateRowByNumber("Pedidos", n, { estado: "pagado", descontado: "sí" });
+  return { ok: true, descontados: items.length };
+}
+
+// Baja la cantidad de un producto (por nombre) y, si llega a 0, lo marca sin stock.
+function descontarProducto(nombre, cant) {
+  if (!nombre || !cant || cant <= 0) return;
+  var n = findRowById("Productos", nombre);
+  if (n < 0) return;
+  var sh = sheetFor("Productos");
+  var keys = keysOf("Productos");
+  var iCant = keys.indexOf("cantidad");
+  var iStock = keys.indexOf("stock");
+  var actual = Number(sh.getRange(n, iCant + 1).getValue()) || 0;
+  var nuevo = Math.max(0, actual - cant);
+  sh.getRange(n, iCant + 1).setValue(nuevo);
+  sh.getRange(n, iStock + 1).setValue(nuevo > 0 ? "sí" : "no");
 }
 
 /* ------------------------------ Categorías ------------------------------- */

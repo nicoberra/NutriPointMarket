@@ -57,7 +57,12 @@ export default function CheckoutPage() {
       .map((v) => String(v || "").trim())
       .filter(Boolean)
       .join(", ");
-    const detalle = items.map((i) => `${i.quantity}x ${i.product.name}`).join(" | ");
+    const detalle = items
+      .map((i) => `${i.quantity}x ${i.product.name}${i.flavor ? ` (${i.flavor})` : ""}`)
+      .join(" | ");
+    const itemsJson = JSON.stringify(
+      items.map((i) => ({ n: i.product.name, v: i.flavor ?? "", q: i.quantity })),
+    );
     const id = "ped" + Date.now();
 
     // Total según el método: efectivo/transferencia con 15% off (por producto);
@@ -77,6 +82,7 @@ export default function CheckoutPage() {
         montoEnvio: shipping,
         envio: direccion,
         metodo,
+        items: itemsJson,
       });
 
       if (metodo === "Mercado Pago") {

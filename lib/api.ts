@@ -373,7 +373,14 @@ export interface OrderInput {
   monto: number;
   montoEnvio: number;
   envio: string; // dirección
-  metodo: string; // "Efectivo" | "Transferencia" | "Mercado Pago"
+  metodo: string; // "Transferencia" | "Mercado Pago"
+  items?: string; // JSON de los productos: [{n,v,q}]
+}
+
+/** Aprueba el pago de un pedido en el CRM: descuenta el stock y lo marca pagado. */
+export async function aprobarPedido(id: string): Promise<boolean> {
+  const r = await api("aprobar_pedido", { id }, 15000);
+  return r.ok !== false;
 }
 
 /**
@@ -395,6 +402,8 @@ export async function createOrder(o: OrderInput): Promise<boolean> {
       envio: o.envio,
       montoEnvio: o.montoEnvio,
       pago: o.metodo,
+      items: o.items ?? "",
+      descontado: "no",
     }),
   }, 18000);
   return r.ok !== false;

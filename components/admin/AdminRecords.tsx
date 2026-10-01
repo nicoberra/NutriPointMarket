@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { listTable, addRow, updateRow } from "@/lib/api";
+import { listTable, addRow, updateRow, aprobarPedido } from "@/lib/api";
 import { whatsappLink } from "@/lib/config";
 import { CloseIcon, PlusIcon, WhatsappIcon, CheckIcon, SearchIcon } from "@/components/Icons";
 
@@ -24,6 +24,8 @@ export interface RecordsConfig {
   secondary: (r: Record<string, string>) => string;
   /** Muestra estado Pendiente/Entregado con toggle (para Pedidos) */
   estado?: boolean;
+  /** Muestra botón "Aprobar pago" que descuenta stock (para Pedidos) */
+  aprobar?: boolean;
   /** Etiqueta opcional (ej: "Web" para clientes registrados desde la tienda) */
   tag?: (r: Record<string, string>) => string | undefined;
   /** Divide en dos solapas por origen web (para Clientes) */
@@ -83,6 +85,15 @@ export function AdminRecords({
       prev.map((r) => (r.id === row.id ? { ...r, estado: nuevo } : r)),
     );
     await updateRow(config.tab, row.id, { estado: nuevo });
+  };
+
+  const aprobarPago = async (row: Row) => {
+    onToast("Aprobando y descontando stock… ⏳");
+    setRows((prev) =>
+      prev.map((r) => (r.id === row.id ? { ...r, descontado: "sí", estado: "pagado" } : r)),
+    );
+    const ok = await aprobarPedido(row.id);
+    onToast(ok ? "Pago aprobado · stock descontado ✓" : "No se pudo aprobar");
   };
 
   // Solapas por origen (Mis usuarios / Usuarios web)
@@ -197,6 +208,19 @@ export function AdminRecords({
                     )}
                   </button>
                 )}
+                {config.aprobar &&
+                  (r.descontado === "sí" ? (
+                    <span className="ml-1.5 mt-1.5 inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-bold text-green-700">
+                      <CheckIcon className="h-3.5 w-3.5" /> Pago aprobado
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => aprobarPago(r)}
+                      className="ml-1.5 mt-1.5 inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-xs font-bold text-white hover:brightness-110"
+                    >
+                      Aprobar pago
+                    </button>
+                  ))}
               </div>
               {r.telefono && (
                 <a

@@ -70,6 +70,7 @@ const PEDIDOS_CFG: RecordsConfig = {
   secondary: (r) =>
     [r.detalle, r.monto ? `$${r.monto}` : "", r.pago].filter(Boolean).join(" · "),
   estado: true,
+  aprobar: true,
 };
 
 export function AdminApp() {
