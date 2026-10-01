@@ -221,15 +221,20 @@ export default function CheckoutPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field name="nombre" label="Nombre y apellido" defaultValue={user?.name} required />
                 <Field name="email" label="Email" type="email" defaultValue={user?.email} required />
-                <Field name="telefono" label="Teléfono" type="tel" required />
+                <Field name="telefono" label="WhatsApp" type="tel" required />
                 <Field name="dni" label="DNI" />
               </div>
             </fieldset>
 
             <fieldset className="rounded-xl border border-line bg-white p-5">
               <legend className="px-2 font-display text-base font-bold text-primary">Envío</legend>
-              <p className="mb-3 text-xs text-muted">
+              <p className="mb-2 text-xs text-muted">
                 {formatPrice(4500)} · gratis en compras desde {formatPrice(120000)}.
+              </p>
+              <p className="mb-3 rounded-lg bg-page-soft px-3 py-2 text-xs text-muted">
+                🛵 Los envíos se hacen por <b>motomensajería / logística propia</b>, así que
+                no hay código de seguimiento (tipo Andreani o Correo). Coordinamos la
+                entrega con vos por WhatsApp.
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">

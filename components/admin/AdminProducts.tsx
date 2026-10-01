@@ -8,11 +8,12 @@ import {
   saveProduct,
   uploadProductImage,
   deleteProductImage,
+  deleteRow,
   type ProductInput,
 } from "@/lib/api";
 import { formatPrice } from "@/lib/format";
 import { categoryMap } from "@/data/categories";
-import { SearchIcon, CloseIcon, CheckIcon, PlusIcon } from "@/components/Icons";
+import { SearchIcon, CloseIcon, CheckIcon, PlusIcon, TrashIcon } from "@/components/Icons";
 import { AdminCategories } from "./AdminCategories";
 
 /**
@@ -95,14 +96,23 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
     setTimeout(() => refresh().catch(() => {}), 1500);
   };
 
+  // Guardado optimista: cierra al toque y guarda en segundo plano (se siente
+  // instantáneo). Igual avisa cuando terminó de guardar.
   const handleFullSave = async (row: ProductInput) => {
-    setSaving(true);
-    const ok = await saveProduct(row);
-    setSaving(false);
     setEditing(null);
     setAdding(false);
-    onToast(ok ? "Producto guardado ✓" : "Guardado (verificá la planilla)");
-    setTimeout(() => refresh().catch(() => {}), 1200);
+    onToast("Guardando…");
+    const ok = await saveProduct(row);
+    onToast(ok ? "Guardado ✓" : "Guardado (verificá la planilla)");
+    setTimeout(() => refresh().catch(() => {}), 800);
+  };
+
+  const handleDelete = async (p: Product) => {
+    if (!window.confirm(`¿Eliminar "${p.name}"? No se puede deshacer.`)) return;
+    onToast("Eliminando…");
+    await deleteRow("Productos", p.name);
+    onToast("Producto eliminado ✓");
+    setTimeout(() => refresh().catch(() => {}), 800);
   };
 
   // Grupos por categoría (solo cuando el filtro es "Todas").
@@ -177,6 +187,7 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
                   onEdit={() => setEditing(p)}
                   onUpload={handleUpload}
                   onDeleteImage={handleDeleteImage}
+                  onDelete={handleDelete}
                 />
               ))}
             </div>
@@ -217,6 +228,7 @@ function ProductRow({
   onEdit,
   onUpload,
   onDeleteImage,
+  onDelete,
 }: {
   product: Product;
   dollar: number;
@@ -224,6 +236,7 @@ function ProductRow({
   onEdit: () => void;
   onUpload: (p: Product, file: File, variante?: string) => Promise<void>;
   onDeleteImage: (p: Product, opts: { url?: string; variante?: string }) => Promise<void>;
+  onDelete: (p: Product) => void;
 }) {
   const [uploading, setUploading] = useState(false);
   const [precioNormal, setPrecioNormal] = useState<number>(
@@ -263,12 +276,21 @@ function ProductRow({
           </p>
           <p className="font-semibold text-ink">{product.name}</p>
         </div>
-        <button
-          onClick={onEdit}
-          className="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-primary hover:bg-page-soft"
-        >
-          Editar
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            onClick={onEdit}
+            className="rounded-lg px-2 py-1 text-xs font-semibold text-primary hover:bg-page-soft"
+          >
+            Editar
+          </button>
+          <button
+            onClick={() => onDelete(product)}
+            aria-label="Eliminar producto"
+            className="grid h-7 w-7 place-items-center rounded-lg text-sale hover:bg-sale/10"
+          >
+            <TrashIcon className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       {/* Fotos del producto (galería) */}
@@ -617,17 +639,23 @@ function ProductSheet({
     });
   };
 
+  // Al salir, si hay nombre, guarda solo (lo que pidió el usuario).
+  const closeAndSave = () => {
+    if (nombre.trim()) submit();
+    else onClose();
+  };
+
   return (
     <div className="fixed inset-0 z-[90] flex items-end justify-center sm:items-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50" onClick={closeAndSave} />
       <div className="relative max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-page p-5 sm:rounded-2xl">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-display text-lg font-bold text-primary">
             {isEdit ? "Editar producto" : "Agregar producto"}
           </h3>
           <button
-            onClick={onClose}
-            aria-label="Cerrar"
+            onClick={closeAndSave}
+            aria-label="Cerrar y guardar"
             className="grid h-9 w-9 place-items-center rounded-full text-ink hover:bg-page-soft"
           >
             <CloseIcon className="h-5 w-5" />
@@ -871,21 +899,17 @@ function ProductSheet({
           </div>
         </div>
 
-        <div className="mt-5 flex gap-2">
-          <button onClick={onClose} className="btn btn-outline btn-md flex-1">
-            Cancelar
-          </button>
+        <div className="mt-5">
           <button
             onClick={submit}
             disabled={saving || !nombre.trim()}
-            className="btn btn-primary btn-md flex-1"
+            className="btn btn-primary btn-md w-full"
           >
-            {saving ? "Guardando…" : (
-              <>
-                <CheckIcon className="h-4.5 w-4.5" /> Guardar
-              </>
-            )}
+            <CheckIcon className="h-4.5 w-4.5" /> Guardar
           </button>
+          <p className="mt-2 text-center text-[11px] text-muted">
+            También se guarda solo al salir (tocá la ✕ o fuera del cuadro).
+          </p>
         </div>
       </div>
     </div>

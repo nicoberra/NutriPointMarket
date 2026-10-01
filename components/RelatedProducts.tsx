@@ -16,5 +16,7 @@ export function RelatedProducts({ slug }: { slug: string }) {
 
   if (!related.length) return null;
 
-  return <ProductCarousel title="Productos relacionados" products={related} />;
+  return (
+    <ProductCarousel title="Nuestros usuarios también suelen comprar" products={related} />
+  );
 }
