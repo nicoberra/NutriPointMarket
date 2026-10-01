@@ -7,6 +7,7 @@ import { AdminProducts } from "./AdminProducts";
 import { AdminRecords, type RecordsConfig } from "./AdminRecords";
 import { AdminDashboard } from "./AdminDashboard";
 import { AdminBilling } from "./AdminBilling";
+import { PullToRefresh } from "./PullToRefresh";
 import {
   GridIcon,
   PackageIcon,
@@ -125,6 +126,7 @@ export function AdminApp() {
 
   return (
     <div className="crm-app min-h-screen bg-page-soft lg:flex lg:select-auto">
+      <PullToRefresh />
       {/* Sidebar (solo desktop) */}
       <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:w-60 lg:flex-col lg:border-r lg:border-white/10 lg:bg-primary lg:text-white">
         <div className="px-5 py-6">
@@ -172,12 +174,33 @@ export function AdminApp() {
               {titles[section]}
             </h1>
           </div>
-          <button
-            onClick={logout}
-            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/10 lg:hidden"
-          >
-            <LogoutIcon className="h-4.5 w-4.5" /> Salir
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => window.location.reload()}
+              aria-label="Actualizar"
+              title="Actualizar"
+              className="grid h-9 w-9 place-items-center rounded-lg text-white/80 hover:bg-white/10 lg:text-muted lg:hover:bg-page-soft"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                <path d="M21 3v6h-6" />
+              </svg>
+            </button>
+            <button
+              onClick={logout}
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/10 lg:hidden"
+            >
+              <LogoutIcon className="h-4.5 w-4.5" /> Salir
+            </button>
+          </div>
         </header>
 
         {/* Contenido */}
