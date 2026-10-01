@@ -163,7 +163,7 @@ export function ProductDetail({ product: initial }: { product: Product }) {
               )}
             </div>
             <p className="mt-1.5 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
-              <PercentIcon className="h-4.5 w-4.5" /> 15% de descuento por transferencia
+              <PercentIcon className="h-4.5 w-4.5" /> 10% de descuento por transferencia
             </p>
             {product.freeShipping && (
               <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
@@ -258,7 +258,7 @@ export function ProductDetail({ product: initial }: { product: Product }) {
               <ShieldIcon className="h-5 w-5 text-primary" /> Producto original
             </li>
             <li className="flex items-center gap-2">
-              <PercentIcon className="h-5 w-5 text-primary" /> 15% de descuento por transferencia
+              <PercentIcon className="h-5 w-5 text-primary" /> 10% de descuento por transferencia
             </li>
             <li className="flex items-center gap-2">
               <CardIcon className="h-5 w-5 text-primary" /> Pago seguro

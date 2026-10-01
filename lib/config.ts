@@ -55,7 +55,7 @@ export function whatsappLink(message: string = WHATSAPP_MESSAGE): string {
 /** Mensajes de la barra promocional superior (rotan en mobile) */
 export const PROMO_MESSAGES = [
   "✅ Productos 100% originales",
-  "💰 15% de descuento pagando por transferencia",
+  "💰 10% de descuento pagando por transferencia",
   "🏦 Aceptamos transferencia bancaria y Mercado Pago",
 ];
 
@@ -69,7 +69,7 @@ export const TRUST_ITEMS = [
   {
     icon: "percent",
     title: "Descuento por transferencia",
-    text: "15% de descuento pagando por transferencia.",
+    text: "10% de descuento pagando por transferencia.",
   },
   {
     icon: "card",

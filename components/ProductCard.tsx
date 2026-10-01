@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Product } from "@/lib/types";
 import { brandName } from "@/data/brands";
@@ -13,6 +14,7 @@ import { CartIcon, TruckIcon } from "./Icons";
 
 export function ProductCard({ product }: { product: Product }) {
   const { addItem } = useCart();
+  const router = useRouter();
   const hasFlavors = product.flavors.length > 0;
   const [flavor, setFlavor] = useState<string>(product.flavors[0] ?? "");
   const shape = categoryMap[product.category]?.shape ?? "tub";
@@ -106,15 +108,27 @@ export function ProductCard({ product }: { product: Product }) {
         )}
 
         {/* CTA */}
-        <button
-          type="button"
-          disabled={product.inStock === false}
-          onClick={() => addItem(product, { flavor: flavor || undefined })}
-          className="btn btn-primary btn-md mt-3 w-full"
-        >
-          <CartIcon className="h-4.5 w-4.5" />
-          {product.inStock === false ? "Sin stock" : "Agregar al carrito"}
-        </button>
+        <div className="mt-3 space-y-2">
+          <button
+            type="button"
+            disabled={product.inStock === false}
+            onClick={() => {
+              addItem(product, { flavor: flavor || undefined });
+              router.push("/checkout");
+            }}
+            className="btn btn-primary btn-md w-full"
+          >
+            {product.inStock === false ? "Sin stock" : "Comprar"}
+          </button>
+          <button
+            type="button"
+            disabled={product.inStock === false}
+            onClick={() => addItem(product, { flavor: flavor || undefined })}
+            className="btn btn-outline btn-md w-full"
+          >
+            <CartIcon className="h-4.5 w-4.5" /> Agregar al carrito
+          </button>
+        </div>
       </div>
     </article>
   );

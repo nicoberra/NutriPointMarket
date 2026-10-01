@@ -65,7 +65,7 @@ export function PromoBannerRow() {
         <PromoBanner
           variant="primary"
           title="Descuento por transferencia"
-          text="Pagando por transferencia bancaria tenés 15% de descuento."
+          text="Pagando por transferencia bancaria tenés 10% de descuento."
           ctaLabel="Cómo comprar"
           ctaHref="/contacto#pagos"
         />

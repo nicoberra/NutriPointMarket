@@ -13,7 +13,7 @@ import { CheckIcon, WhatsappIcon } from "@/components/Icons";
 type Metodo = "Transferencia" | "Mercado Pago";
 
 // Descuento por pagar en efectivo o transferencia (sobre los productos).
-const DESCUENTO_EF_TR = 0.15;
+const DESCUENTO_EF_TR = 0.1;
 
 interface DoneInfo {
   metodo: Metodo;
@@ -174,7 +174,7 @@ export default function CheckoutPage() {
   }
 
   const metodos: { v: Metodo; label: string; hint?: string }[] = [
-    { v: "Transferencia", label: "Transferencia bancaria", hint: "15% de descuento. Enviás el comprobante por WhatsApp." },
+    { v: "Transferencia", label: "Transferencia bancaria", hint: "10% de descuento. Enviás el comprobante por WhatsApp." },
     { v: "Mercado Pago", label: "Mercado Pago", hint: "Dinero en cuenta, débito o crédito. Te lleva a Mercado Pago." },
   ];
 
@@ -272,7 +272,7 @@ export default function CheckoutPage() {
                 </div>
                 {descuento > 0 && (
                   <div className="flex justify-between text-secondary">
-                    <dt className="font-semibold">Descuento {method.toLowerCase()} (15%)</dt>
+                    <dt className="font-semibold">Descuento {method.toLowerCase()} (10%)</dt>
                     <dd className="font-semibold">− {formatPrice(descuento)}</dd>
                   </div>
                 )}
@@ -292,7 +292,7 @@ export default function CheckoutPage() {
               </div>
               {descuento > 0 && (
                 <p className="mt-1 text-right text-xs font-semibold text-secondary">
-                  Precio con 15% off pagando con {method.toLowerCase()} · ahorrás{" "}
+                  Precio con 10% off pagando con {method.toLowerCase()} · ahorrás{" "}
                   {formatPrice(descuento)}
                 </p>
               )}

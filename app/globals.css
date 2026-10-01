@@ -76,15 +76,23 @@
     @apply text-ink font-sans antialiased;
     text-rendering: optimizeLegibility;
     background-color: rgb(var(--color-page));
-    /* Fondo con los doodles de la marca en toda la página. El velo crema encima
-       lo suaviza para que los textos y las tarjetas se sigan leyendo bien. */
+  }
+
+  /* Fondo con los doodles de la marca en TODA la página. Usamos un pseudo-
+     elemento fijo (en vez de background-attachment: fixed, que no anda en iOS)
+     así se ve igual en celular y compu. El velo claro lo suaviza para que los
+     textos y las tarjetas se sigan leyendo bien. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
     background-image:
-      linear-gradient(rgb(var(--color-page) / 0.84), rgb(var(--color-page) / 0.84)),
+      linear-gradient(rgb(var(--color-page) / 0.8), rgb(var(--color-page) / 0.8)),
       url("/fondo.jpg");
-    background-repeat: repeat, no-repeat;
-    background-size: auto, cover;
-    background-position: center, center;
-    background-attachment: fixed;
+    background-size: cover;
+    background-position: center;
   }
 
   h1, h2, h3, h4 {

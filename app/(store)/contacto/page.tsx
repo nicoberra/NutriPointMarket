@@ -31,13 +31,13 @@ const INFO = [
     id: "pagos",
     icon: CardIcon,
     title: "Medios de pago",
-    text: "Aceptamos transferencia bancaria y Mercado Pago. Pagando por transferencia tenés 15% de descuento.",
+    text: "Aceptamos transferencia bancaria y Mercado Pago. Pagando por transferencia tenés 10% de descuento.",
   },
 ];
 
 const FAQ = [
   { q: "¿Los productos son originales?", a: "Sí. Trabajamos únicamente con distribuidores oficiales de cada marca." },
-  { q: "¿Hay descuento por transferencia?", a: "Sí, pagando por transferencia bancaria tenés un 15% de descuento. Consultanos por WhatsApp." },
+  { q: "¿Hay descuento por transferencia?", a: "Sí, pagando por transferencia bancaria tenés un 10% de descuento. Consultanos por WhatsApp." },
   { q: "¿Cómo recibo mi pedido?", a: "Coordinamos la entrega o el envío por WhatsApp según tu zona." },
   { q: "¿Puedo cambiar o devolver un producto?", a: "Sí, dentro de los plazos legales y con el producto cerrado. Escribinos y te ayudamos." },
 ];
