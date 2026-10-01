@@ -17,7 +17,7 @@ export function Hero() {
             10% de descuento por transferencia
           </span>
           <h1 className="font-display text-4xl font-black leading-[1.05] tracking-tight text-primary sm:text-5xl lg:text-6xl">
-            Alcanzá tu <span className="text-secondary">mejor versión</span>
+            Potenciá tu <span className="text-secondary">rendimiento</span>
           </h1>
           <p className="mt-4 max-w-md text-base text-muted sm:text-lg">
             Proteínas, creatinas, vitaminas y suplementos seleccionados para
@@ -27,8 +27,8 @@ export function Hero() {
             <Link href="/productos" className="btn btn-primary btn-lg">
               Ver productos <ArrowRightIcon className="h-5 w-5" />
             </Link>
-            <Link href="/ofertas" className="btn btn-secondary btn-lg">
-              Ver ofertas
+            <Link href="/productos?orden=destacados" className="btn btn-secondary btn-lg">
+              Ver destacados
             </Link>
           </div>
 

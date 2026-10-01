@@ -72,6 +72,8 @@ const PEDIDOS_CFG: RecordsConfig = {
     [r.detalle, r.monto ? `$${r.monto}` : "", r.pago].filter(Boolean).join(" · "),
   estado: true,
   aprobar: true,
+  deletable: true,
+  detail: true,
 };
 
 export function AdminApp() {

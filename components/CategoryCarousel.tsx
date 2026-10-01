@@ -75,14 +75,30 @@ export function CategoryCarousel() {
       };
       raf = requestAnimationFrame(tick);
 
+      let touchStartY = 0;
+      let decided = false;
+      let horizontal = false;
       const onStart = (e: TouchEvent) => {
         dragging = true;
+        decided = false;
+        horizontal = false;
         autoPlay = false;
         touchStartX = e.touches[0].pageX;
+        touchStartY = e.touches[0].pageY;
         startOffset = offset;
       };
       const onMove = (e: TouchEvent) => {
-        offset = loop(startOffset + (touchStartX - e.touches[0].pageX));
+        if (!dragging) return;
+        const dx = e.touches[0].pageX - touchStartX;
+        const dy = e.touches[0].pageY - touchStartY;
+        // Decidir una sola vez: ¿el gesto es horizontal (carrusel) o vertical (scroll)?
+        if (!decided && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
+          decided = true;
+          horizontal = Math.abs(dx) > Math.abs(dy);
+        }
+        if (!horizontal) return; // gesto vertical → dejar que la página scrollee
+        e.preventDefault(); // gesto horizontal → mover el carrusel, no la página
+        offset = loop(startOffset - dx);
         track.style.transform = `translateX(-${offset}px)`;
       };
       const onEnd = () => {
@@ -90,7 +106,7 @@ export function CategoryCarousel() {
         pauseAndResume(1500);
       };
       wrap.addEventListener("touchstart", onStart, { passive: true });
-      wrap.addEventListener("touchmove", onMove, { passive: true });
+      wrap.addEventListener("touchmove", onMove, { passive: false });
       wrap.addEventListener("touchend", onEnd, { passive: true });
       cleanups.push(() => {
         wrap.removeEventListener("touchstart", onStart);
@@ -203,7 +219,7 @@ export function CategoryCarousel() {
 
         <div
           ref={wrapRef}
-          className="no-scrollbar cursor-grab overflow-x-scroll overflow-y-hidden select-none [overscroll-behavior-x:contain] active:cursor-grabbing max-md:overflow-hidden"
+          className="no-scrollbar cursor-grab overflow-x-scroll overflow-y-hidden select-none [overscroll-behavior-x:contain] [touch-action:pan-y] active:cursor-grabbing max-md:overflow-hidden"
         >
           <div ref={trackRef} className="flex w-max">
             {items.map((c, i) => (
@@ -228,7 +244,7 @@ export function CategoryCarousel() {
                     />
                   )}
                 </div>
-                <span className="text-sm font-bold text-ink group-hover/slide:text-primary">
+                <span className="text-sm font-bold uppercase text-ink group-hover/slide:text-primary">
                   {c.name}
                 </span>
               </Link>

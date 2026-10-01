@@ -43,10 +43,24 @@ export default function CarritoPage() {
                   className="flex gap-4 rounded-xl border border-line bg-white p-3 sm:p-4"
                 >
                   <Link href={`/producto?slug=${item.product.slug}`} className="shrink-0">
-                    <ProductVisual
-                      shape={categoryMap[item.product.category]?.shape ?? "tub"}
-                      className="h-24 w-24 rounded-lg sm:h-28 sm:w-28"
-                    />
+                    {(() => {
+                      const img =
+                        item.product.variantImages?.[item.flavor ?? ""]?.[0] ??
+                        item.product.image;
+                      return img ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={img}
+                          alt={item.product.name}
+                          className="h-24 w-24 rounded-lg object-cover sm:h-28 sm:w-28"
+                        />
+                      ) : (
+                        <ProductVisual
+                          shape={categoryMap[item.product.category]?.shape ?? "tub"}
+                          className="h-24 w-24 rounded-lg sm:h-28 sm:w-28"
+                        />
+                      );
+                    })()}
                   </Link>
                   <div className="flex min-w-0 flex-1 flex-col">
                     <p className="text-[11px] font-bold uppercase text-muted">

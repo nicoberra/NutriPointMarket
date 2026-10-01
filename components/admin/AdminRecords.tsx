@@ -1,9 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { listTable, addRow, updateRow, aprobarPedido } from "@/lib/api";
+import { listTable, addRow, updateRow, deleteRow, aprobarPedido } from "@/lib/api";
 import { whatsappLink } from "@/lib/config";
-import { CloseIcon, PlusIcon, WhatsappIcon, CheckIcon, SearchIcon } from "@/components/Icons";
+import { formatPrice } from "@/lib/format";
+import {
+  CloseIcon,
+  PlusIcon,
+  WhatsappIcon,
+  CheckIcon,
+  SearchIcon,
+  TrashIcon,
+} from "@/components/Icons";
 
 export interface FieldDef {
   key: string;
@@ -26,6 +34,10 @@ export interface RecordsConfig {
   estado?: boolean;
   /** Muestra botón "Aprobar pago" que descuenta stock (para Pedidos) */
   aprobar?: boolean;
+  /** Permite eliminar la fila */
+  deletable?: boolean;
+  /** Permite abrir el detalle completo (para Pedidos) */
+  detail?: boolean;
   /** Etiqueta opcional (ej: "Web" para clientes registrados desde la tienda) */
   tag?: (r: Record<string, string>) => string | undefined;
   /** Divide en dos solapas por origen web (para Clientes) */
@@ -55,6 +67,7 @@ export function AdminRecords({
   const [saving, setSaving] = useState(false);
   const [seg, setSeg] = useState<"mine" | "web">("mine");
   const [q, setQ] = useState("");
+  const [detailRow, setDetailRow] = useState<Row | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -85,6 +98,13 @@ export function AdminRecords({
       prev.map((r) => (r.id === row.id ? { ...r, estado: nuevo } : r)),
     );
     await updateRow(config.tab, row.id, { estado: nuevo });
+  };
+
+  const eliminar = async (row: Row) => {
+    if (!window.confirm("¿Eliminar este pedido? No se puede deshacer.")) return;
+    setRows((prev) => prev.filter((r) => r.id !== row.id));
+    await deleteRow(config.tab, row.id);
+    onToast("Pedido eliminado ✓");
   };
 
   const aprobarPago = async (row: Row) => {
@@ -182,7 +202,16 @@ export function AdminRecords({
             >
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
-                  <span className="truncate">{config.primary(r) || "—"}</span>
+                  {config.detail ? (
+                    <button
+                      onClick={() => setDetailRow(r)}
+                      className="truncate text-left hover:text-primary hover:underline"
+                    >
+                      {config.primary(r) || "—"}
+                    </button>
+                  ) : (
+                    <span className="truncate">{config.primary(r) || "—"}</span>
+                  )}
                   {config.tag?.(r) && (
                     <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-bold uppercase text-primary">
                       {config.tag(r)}
@@ -233,6 +262,15 @@ export function AdminRecords({
                   <WhatsappIcon className="h-5 w-5" />
                 </a>
               )}
+              {config.deletable && (
+                <button
+                  onClick={() => eliminar(r)}
+                  aria-label="Eliminar"
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-sale hover:bg-sale/10"
+                >
+                  <TrashIcon className="h-5 w-5" />
+                </button>
+              )}
             </li>
           ))}
         </ul>
@@ -246,6 +284,109 @@ export function AdminRecords({
           onSave={handleAdd}
         />
       )}
+
+      {detailRow && <DetailSheet row={detailRow} onClose={() => setDetailRow(null)} />}
+    </div>
+  );
+}
+
+/* ------------------------- Detalle de un pedido --------------------------- */
+
+function DetailSheet({ row, onClose }: { row: Row; onClose: () => void }) {
+  let items: { n: string; v?: string; q: number }[] = [];
+  try {
+    items = JSON.parse(row.items || "[]");
+  } catch {
+    /* ignore */
+  }
+  const email = (row.notas || "").match(/Email:\s*([^\s|]+)/i)?.[1] || "";
+  const esTransfer = (row.pago || "").toLowerCase().includes("transfer");
+
+  return (
+    <div className="fixed inset-0 z-[95] flex items-end justify-center sm:items-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-page p-5 sm:rounded-2xl">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="font-display text-lg font-bold text-primary">Detalle del pedido</h3>
+          <button
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="grid h-9 w-9 place-items-center rounded-full text-ink hover:bg-page-soft"
+          >
+            <CloseIcon className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-3 text-sm">
+          <DetailBox title="Cliente">
+            <DetailLine k="Nombre" v={row.cliente} />
+            <DetailLine k="Teléfono" v={row.telefono} />
+            {email && <DetailLine k="Email" v={email} />}
+            <DetailLine k="Fecha" v={row.fecha} />
+          </DetailBox>
+
+          <DetailBox title="Pago y envío">
+            <DetailLine k="Forma de pago" v={row.pago} />
+            <DetailLine
+              k="Estado"
+              v={row.descontado === "sí" ? "Pagado · stock descontado" : row.estado || "Pendiente"}
+            />
+            <DetailLine k="Envío" v={row.envio} />
+          </DetailBox>
+
+          <DetailBox title="Productos">
+            {items.length ? (
+              <ul className="space-y-1">
+                {items.map((it, i) => (
+                  <li key={i} className="text-ink">
+                    {it.q}× {it.n}
+                    {it.v ? ` · ${it.v}` : ""}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-muted">{row.detalle || "—"}</p>
+            )}
+          </DetailBox>
+
+          <DetailBox title="Totales">
+            {Number(row.montoEnvio) > 0 && (
+              <DetailLine k="Envío" v={formatPrice(Number(row.montoEnvio))} />
+            )}
+            <DetailLine k="Total" v={formatPrice(Number(row.monto) || 0)} />
+            {esTransfer && (
+              <p className="mt-1 text-xs font-semibold text-secondary">
+                Incluye 10% de descuento por transferencia.
+              </p>
+            )}
+          </DetailBox>
+
+          {row.notas && (
+            <DetailBox title="Notas">
+              <p className="text-muted">{row.notas}</p>
+            </DetailBox>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DetailBox({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-line bg-white p-3">
+      <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-muted">{title}</p>
+      {children}
+    </div>
+  );
+}
+
+function DetailLine({ k, v }: { k: string; v?: string }) {
+  if (!v) return null;
+  return (
+    <div className="flex justify-between gap-3 py-0.5">
+      <span className="text-muted">{k}</span>
+      <span className="text-right font-medium text-ink">{v}</span>
     </div>
   );
 }

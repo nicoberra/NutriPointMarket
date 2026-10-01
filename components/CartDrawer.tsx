@@ -131,10 +131,24 @@ export function CartDrawer() {
                       onClick={closeCart}
                       className="shrink-0"
                     >
-                      <ProductVisual
-                        shape={categoryMap[item.product.category]?.shape ?? "tub"}
-                        className="h-20 w-20 rounded-md"
-                      />
+                      {(() => {
+                        const img =
+                          item.product.variantImages?.[item.flavor ?? ""]?.[0] ??
+                          item.product.image;
+                        return img ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={img}
+                            alt={item.product.name}
+                            className="h-20 w-20 rounded-md object-cover"
+                          />
+                        ) : (
+                          <ProductVisual
+                            shape={categoryMap[item.product.category]?.shape ?? "tub"}
+                            className="h-20 w-20 rounded-md"
+                          />
+                        );
+                      })()}
                     </Link>
                     <div className="flex min-w-0 flex-1 flex-col">
                       <div className="flex items-start justify-between gap-2">
