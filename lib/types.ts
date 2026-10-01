@@ -33,6 +33,12 @@ export interface Product {
   brand: string; // slug de la marca
   category: CategorySlug;
   description: string;
+  /** Modo de uso (opcional, editable desde el CRM). */
+  usage?: string;
+  /** Información nutricional (opcional; si está vacío no se muestra). */
+  nutrition?: string;
+  /** Ingredientes (opcional; si está vacío no se muestra). */
+  ingredients?: string;
   price: number;
   oldPrice?: number;
   /** Porcentaje de descuento (0 si no tiene). Se puede calcular pero se guarda para control manual */

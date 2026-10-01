@@ -167,6 +167,9 @@ export function buildProduct(row: Record<string, unknown>): Product {
     brand: String(row.marca ?? "").trim(),
     category,
     description: String(row.descripcion ?? "").trim(),
+    usage: String(row.modoUso ?? "").trim() || undefined,
+    nutrition: String(row.infoNutricional ?? "").trim() || undefined,
+    ingredients: String(row.ingredientes ?? "").trim() || undefined,
     price: precio,
     oldPrice,
     discount: discountPercent(precio, oldPrice),
@@ -309,6 +312,9 @@ export interface ProductInput {
   costoMoneda?: "USD" | "ARS";
   cantidad?: number;
   descripcion?: string;
+  modoUso?: string;
+  infoNutricional?: string;
+  ingredientes?: string;
 }
 
 export async function saveProduct(row: ProductInput): Promise<boolean> {
@@ -325,6 +331,9 @@ export async function saveProduct(row: ProductInput): Promise<boolean> {
     costoMoneda: row.costoMoneda ?? "ARS",
     cantidad: row.cantidad ?? "",
     descripcion: row.descripcion ?? "",
+    modoUso: row.modoUso ?? "",
+    infoNutricional: row.infoNutricional ?? "",
+    ingredientes: row.ingredientes ?? "",
   });
   const r = await api("productos_save", { data });
   return r.ok !== false;

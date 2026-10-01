@@ -9,6 +9,7 @@ import { formatPrice } from "@/lib/format";
 import { ASSET_PREFIX } from "@/lib/config";
 import { ProductVisual } from "./ProductVisual";
 import { QuantitySelector } from "./QuantitySelector";
+import { stockMax } from "@/lib/stock";
 import { CartIcon, CloseIcon, TrashIcon, TruckIcon, ArrowRightIcon } from "./Icons";
 
 const FREE_SHIPPING_THRESHOLD = 120000;
@@ -185,6 +186,7 @@ export function CartDrawer() {
                           size="sm"
                           value={item.quantity}
                           onChange={(v) => setQuantity(item.key, v)}
+                          max={stockMax(item.product, item.flavor)}
                         />
                         <span className="text-sm font-extrabold text-primary">
                           {formatPrice(item.product.price * item.quantity)}

@@ -47,6 +47,14 @@ export function ProductDetail({ product: initial }: { product: Product }) {
 
   const selQty = variantQty(flavor);
   const soldOut = product.inStock === false || (selQty !== null && selQty <= 0);
+  // Máximo que se puede comprar: el stock de la variante elegida, o el stock
+  // total del producto si no usa variantes. Sin seguimiento → 99.
+  const maxQty =
+    selQty !== null
+      ? Math.max(1, selQty)
+      : (product.stockQty ?? 0) > 0
+        ? (product.stockQty as number)
+        : 99;
 
   // Galería: por defecto las fotos principales; al elegir una variante con
   // fotos, se muestran las de esa variante.
@@ -54,9 +62,14 @@ export function ProductDetail({ product: initial }: { product: Product }) {
   const displayPhotos = variantPhotos.length ? variantPhotos : product.images ?? [];
   const mainImage = displayPhotos[activeThumb] ?? product.image;
 
-  // Al cambiar de variante, volver a la primera foto.
+  // Al cambiar de variante, volver a la primera foto y ajustar la cantidad al
+  // stock de esa variante (para no pasarse).
   useEffect(() => {
     setActiveThumb(0);
+    const q = variantQty(flavor);
+    const m = q !== null ? q : (product.stockQty ?? 0) > 0 ? (product.stockQty as number) : 99;
+    setQty((cur) => Math.min(Math.max(1, cur), Math.max(1, m)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flavor]);
 
   // Variaciones de color para simular una galería (placeholder)
@@ -135,12 +148,6 @@ export function ProductDetail({ product: initial }: { product: Product }) {
             <div className="mt-2.5">
               <Rating value={product.rating} reviews={product.reviews} size="md" />
             </div>
-          )}
-
-          {product.description && (
-            <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-muted">
-              {product.description}
-            </p>
           )}
 
           {/* Precio */}
@@ -230,13 +237,17 @@ export function ProductDetail({ product: initial }: { product: Product }) {
 
           {/* Cantidad + acciones */}
           <div className="mt-6 flex flex-wrap items-center gap-3">
-            <QuantitySelector value={qty} onChange={setQty} />
+            <QuantitySelector value={qty} onChange={setQty} max={maxQty} />
             <span
               className={`text-xs font-medium ${
-                product.inStock !== false ? "text-primary" : "text-sale"
+                soldOut ? "text-sale" : "text-primary"
               }`}
             >
-              {product.inStock !== false ? "En stock" : "Sin stock"}
+              {soldOut
+                ? "Sin stock"
+                : selQty !== null
+                  ? `Quedan ${selQty}`
+                  : "En stock"}
             </span>
           </div>
 
@@ -277,61 +288,44 @@ export function ProductDetail({ product: initial }: { product: Product }) {
 /* ------------------------- Tabs (desktop) / Accordion (mobile) ------------- */
 
 function ProductTabs({ product }: { product: Product }) {
+  // Solo se muestran las secciones que tengan contenido (cargadas desde el CRM).
   const tabs = [
-    {
-      id: "descripcion",
-      label: "Descripción",
-      content: (
-        <p>
-          {product.description} Presentado por {brandName(product.brand)}, este
-          producto forma parte de nuestra selección de suplementos originales,
-          pensados para acompañar tus objetivos de rendimiento y bienestar.
-        </p>
-      ),
-    },
-    {
-      id: "nutricional",
-      label: "Información nutricional",
-      content: (
-        <div>
-          <p className="mb-3">Valores de referencia por porción (información de demostración):</p>
-          <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {[
-              ["Energía", "120 kcal"],
-              ["Proteínas", "24 g"],
-              ["Carbohidratos", "3 g"],
-              ["Grasas", "1.5 g"],
-            ].map(([k, v]) => (
-              <li key={k} className="rounded-lg border border-line bg-white p-3 text-center">
-                <span className="block text-xs text-muted">{k}</span>
-                <span className="block font-bold text-primary">{v}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ),
-    },
-    {
-      id: "uso",
-      label: "Modo de uso",
-      content: (
-        <p>
-          Mezclar una porción con 200–300 ml de agua o la bebida de tu preferencia.
-          Consumir según tus objetivos y actividad física. Ante cualquier duda,
-          consultá con un profesional de la salud.
-        </p>
-      ),
-    },
-    {
-      id: "ingredientes",
-      label: "Ingredientes",
-      content: (
-        <p>
-          Información de demostración. Consultá siempre la etiqueta del envase para
-          conocer los ingredientes, alérgenos y advertencias específicas del producto.
-        </p>
-      ),
-    },
+    ...(product.description
+      ? [
+          {
+            id: "descripcion",
+            label: "Descripción",
+            content: <p className="whitespace-pre-line">{product.description}</p>,
+          },
+        ]
+      : []),
+    ...(product.usage
+      ? [
+          {
+            id: "uso",
+            label: "Modo de uso",
+            content: <p className="whitespace-pre-line">{product.usage}</p>,
+          },
+        ]
+      : []),
+    ...(product.nutrition
+      ? [
+          {
+            id: "nutricional",
+            label: "Información nutricional",
+            content: <p className="whitespace-pre-line">{product.nutrition}</p>,
+          },
+        ]
+      : []),
+    ...(product.ingredients
+      ? [
+          {
+            id: "ingredientes",
+            label: "Ingredientes",
+            content: <p className="whitespace-pre-line">{product.ingredients}</p>,
+          },
+        ]
+      : []),
     {
       id: "faq",
       label: "Preguntas frecuentes",

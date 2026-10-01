@@ -68,6 +68,9 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
       costoMoneda: ch.costoMoneda ?? p.costCurrency ?? "ARS",
       cantidad: ch.cantidad ?? p.stockQty ?? 0,
       descripcion: p.description ?? "",
+      modoUso: p.usage ?? "",
+      infoNutricional: p.nutrition ?? "",
+      ingredientes: p.ingredients ?? "",
     };
     const ok = await saveProduct(row);
     onToast(ok ? "Guardado ✓" : "Guardado (verificá)");
@@ -567,6 +570,9 @@ function ProductSheet({
   const [moneda, setMoneda] = useState<"USD" | "ARS">(product?.costCurrency ?? "ARS");
   const [cantidad, setCantidad] = useState<number | "">(product?.stockQty ?? "");
   const [descripcion, setDescripcion] = useState(product?.description ?? "");
+  const [modoUso, setModoUso] = useState(product?.usage ?? "");
+  const [infoNutri, setInfoNutri] = useState(product?.nutrition ?? "");
+  const [ingredientes, setIngredientes] = useState(product?.ingredients ?? "");
 
   const descValNum = descVal === "" ? 0 : Number(descVal);
   const descPesos = descMode === "%" ? Math.round((precioNormal * descValNum) / 100) : descValNum;
@@ -605,6 +611,9 @@ function ProductSheet({
       costoMoneda: moneda,
       cantidad: totalStock,
       descripcion: descripcion.trim(),
+      modoUso: modoUso.trim(),
+      infoNutricional: infoNutri.trim(),
+      ingredientes: ingredientes.trim(),
     });
   };
 
@@ -705,7 +714,34 @@ function ProductSheet({
               value={descripcion}
               onChange={(e) => setDescripcion(e.target.value)}
               className="input min-h-24 py-2 text-base"
-              placeholder="Detalle del producto, modo de uso, beneficios…"
+              placeholder="Detalle del producto, beneficios…"
+            />
+          </Field>
+
+          <Field label="Modo de uso (opcional)">
+            <textarea
+              value={modoUso}
+              onChange={(e) => setModoUso(e.target.value)}
+              className="input min-h-20 py-2 text-base"
+              placeholder="Cómo se toma / se usa…"
+            />
+          </Field>
+
+          <Field label="Información nutricional (opcional — si lo dejás vacío no se muestra)">
+            <textarea
+              value={infoNutri}
+              onChange={(e) => setInfoNutri(e.target.value)}
+              className="input min-h-20 py-2 text-base"
+              placeholder="Ej: Energía 120 kcal · Proteínas 24 g · Carbohidratos 3 g…"
+            />
+          </Field>
+
+          <Field label="Ingredientes (opcional — si lo dejás vacío no se muestra)">
+            <textarea
+              value={ingredientes}
+              onChange={(e) => setIngredientes(e.target.value)}
+              className="input min-h-20 py-2 text-base"
+              placeholder="Lista de ingredientes…"
             />
           </Field>
 

@@ -9,6 +9,7 @@ import { ASSET_PREFIX } from "@/lib/config";
 import { PageBanner } from "@/components/PageBanner";
 import { ProductVisual } from "@/components/ProductVisual";
 import { QuantitySelector } from "@/components/QuantitySelector";
+import { stockMax } from "@/lib/stock";
 import { TrashIcon, ArrowRightIcon } from "@/components/Icons";
 
 export default function CarritoPage() {
@@ -81,6 +82,7 @@ export default function CarritoPage() {
                       <QuantitySelector
                         value={item.quantity}
                         onChange={(v) => setQuantity(item.key, v)}
+                        max={stockMax(item.product, item.flavor)}
                       />
                       <div className="flex items-center gap-4">
                         <span className="font-display text-lg font-extrabold text-primary">

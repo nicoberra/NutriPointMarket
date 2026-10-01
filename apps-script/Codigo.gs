@@ -49,6 +49,9 @@ var TABLES = {
       ["cantidad", "Cantidad"],
       ["variantesFotos", "Variantes fotos"],
       ["descripcion", "Descripción"],
+      ["modoUso", "Modo de uso"],
+      ["infoNutricional", "Información nutricional"],
+      ["ingredientes", "Ingredientes"],
     ],
     idField: "nombre",
   },
@@ -397,6 +400,9 @@ function listProductos() {
       cantidad: row[11] === "" || row[11] == null ? 0 : Number(row[11]) || 0,
       variantesFotos: String(row[12] || "").trim(),
       descripcion: String(row[13] || "").trim(),
+      modoUso: String(row[14] || "").trim(),
+      infoNutricional: String(row[15] || "").trim(),
+      ingredientes: String(row[16] || "").trim(),
     });
   }
   return list;
