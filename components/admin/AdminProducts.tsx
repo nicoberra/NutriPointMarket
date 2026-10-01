@@ -5,7 +5,7 @@ import type { Product } from "@/lib/types";
 import { useProducts } from "@/context/ProductsContext";
 import { useCategories } from "@/context/CategoriesContext";
 import { saveProduct, uploadProductImage, type ProductInput } from "@/lib/api";
-import { formatPrice, discountPercent } from "@/lib/format";
+import { formatPrice } from "@/lib/format";
 import { categoryMap } from "@/data/categories";
 import { SearchIcon, CloseIcon, CheckIcon, PlusIcon } from "@/components/Icons";
 import { AdminCategories } from "./AdminCategories";
@@ -208,26 +208,32 @@ function ProductRow({
   onUpload: (p: Product, file: File) => Promise<void>;
 }) {
   const [uploading, setUploading] = useState(false);
-  const [precio, setPrecio] = useState<number>(product.price);
-  const [precioML, setPrecioML] = useState<number | "">(product.oldPrice ?? "");
+  const [precioNormal, setPrecioNormal] = useState<number>(
+    product.oldPrice && product.oldPrice > product.price ? product.oldPrice : product.price,
+  );
+  const [descMode, setDescMode] = useState<"$" | "%">("$");
+  const [descVal, setDescVal] = useState<number | "">(
+    product.oldPrice && product.oldPrice > product.price ? product.oldPrice - product.price : "",
+  );
   const [stock, setStock] = useState<boolean>(product.inStock !== false);
   const [destacado, setDestacado] = useState<boolean>(product.featured);
   const [costo, setCosto] = useState<number | "">(product.cost || "");
   const [moneda, setMoneda] = useState<"USD" | "ARS">(product.costCurrency ?? "ARS");
   const [cantidad, setCantidad] = useState<number | "">(product.stockQty ?? "");
 
-  const desc = discountPercent(precio, precioML ? Number(precioML) : undefined);
+  const descValNum = descVal === "" ? 0 : Number(descVal);
+  const descPesos = descMode === "%" ? Math.round((precioNormal * descValNum) / 100) : descValNum;
+  const descPorc = precioNormal > 0 ? Math.round((descPesos / precioNormal) * 100) : 0;
+  const precioFinal = Math.max(0, precioNormal - descPesos);
   const costoNum = costo === "" ? 0 : Number(costo);
   const costoPesos = costToPesos(costoNum, moneda, dollar);
-  const ganancia = precio - costoPesos;
-  const margen = precio > 0 ? Math.round((ganancia / precio) * 100) : 0;
+  const ganancia = precioFinal - costoPesos;
+  const margen = precioFinal > 0 ? Math.round((ganancia / precioFinal) * 100) : 0;
 
   const saveCosto = (m = moneda) => onSave(product, { costo: costoNum, costoMoneda: m });
 
   const savePrices = () => {
-    const mlNum = precioML === "" ? undefined : Number(precioML);
-    if (precio === product.price && (product.oldPrice ?? undefined) === mlNum) return;
-    onSave(product, { precio, precioML: mlNum });
+    onSave(product, { precio: precioFinal, precioML: descPesos > 0 ? precioNormal : undefined });
   };
 
   return (
@@ -278,36 +284,56 @@ function ProductRow({
 
       <div className="grid grid-cols-2 gap-3">
         <label className="block">
-          <span className="mb-1 block text-xs font-semibold text-ink">Precio</span>
+          <span className="mb-1 block text-xs font-semibold text-ink">Precio (normal)</span>
           <input
             type="number"
             inputMode="numeric"
-            value={precio || ""}
-            onChange={(e) => setPrecio(Number(e.target.value))}
+            value={precioNormal || ""}
+            onChange={(e) => setPrecioNormal(Number(e.target.value))}
             onBlur={savePrices}
             className="input h-11 text-base"
           />
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs font-semibold text-ink">
-            Precio ML (oferta)
-          </span>
-          <input
-            type="number"
-            inputMode="numeric"
-            value={precioML}
-            onChange={(e) => setPrecioML(e.target.value ? Number(e.target.value) : "")}
-            onBlur={savePrices}
-            className="input h-11 text-base"
-          />
+          <span className="mb-1 block text-xs font-semibold text-ink">Descuento</span>
+          <div className="flex items-stretch gap-1.5">
+            <input
+              type="number"
+              inputMode="numeric"
+              value={descVal}
+              onChange={(e) => setDescVal(e.target.value === "" ? "" : Number(e.target.value))}
+              onBlur={savePrices}
+              className="input h-11 flex-1 text-base"
+              placeholder="0"
+            />
+            <div className="flex overflow-hidden rounded-lg border border-line">
+              {(["$", "%"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => {
+                    setDescMode(m);
+                    setTimeout(savePrices, 0);
+                  }}
+                  className={`px-2.5 text-sm font-bold transition-colors ${
+                    descMode === m ? "bg-primary text-white" : "bg-white text-muted"
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
         </label>
       </div>
 
-      <p className="mt-1.5 text-xs text-muted">
-        {desc > 0 ? (
-          <span className="font-semibold text-sale">{desc}% OFF</span>
+      <p className="mt-1.5 text-xs">
+        {descPesos > 0 ? (
+          <span className="font-semibold text-sale">
+            {descPorc}% OFF · {formatPrice(descPesos)} · Final {formatPrice(precioFinal)}
+          </span>
         ) : (
-          "Sin oferta"
+          <span className="text-muted">Sin descuento</span>
         )}
       </p>
 
@@ -350,7 +376,7 @@ function ProductRow({
                 ≈ {formatPrice(Math.round(costoPesos))} <span className="opacity-70">(dólar ${dollar})</span>
               </span>
             )}
-            {precio > 0 && costoPesos < precio && (
+            {precioFinal > 0 && costoPesos < precioFinal && (
               <span className="rounded-full bg-green-100 px-2 py-0.5 font-bold text-green-700">
                 Ganancia {formatPrice(Math.round(ganancia))} · {margen}%
               </span>
@@ -444,8 +470,16 @@ function ProductSheet({
       ? categoryMap[product.category]?.name ?? categories[0]?.name ?? ""
       : categories[0]?.name ?? "",
   );
-  const [precio, setPrecio] = useState<number>(product?.price ?? 0);
-  const [precioML, setPrecioML] = useState<number | "">(product?.oldPrice ?? "");
+  // Precio NORMAL + descuento (en $ o %). El precio final = normal − descuento.
+  const [precioNormal, setPrecioNormal] = useState<number>(
+    product ? (product.oldPrice && product.oldPrice > product.price ? product.oldPrice : product.price) : 0,
+  );
+  const [descMode, setDescMode] = useState<"$" | "%">("$");
+  const [descVal, setDescVal] = useState<number | "">(
+    product && product.oldPrice && product.oldPrice > product.price
+      ? product.oldPrice - product.price
+      : "",
+  );
   const [variantes, setVariantes] = useState(product?.flavors.join(", ") ?? "");
   const [stock, setStock] = useState<boolean>(product?.inStock !== false);
   const [destacado, setDestacado] = useState<boolean>(product?.featured ?? false);
@@ -453,10 +487,13 @@ function ProductSheet({
   const [moneda, setMoneda] = useState<"USD" | "ARS">(product?.costCurrency ?? "ARS");
   const [cantidad, setCantidad] = useState<number | "">(product?.stockQty ?? "");
 
-  const desc = discountPercent(precio, precioML ? Number(precioML) : undefined);
+  const descValNum = descVal === "" ? 0 : Number(descVal);
+  const descPesos = descMode === "%" ? Math.round((precioNormal * descValNum) / 100) : descValNum;
+  const descPorc = precioNormal > 0 ? Math.round((descPesos / precioNormal) * 100) : 0;
+  const precioFinal = Math.max(0, precioNormal - descPesos);
   const costoNum = costo === "" ? 0 : Number(costo);
   const costoPesos = costToPesos(costoNum, moneda, dollar);
-  const ganancia = precio - costoPesos;
+  const ganancia = precioFinal - costoPesos;
 
   const submit = () => {
     if (!nombre.trim()) return;
@@ -465,8 +502,8 @@ function ProductSheet({
       nombre: nombre.trim(),
       marca: marca.trim(),
       categoria,
-      precio,
-      precioML: precioML ? Number(precioML) : undefined,
+      precio: precioFinal,
+      precioML: descPesos > 0 ? precioNormal : undefined,
       variantes: variantes.trim(),
       stock: cantidad === "" ? stock : cantNum > 0,
       destacado,
@@ -531,23 +568,40 @@ function ProductSheet({
                 ))}
               </select>
             </Field>
-            <Field label="Precio">
+            <Field label="Precio (normal)">
               <input
                 type="number"
                 inputMode="numeric"
-                value={precio || ""}
-                onChange={(e) => setPrecio(Number(e.target.value))}
+                value={precioNormal || ""}
+                onChange={(e) => setPrecioNormal(Number(e.target.value))}
                 className="input h-11 text-base"
               />
             </Field>
-            <Field label="Precio ML (tachado)">
-              <input
-                type="number"
-                inputMode="numeric"
-                value={precioML}
-                onChange={(e) => setPrecioML(e.target.value ? Number(e.target.value) : "")}
-                className="input h-11 text-base"
-              />
+            <Field label="Descuento">
+              <div className="flex items-stretch gap-2">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={descVal}
+                  onChange={(e) => setDescVal(e.target.value === "" ? "" : Number(e.target.value))}
+                  className="input h-11 flex-1 text-base"
+                  placeholder="0"
+                />
+                <div className="flex overflow-hidden rounded-lg border border-line">
+                  {(["$", "%"] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setDescMode(m)}
+                      className={`px-3 text-sm font-bold transition-colors ${
+                        descMode === m ? "bg-primary text-white" : "bg-white text-muted"
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </Field>
           </div>
 
@@ -604,17 +658,24 @@ function ProductSheet({
                   ≈ {formatPrice(Math.round(costoPesos))} (dólar ${dollar}) ·{" "}
                 </span>
               )}
-              {precio > 0 && costoPesos < precio && (
+              {precioFinal > 0 && costoPesos < precioFinal && (
                 <span className="font-semibold text-green-600">
                   Ganancia {formatPrice(Math.round(ganancia))} ·{" "}
-                  {Math.round((ganancia / precio) * 100)}%
+                  {Math.round((ganancia / precioFinal) * 100)}%
                 </span>
               )}
             </p>
           )}
 
-          <p className="text-xs text-muted">
-            {desc > 0 ? `Se mostrará ${desc}% OFF` : "Sin descuento"}
+          <p className="text-xs">
+            {descPesos > 0 ? (
+              <span className="font-semibold text-secondary">
+                Descuento {formatPrice(descPesos)} ({descPorc}%) · Precio final:{" "}
+                {formatPrice(precioFinal)}
+              </span>
+            ) : (
+              <span className="text-muted">Sin descuento</span>
+            )}
           </p>
 
           <div className="space-y-2">
