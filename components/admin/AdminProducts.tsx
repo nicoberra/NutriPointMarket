@@ -67,6 +67,7 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
       costo: "costo" in ch ? ch.costo : p.cost,
       costoMoneda: ch.costoMoneda ?? p.costCurrency ?? "ARS",
       cantidad: ch.cantidad ?? p.stockQty ?? 0,
+      descripcion: p.description ?? "",
     };
     const ok = await saveProduct(row);
     onToast(ok ? "Guardado ✓" : "Guardado (verificá)");
@@ -308,44 +309,48 @@ function ProductRow({
           <div className="mt-2 space-y-1.5">
             <p className="text-[11px] font-semibold text-muted">Foto por variante</p>
             {product.flavors.map((f) => {
-              const vimg = product.variantImages?.[f];
+              const vimgs = product.variantImages?.[f] ?? [];
               return (
-                <div key={f} className="flex items-center gap-2">
-                  {vimg ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={vimg} alt="" className="h-9 w-9 rounded border border-line object-cover" />
-                  ) : (
-                    <div className="grid h-9 w-9 place-items-center rounded border border-line bg-page-soft text-[9px] text-muted">
-                      —
-                    </div>
-                  )}
-                  <span className="flex-1 truncate text-xs text-ink">{f}</span>
-                  <label className="cursor-pointer rounded-lg border border-line px-2 py-1 text-[11px] font-semibold text-primary hover:bg-page-soft">
-                    {vimg ? "Cambiar" : "Subir"}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      disabled={uploading}
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        e.target.value = "";
-                        if (!file) return;
-                        setUploading(true);
-                        await onUpload(product, file, f);
-                        setUploading(false);
-                      }}
-                    />
-                  </label>
-                  {vimg && (
-                    <button
-                      type="button"
-                      onClick={() => onDeleteImage(product, { variante: f })}
-                      className="text-[11px] font-semibold text-sale"
-                    >
-                      Quitar
-                    </button>
-                  )}
+                <div key={f} className="rounded-lg border border-line p-2">
+                  <div className="mb-1.5 flex items-center justify-between gap-2">
+                    <span className="truncate text-xs font-semibold text-ink">{f}</span>
+                    <label className="cursor-pointer rounded border border-line px-2 py-1 text-[11px] font-semibold text-primary hover:bg-page-soft">
+                      + Foto
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploading}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = "";
+                          if (!file) return;
+                          setUploading(true);
+                          await onUpload(product, file, f);
+                          setUploading(false);
+                        }}
+                      />
+                    </label>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {vimgs.map((src) => (
+                      <div key={src} className="relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={src} alt="" className="h-9 w-9 rounded border border-line object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => onDeleteImage(product, { variante: f, url: src })}
+                          aria-label="Quitar foto"
+                          className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-sale text-[9px] font-bold text-white"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    {vimgs.length === 0 && (
+                      <span className="text-[10px] text-muted">Sin fotos</span>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -561,6 +566,7 @@ function ProductSheet({
   const [costo, setCosto] = useState<number | "">(product?.cost || "");
   const [moneda, setMoneda] = useState<"USD" | "ARS">(product?.costCurrency ?? "ARS");
   const [cantidad, setCantidad] = useState<number | "">(product?.stockQty ?? "");
+  const [descripcion, setDescripcion] = useState(product?.description ?? "");
 
   const descValNum = descVal === "" ? 0 : Number(descVal);
   const descPesos = descMode === "%" ? Math.round((precioNormal * descValNum) / 100) : descValNum;
@@ -598,6 +604,7 @@ function ProductSheet({
       costo: costoNum,
       costoMoneda: moneda,
       cantidad: totalStock,
+      descripcion: descripcion.trim(),
     });
   };
 
@@ -692,6 +699,15 @@ function ProductSheet({
               </div>
             </Field>
           </div>
+
+          <Field label="Descripción (se muestra en la página del producto)">
+            <textarea
+              value={descripcion}
+              onChange={(e) => setDescripcion(e.target.value)}
+              className="input min-h-24 py-2 text-base"
+              placeholder="Detalle del producto, modo de uso, beneficios…"
+            />
+          </Field>
 
           <div>
             <span className="mb-1 block text-xs font-semibold text-ink">

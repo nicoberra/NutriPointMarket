@@ -43,7 +43,11 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
     try {
       const rows = await fetchCategories();
       if (!rows.length) return;
-      const list = rows.map((r) => categoryFromName(String(r.nombre)));
+      const list = rows.map((r) => {
+        const cat = categoryFromName(String(r.nombre));
+        const img = String(r.imagen ?? "").trim();
+        return img ? { ...cat, image: img } : cat;
+      });
       sync(list);
       setCategories(list);
       try {

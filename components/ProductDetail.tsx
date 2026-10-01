@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { Product } from "@/lib/types";
 import { brandName } from "@/data/brands";
 import { categoryMap } from "@/data/categories";
@@ -48,24 +48,16 @@ export function ProductDetail({ product: initial }: { product: Product }) {
   const selQty = variantQty(flavor);
   const soldOut = product.inStock === false || (selQty !== null && selQty <= 0);
 
-  // Galería: fotos del producto + fotos de variantes (sin repetir).
-  const allPhotos = useMemo(
-    () =>
-      Array.from(
-        new Set([...(product.images ?? []), ...Object.values(product.variantImages ?? {})]),
-      ),
-    [product.images, product.variantImages],
-  );
-  const mainImage = allPhotos[activeThumb] ?? product.image;
+  // Galería: por defecto las fotos principales; al elegir una variante con
+  // fotos, se muestran las de esa variante.
+  const variantPhotos = product.variantImages?.[flavor] ?? [];
+  const displayPhotos = variantPhotos.length ? variantPhotos : product.images ?? [];
+  const mainImage = displayPhotos[activeThumb] ?? product.image;
 
-  // Al elegir una variante que tiene foto, saltar a esa foto.
+  // Al cambiar de variante, volver a la primera foto.
   useEffect(() => {
-    const vp = product.variantImages?.[flavor];
-    if (vp) {
-      const i = allPhotos.indexOf(vp);
-      if (i >= 0) setActiveThumb(i);
-    }
-  }, [flavor, allPhotos, product.variantImages]);
+    setActiveThumb(0);
+  }, [flavor]);
 
   // Variaciones de color para simular una galería (placeholder)
   const gallery = ["rgb(var(--color-accent))", "rgb(var(--color-secondary))", "rgb(var(--color-primary-soft))"];
@@ -112,9 +104,9 @@ export function ProductDetail({ product: initial }: { product: Product }) {
               />
             )}
           </div>
-          {allPhotos.length > 1 && (
+          {displayPhotos.length > 1 && (
             <div className="mt-3 flex flex-wrap gap-3">
-              {allPhotos.map((src, i) => (
+              {displayPhotos.map((src, i) => (
                 <button
                   key={src}
                   onClick={() => setActiveThumb(i)}
@@ -143,6 +135,12 @@ export function ProductDetail({ product: initial }: { product: Product }) {
             <div className="mt-2.5">
               <Rating value={product.rating} reviews={product.reviews} size="md" />
             </div>
+          )}
+
+          {product.description && (
+            <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-muted">
+              {product.description}
+            </p>
           )}
 
           {/* Precio */}

@@ -12,6 +12,8 @@ export interface Category {
   tagline: string;
   /** Forma del ícono/visual placeholder */
   shape: ProductShape;
+  /** Foto real de la categoría (URL de GitHub), cargada desde el CRM. */
+  image?: string;
 }
 
 export interface Brand {
@@ -39,8 +41,8 @@ export interface Product {
   images: string[];
   /** Foto principal (primera de la galería). */
   image?: string;
-  /** Foto por variante: { "Rojo": "url", "Azul": "url" }. */
-  variantImages?: Record<string, string>;
+  /** Fotos por variante: { "Rojo": ["url1","url2"], "Azul": ["url"] }. */
+  variantImages?: Record<string, string[]>;
   stock: number;
   /** Hay stock (viene de la planilla: Stock sí/no). Por defecto true. */
   inStock?: boolean;

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ASSET_PREFIX } from "@/lib/config";
+import { subscribeEmail } from "@/lib/api";
 import { MailIcon, CheckIcon } from "./Icons";
 
 /** Bloque de newsletter antes del footer. */
@@ -39,7 +40,11 @@ export function Newsletter() {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                if (email.trim()) setDone(true);
+                const mail = email.trim();
+                if (!mail) return;
+                setDone(true);
+                // Guarda el email en la planilla (pestaña Suscriptores).
+                subscribeEmail(mail).catch(() => {});
               }}
               className="mx-auto mt-6 flex max-w-md flex-col gap-2 sm:flex-row"
             >

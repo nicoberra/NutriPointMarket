@@ -132,11 +132,17 @@ export function parseVariants(raw: unknown): { name: string; qty: number | null 
 }
 
 /** Convierte una fila cruda de la planilla en un Product de la tienda. */
-/** Parsea el JSON de fotos por variante { "Rojo": "url" }. */
-export function parseVariantImages(raw: unknown): Record<string, string> {
+/** Parsea el JSON de fotos por variante { "Rojo": ["url1","url2"] }. */
+export function parseVariantImages(raw: unknown): Record<string, string[]> {
   try {
     const o = JSON.parse(String(raw ?? "") || "{}");
-    return o && typeof o === "object" ? (o as Record<string, string>) : {};
+    if (!o || typeof o !== "object") return {};
+    const out: Record<string, string[]> = {};
+    for (const k of Object.keys(o)) {
+      const v = (o as Record<string, unknown>)[k];
+      out[k] = Array.isArray(v) ? v.map(String).filter(Boolean) : v ? [String(v)] : [];
+    }
+    return out;
   } catch {
     return {};
   }
@@ -160,7 +166,7 @@ export function buildProduct(row: Record<string, unknown>): Product {
     name: nombre,
     brand: String(row.marca ?? "").trim(),
     category,
-    description: "",
+    description: String(row.descripcion ?? "").trim(),
     price: precio,
     oldPrice,
     discount: discountPercent(precio, oldPrice),
@@ -302,6 +308,7 @@ export interface ProductInput {
   costo?: number;
   costoMoneda?: "USD" | "ARS";
   cantidad?: number;
+  descripcion?: string;
 }
 
 export async function saveProduct(row: ProductInput): Promise<boolean> {
@@ -317,6 +324,7 @@ export async function saveProduct(row: ProductInput): Promise<boolean> {
     costo: row.costo ?? "",
     costoMoneda: row.costoMoneda ?? "ARS",
     cantidad: row.cantidad ?? "",
+    descripcion: row.descripcion ?? "",
   });
   const r = await api("productos_save", { data });
   return r.ok !== false;
@@ -417,6 +425,27 @@ export async function deleteProductImage(
   return r.ok !== false;
 }
 
+/** Sube la foto de una categoría (se guarda en GitHub y en la columna Imagen). */
+export async function uploadCategoryImage(categoria: string, file: File): Promise<void> {
+  const data = await resizeImageToBase64(file, 1200, 0.9);
+  await fetch(SHEETS_API_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action: "subir_imagen", nombre: categoria, categoria, data }),
+  });
+}
+
+export async function deleteCategoryImage(categoria: string): Promise<boolean> {
+  const r = await api("borrar_imagen", { categoria });
+  return r.ok !== false;
+}
+
+/** Guarda un email suscripto en la planilla (pestaña Suscriptores). */
+export async function subscribeEmail(email: string): Promise<boolean> {
+  return addRow("Suscriptores", { email: email.trim().toLowerCase() });
+}
+
 /* ========================== PEDIDOS / PAGOS ============================== */
 
 export interface OrderInput {
@@ -497,6 +526,7 @@ export async function mpCreatePreference(args: {
 export interface CategoryRow {
   nombre: string;
   orden?: number | string;
+  imagen?: string;
 }
 
 /** Lista las categorías desde la planilla, ordenadas. */

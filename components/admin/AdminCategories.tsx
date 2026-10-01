@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useCategories } from "@/context/CategoriesContext";
-import { addCategory, renameCategory, deleteCategory } from "@/lib/api";
+import { addCategory, renameCategory, deleteCategory, uploadCategoryImage } from "@/lib/api";
 import { CloseIcon, PlusIcon, TrashIcon, CheckIcon } from "@/components/Icons";
 
 /**
@@ -49,6 +49,15 @@ export function AdminCategories({
     onToast(ok ? "Renombrada ✓" : "Guardado (verificá)");
     await refresh();
     onChanged();
+  };
+
+  const subirFoto = async (catName: string, file: File) => {
+    setBusy(true);
+    onToast("Subiendo foto… ⏳");
+    await uploadCategoryImage(catName, file);
+    onToast("Foto subida ✓ (tarda unos segundos)");
+    setTimeout(() => refresh().catch(() => {}), 2500);
+    setBusy(false);
   };
 
   const remove = async (name: string) => {
@@ -122,6 +131,25 @@ export function AdminCategories({
                 </>
               ) : (
                 <>
+                  <label className="relative grid h-11 w-11 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-lg border border-line bg-page-soft">
+                    {c.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={c.image} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-[9px] font-semibold text-muted">Foto</span>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={busy}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (file) await subirFoto(c.name, file);
+                      }}
+                    />
+                  </label>
                   <button
                     onClick={() => {
                       setEditing(c.slug);

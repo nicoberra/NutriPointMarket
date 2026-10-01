@@ -48,6 +48,7 @@ var TABLES = {
       ["imagen", "Imagen"],
       ["cantidad", "Cantidad"],
       ["variantesFotos", "Variantes fotos"],
+      ["descripcion", "Descripción"],
     ],
     idField: "nombre",
   },
@@ -56,8 +57,16 @@ var TABLES = {
     columns: [
       ["nombre", "Nombre"],
       ["orden", "Orden"],
+      ["imagen", "Imagen"],
     ],
     idField: "nombre",
+  },
+  Suscriptores: {
+    columns: [
+      ["fecha", "Fecha"],
+      ["email", "Email"],
+    ],
+    idField: null,
   },
   Clientes: {
     columns: [
@@ -387,6 +396,7 @@ function listProductos() {
       imagen: String(row[10] || "").trim(),
       cantidad: row[11] === "" || row[11] == null ? 0 : Number(row[11]) || 0,
       variantesFotos: String(row[12] || "").trim(),
+      descripcion: String(row[13] || "").trim(),
     });
   }
   return list;
@@ -432,21 +442,32 @@ function subirImagen(p) {
   }
   var url =
     "https://raw.githubusercontent.com/" + GITHUB_REPO + "/" + GITHUB_BRANCH + "/" + path;
+
+  // Foto de una CATEGORÍA.
+  if (p.categoria) {
+    var cn = findRowById("Categorias", p.categoria);
+    if (cn > 0) updateRowByNumber("Categorias", cn, { imagen: url });
+    else addRow("Categorias", { nombre: p.categoria, imagen: url });
+    return { ok: true, url: url };
+  }
+
   var n = findRowById("Productos", p.nombre);
   if (n < 0) {
-    // Producto nuevo: lo crea con la primera foto.
-    if (p.variante) addRow("Productos", { nombre: p.nombre, variantesFotos: JSON.stringify(mapVar(p.variante, url)) });
+    if (p.variante) addRow("Productos", { nombre: p.nombre, variantesFotos: JSON.stringify(mapVar(p.variante, [url])) });
     else addRow("Productos", { nombre: p.nombre, imagen: url });
     return { ok: true, url: url };
   }
   var sh = sheetFor("Productos");
   var keys = keysOf("Productos");
   if (p.variante) {
-    // Foto de una variante puntual.
+    // Varias fotos por variante → array.
     var iVF = keys.indexOf("variantesFotos");
     var vf = {};
     try { vf = JSON.parse(sh.getRange(n, iVF + 1).getValue() || "{}"); } catch (e1) {}
-    vf[p.variante] = url;
+    var arr = vf[p.variante];
+    if (Object.prototype.toString.call(arr) !== "[object Array]") arr = arr ? [arr] : [];
+    arr.push(url);
+    vf[p.variante] = arr;
     sh.getRange(n, iVF + 1).setValue(JSON.stringify(vf));
   } else {
     // Galería del producto: agrega a la lista (separada por "|").
@@ -465,6 +486,12 @@ function mapVar(k, v) {
 
 // Borra la referencia a una foto (no borra el archivo de GitHub).
 function borrarImagen(p) {
+  // Foto de una categoría.
+  if (p.categoria) {
+    var cn = findRowById("Categorias", p.categoria);
+    if (cn > 0) updateRowByNumber("Categorias", cn, { imagen: " " });
+    return { ok: true };
+  }
   if (!p.nombre) return { ok: false, error: "Falta el producto" };
   var n = findRowById("Productos", p.nombre);
   if (n < 0) return { ok: false, error: "Producto no encontrado" };
@@ -474,7 +501,16 @@ function borrarImagen(p) {
     var iVF = keys.indexOf("variantesFotos");
     var vf = {};
     try { vf = JSON.parse(sh.getRange(n, iVF + 1).getValue() || "{}"); } catch (e2) {}
-    delete vf[p.variante];
+    if (p.url) {
+      // Quita una foto puntual de esa variante.
+      var arr = vf[p.variante];
+      if (Object.prototype.toString.call(arr) !== "[object Array]") arr = arr ? [arr] : [];
+      arr = arr.filter(function (u) { return u && u !== p.url; });
+      if (arr.length) vf[p.variante] = arr;
+      else delete vf[p.variante];
+    } else {
+      delete vf[p.variante]; // quita todas las de esa variante
+    }
     sh.getRange(n, iVF + 1).setValue(JSON.stringify(vf));
   } else if (p.url) {
     var iImg = keys.indexOf("imagen");

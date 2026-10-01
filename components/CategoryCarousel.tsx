@@ -214,10 +214,19 @@ export function CategoryCarousel() {
                 className="group/slide flex w-40 shrink-0 flex-col items-center gap-3 px-2 text-center transition-transform duration-200 hover:-translate-y-1"
               >
                 <div className="grid h-[130px] w-[130px] place-items-center overflow-hidden rounded-2xl bg-page-soft ring-1 ring-line transition-all group-hover/slide:ring-accent">
-                  <ProductVisual
-                    shape={c.shape}
-                    className="h-28 w-28 transition-transform duration-500 group-hover/slide:scale-110"
-                  />
+                  {c.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={c.image}
+                      alt={c.name}
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover/slide:scale-110"
+                    />
+                  ) : (
+                    <ProductVisual
+                      shape={c.shape}
+                      className="h-28 w-28 transition-transform duration-500 group-hover/slide:scale-110"
+                    />
+                  )}
                 </div>
                 <span className="text-sm font-bold text-ink group-hover/slide:text-primary">
                   {c.name}
