@@ -8,6 +8,22 @@ function deaccent(s: string): string {
   return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 }
 
+/**
+ * Convierte una URL de imagen de `raw.githubusercontent.com` (del repo) en una
+ * ruta local del propio dominio. El archivo ya está publicado junto al sitio
+ * (ej. /productos/x.jpg), así que servirlo desde el mismo origen (Cloudflare)
+ * carga al instante y de forma confiable, en vez de depender de GitHub raw
+ * (lento y a veces no carga). Si no coincide el patrón, devuelve la URL igual.
+ */
+export function localAsset(url: unknown): string {
+  const s = String(url ?? "").trim();
+  if (!s) return "";
+  return s.replace(
+    /^https?:\/\/raw\.githubusercontent\.com\/[^/]+\/[^/]+\/[^/]+\/public\//i,
+    "/",
+  );
+}
+
 /** Genera un slug de URL a partir del nombre del producto. */
 export function slugify(name: string): string {
   return deaccent(String(name))
@@ -140,7 +156,9 @@ export function parseVariantImages(raw: unknown): Record<string, string[]> {
     const out: Record<string, string[]> = {};
     for (const k of Object.keys(o)) {
       const v = (o as Record<string, unknown>)[k];
-      out[k] = Array.isArray(v) ? v.map(String).filter(Boolean) : v ? [String(v)] : [];
+      out[k] = (Array.isArray(v) ? v.map(String) : v ? [String(v)] : [])
+        .map(localAsset)
+        .filter(Boolean);
     }
     return out;
   } catch {
@@ -165,7 +183,7 @@ export function buildProduct(row: Record<string, unknown>): Product {
   const nombre = String(row.nombre ?? "").trim();
   const imgs = String(row.imagen ?? "")
     .split("|")
-    .map((s) => s.trim())
+    .map((s) => localAsset(s.trim()))
     .filter(Boolean);
   const precio = toNum(row.precio);
   const precioML = toNum(row.precioML);

@@ -15,7 +15,7 @@ import {
   categoryFromName,
   registerCategories,
 } from "@/data/categories";
-import { fetchCategories } from "@/lib/api";
+import { fetchCategories, localAsset } from "@/lib/api";
 
 /**
  * Categorías cargadas desde la planilla (pestaña Categorias), editables desde
@@ -45,7 +45,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
       if (!rows.length) return;
       const list = rows.map((r) => {
         const cat = categoryFromName(String(r.nombre));
-        const img = String(r.imagen ?? "").trim();
+        const img = localAsset(r.imagen);
         return img ? { ...cat, image: img } : cat;
       });
       sync(list);
@@ -67,8 +67,12 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
       if (raw) {
         const cached = JSON.parse(raw) as Category[];
         if (Array.isArray(cached) && cached.length) {
-          sync(cached);
-          setCategories(cached);
+          // Normaliza URLs viejas (raw.githubusercontent → ruta local).
+          const fixed = cached.map((c) =>
+            c.image ? { ...c, image: localAsset(c.image) } : c,
+          );
+          sync(fixed);
+          setCategories(fixed);
         }
       }
     } catch {
