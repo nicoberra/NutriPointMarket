@@ -31,6 +31,7 @@ type Changes = Partial<{
   costo: number;
   costoMoneda: "USD" | "ARS";
   cantidad: number;
+  variantes: string;
 }>;
 
 export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
@@ -62,7 +63,12 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
       categoria: categoryMap[p.category]?.name ?? "",
       precio: ch.precio ?? p.price,
       precioML: "precioML" in ch ? ch.precioML : p.oldPrice,
-      variantes: p.flavors.join(", "),
+      // Conserva el stock por variante ("Rojo:3"), no solo los nombres.
+      variantes:
+        ch.variantes ??
+        (p.variants && p.variants.length
+          ? p.variants.map((v) => (v.qty == null ? v.name : `${v.name}:${v.qty}`)).join(", ")
+          : p.flavors.join(", ")),
       stock: ch.stock ?? p.inStock !== false,
       destacado: ch.destacado ?? p.featured,
       costo: "costo" in ch ? ch.costo : p.cost,
@@ -251,6 +257,23 @@ function ProductRow({
   const [costo, setCosto] = useState<number | "">(product.cost || "");
   const [moneda, setMoneda] = useState<"USD" | "ARS">(product.costCurrency ?? "ARS");
   const [cantidad, setCantidad] = useState<number | "">(product.stockQty ?? "");
+  const hasVars = !!(product.variants && product.variants.length);
+  const [varQty, setVarQty] = useState<Record<string, string>>(
+    Object.fromEntries(
+      (product.variants ?? []).map((v) => [v.name, v.qty == null ? "" : String(v.qty)]),
+    ),
+  );
+  const saveVarStock = () => {
+    const vars = (product.variants ?? []).map((v) => {
+      const q = varQty[v.name];
+      return q === undefined || q === "" ? v.name : `${v.name}:${Number(q) || 0}`;
+    });
+    const total = (product.variants ?? []).reduce((a, v) => {
+      const q = varQty[v.name];
+      return a + (q === undefined || q === "" ? 0 : Number(q) || 0);
+    }, 0);
+    onSave(product, { variantes: vars.join(", "), cantidad: total, stock: total > 0 });
+  };
 
   const descValNum = descVal === "" ? 0 : Number(descVal);
   const descPesos = descMode === "%" ? Math.round((precioNormal * descValNum) / 100) : descValNum;
@@ -486,21 +509,48 @@ function ProductRow({
         )}
       </div>
 
-      <label className="mt-3 block">
-        <span className="mb-1 block text-xs font-semibold text-ink">Cantidad en stock</span>
-        <input
-          type="number"
-          inputMode="numeric"
-          value={cantidad}
-          onChange={(e) => setCantidad(e.target.value === "" ? "" : Number(e.target.value))}
-          onBlur={() => {
-            const n = cantidad === "" ? 0 : Number(cantidad);
-            onSave(product, { cantidad: n, stock: n > 0 });
-          }}
-          className="input h-11 text-base"
-          placeholder="0"
-        />
-      </label>
+      {hasVars ? (
+        <div className="mt-3">
+          <span className="mb-1 block text-xs font-semibold text-ink">
+            Stock por variante{" "}
+            <span className="font-normal text-muted">(total: {product.stockQty ?? 0})</span>
+          </span>
+          <div className="space-y-1.5">
+            {(product.variants ?? []).map((v) => (
+              <div key={v.name} className="flex items-center gap-2">
+                <span className="flex-1 truncate text-sm text-ink">{v.name}</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={varQty[v.name] ?? ""}
+                  onChange={(e) =>
+                    setVarQty((s) => ({ ...s, [v.name]: e.target.value }))
+                  }
+                  onBlur={saveVarStock}
+                  className="input h-10 w-24 text-base"
+                  placeholder="0"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <label className="mt-3 block">
+          <span className="mb-1 block text-xs font-semibold text-ink">Cantidad en stock</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            value={cantidad}
+            onChange={(e) => setCantidad(e.target.value === "" ? "" : Number(e.target.value))}
+            onBlur={() => {
+              const n = cantidad === "" ? 0 : Number(cantidad);
+              onSave(product, { cantidad: n, stock: n > 0 });
+            }}
+            className="input h-11 text-base"
+            placeholder="0"
+          />
+        </label>
+      )}
 
       <div className="mt-3">
         <Toggle
