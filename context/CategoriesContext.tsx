@@ -28,7 +28,7 @@ interface CategoriesContextValue {
 }
 
 const CategoriesContext = createContext<CategoriesContextValue | null>(null);
-const CACHE_KEY = "npm-categories-cache-v1";
+const CACHE_KEY = "npm-categories-cache-v2";
 
 function sync(list: Category[]) {
   registerCategories(list);

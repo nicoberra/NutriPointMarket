@@ -12,6 +12,13 @@ import {
 import type { Product, CategorySlug } from "@/lib/types";
 import { fetchProducts } from "@/lib/api";
 import { applyComboStock } from "@/lib/stock";
+import { productSeed } from "@/data/products-seed";
+
+/**
+ * Base instantánea: snapshot real de la tienda. Se ve completa al entrar aunque
+ * no haya conexión o la planilla tarde. El fetch en vivo la pisa después.
+ */
+const SEED = applyComboStock(productSeed);
 
 /**
  * Provee TODOS los productos, que se cargan desde la planilla de Google Sheets.
@@ -40,11 +47,12 @@ const ProductsContext = createContext<ProductsContextValue | null>(null);
 const CACHE_KEY = "npm-products-cache-v3";
 
 export function ProductsProvider({ children }: { children: ReactNode }) {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>(SEED);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     const live = applyComboStock(await fetchProducts());
+    if (!live.length) return; // lectura vacía: no borra la base ni el caché
     setProducts(live);
     try {
       localStorage.setItem(CACHE_KEY, JSON.stringify(live));
@@ -58,7 +66,9 @@ export function ProductsProvider({ children }: { children: ReactNode }) {
       const raw = localStorage.getItem(CACHE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as Product[];
-        if (Array.isArray(parsed)) setProducts(applyComboStock(parsed));
+        // Solo pisa la base si el caché trae productos (si está vacío, se
+        // queda con el snapshot para no mostrar la tienda en blanco).
+        if (Array.isArray(parsed) && parsed.length) setProducts(applyComboStock(parsed));
       }
     } catch {
       /* ignore */

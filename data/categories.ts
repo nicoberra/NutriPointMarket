@@ -42,17 +42,21 @@ export function categoryFromName(nombre: string): Category {
   return { slug: s, name: nombre.trim(), tagline: "", shape: shapeForSlug(s) };
 }
 
-/** Categorías por defecto (fallback si la planilla no responde). */
+/**
+ * Categorías por defecto (fallback si la planilla no responde). Es un snapshot
+ * de las categorías REALES de la tienda, con las imágenes servidas desde el
+ * propio dominio, para que al entrar se vean las correctas al instante. La
+ * planilla (CRM) sigue siendo la fuente: cualquier cambio que hagas ahí pisa
+ * esto al refrescar. Si agregás/sacás categorías en el CRM y querés que el
+ * respaldo instantáneo también lo refleje, actualizá esta lista.
+ */
 export const categories: Category[] = [
-  { slug: "proteinas", name: "Proteínas", tagline: "Whey, veganas y caseínas", shape: "tub" },
-  { slug: "creatinas", name: "Creatinas", tagline: "Monohidrato y micronizada", shape: "jar" },
-  { slug: "pre-entreno", name: "Pre entreno", tagline: "Energía y foco", shape: "bottle" },
-  { slug: "aminoacidos", name: "Aminoácidos", tagline: "BCAA, EAA y glutamina", shape: "jar" },
-  { slug: "vitaminas", name: "Vitaminas", tagline: "Defensas y bienestar", shape: "pills" },
-  { slug: "minerales", name: "Minerales", tagline: "Magnesio, zinc y más", shape: "pills" },
-  { slug: "colageno", name: "Colágeno", tagline: "Piel, huesos y articulaciones", shape: "bottle" },
-  { slug: "barras-snacks", name: "Barras y snacks", tagline: "Proteína para llevar", shape: "bar" },
-  { slug: "combos", name: "Combos", tagline: "Comprá más, pagá menos", shape: "combo" },
+  { slug: "proteinas", name: "Proteínas", tagline: "", shape: "tub", image: "/productos/protei-nas-1791159337812.jpg" },
+  { slug: "creatina", name: "Creatina", tagline: "", shape: "jar", image: "/productos/creatina-1791159328845.jpg" },
+  { slug: "pancakes-proteicos", name: "Pancakes PROTEICOS", tagline: "", shape: "bar", image: "/productos/pancakes-proteicos-1791161879816.jpg" },
+  { slug: "kinesio-tape", name: "Kinesio TAPE", tagline: "", shape: "bar", image: "/productos/kinesio-tape-1791159318671.jpg" },
+  { slug: "shakers", name: "Shakers", tagline: "", shape: "bottle", image: "/productos/shakers-1791150078717.jpg" },
+  { slug: "combos", name: "Combos", tagline: "", shape: "combo", image: "/productos/combos-1791149845090.jpg" },
 ];
 
 /**
