@@ -15,6 +15,13 @@ export function PullToRefresh() {
   useEffect(() => {
     const THRESHOLD = 70;
     const onStart = (e: TouchEvent) => {
+      // No activar dentro de modales/ventanas con scroll propio (ej. editar
+      // producto): ahí el gesto es para scrollear el modal, no recargar.
+      const t = e.target as Element | null;
+      if (t && t.closest(".overflow-y-auto, [data-no-ptr]")) {
+        start.current = null;
+        return;
+      }
       start.current =
         window.scrollY <= 0 && e.touches.length === 1 ? e.touches[0].clientY : null;
     };
