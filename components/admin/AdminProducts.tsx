@@ -656,6 +656,10 @@ function ProductSheet({
   const isCombo = comboCostDetail.length > 0;
   const comboCostTotal = comboCostDetail.reduce((a, d) => a + d.total, 0);
   const comboPriceTotal = comboCostDetail.reduce((a, d) => a + d.priceTotal, 0);
+  // La marca del combo sale de las marcas de los productos elegidos.
+  const comboBrand = Array.from(
+    new Set(comboCostDetail.map((d) => d.brand).filter(Boolean)),
+  ).join(" / ");
   const costoNum = costo === "" ? 0 : Number(costo);
   const costoPesos = isCombo ? comboCostTotal : costToPesos(costoNum, moneda, dollar);
   const ganancia = precioFinal - costoPesos;
@@ -678,7 +682,7 @@ function ProductSheet({
     const totalStock = hasVariantStock ? variantTotal : cantNum;
     onSave({
       nombre: nombre.trim(),
-      marca: marca.trim(),
+      marca: isCombo ? comboBrand : marca.trim(),
       categoria,
       precio: precioFinal,
       precioML: descPesos > 0 ? precioNormal : undefined,
@@ -832,13 +836,21 @@ function ProductSheet({
           </div>
 
           <div className="grid grid-cols-2 gap-3 lg:col-span-2">
-            <Field label="Marca">
-              <input
-                value={marca}
-                onChange={(e) => setMarca(e.target.value)}
-                className="input h-11 text-base"
-                placeholder="Ej: ENA"
-              />
+            <Field label={isCombo ? "Marca (del combo)" : "Marca"}>
+              {isCombo ? (
+                <input
+                  readOnly
+                  value={comboBrand || "según los productos"}
+                  className="input h-11 bg-page-soft text-base text-muted"
+                />
+              ) : (
+                <input
+                  value={marca}
+                  onChange={(e) => setMarca(e.target.value)}
+                  className="input h-11 text-base"
+                  placeholder="Ej: ENA"
+                />
+              )}
             </Field>
             <Field label="Categoría">
               <select
