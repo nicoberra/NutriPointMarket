@@ -52,6 +52,8 @@ export function Hero() {
           <img
             src={`${ASSET_PREFIX}/logo.png`}
             alt="Suple Market"
+            fetchPriority="high"
+            decoding="async"
             className="w-full max-w-md object-contain transition-transform duration-300 ease-out hover:scale-105 lg:max-w-lg"
           />
         </div>

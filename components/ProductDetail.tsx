@@ -104,6 +104,7 @@ export function ProductDetail({ product: initial }: { product: Product }) {
               <img
                 src={mainImage}
                 alt={product.name}
+                decoding="async"
                 className="aspect-square w-full object-cover"
               />
             ) : (
@@ -129,7 +130,7 @@ export function ProductDetail({ product: initial }: { product: Product }) {
                   }`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={src} alt="" className="h-20 w-20 object-cover" />
+                  <img src={src} alt="" loading="lazy" decoding="async" className="h-20 w-20 object-cover" />
                 </button>
               ))}
             </div>

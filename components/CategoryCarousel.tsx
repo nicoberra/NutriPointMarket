@@ -235,6 +235,8 @@ export function CategoryCarousel() {
                     <img
                       src={c.image}
                       alt={c.name}
+                      loading="lazy"
+                      decoding="async"
                       className="h-full w-full object-cover transition-transform duration-500 group-hover/slide:scale-110"
                     />
                   ) : (

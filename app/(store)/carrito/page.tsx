@@ -53,6 +53,8 @@ export default function CarritoPage() {
                         <img
                           src={img}
                           alt={item.product.name}
+                          loading="lazy"
+                          decoding="async"
                           className="h-24 w-24 rounded-lg object-cover sm:h-28 sm:w-28"
                         />
                       ) : (

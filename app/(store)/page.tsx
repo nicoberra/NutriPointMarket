@@ -22,6 +22,8 @@ export default function HomePage() {
             <img
               src={`${ASSET_PREFIX}/logo.png`}
               alt="Suple Market"
+              fetchPriority="high"
+              decoding="async"
               className="w-full max-w-[300px] object-contain"
             />
           </div>

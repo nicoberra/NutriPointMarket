@@ -141,6 +141,8 @@ export function CartDrawer() {
                           <img
                             src={img}
                             alt={item.product.name}
+                            loading="lazy"
+                            decoding="async"
                             className="h-20 w-20 rounded-md object-cover"
                           />
                         ) : (
