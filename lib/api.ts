@@ -148,6 +148,19 @@ export function parseVariantImages(raw: unknown): Record<string, string[]> {
   }
 }
 
+/** Parsea el JSON de combo [{n,q}]. */
+export function parseCombo(raw: unknown): { n: string; q: number }[] | undefined {
+  try {
+    const a = JSON.parse(String(raw ?? "") || "[]");
+    if (!Array.isArray(a) || !a.length) return undefined;
+    return a
+      .map((x) => ({ n: String(x.n ?? "").trim(), q: Number(x.q) || 1 }))
+      .filter((x) => x.n);
+  } catch {
+    return undefined;
+  }
+}
+
 export function buildProduct(row: Record<string, unknown>): Product {
   const nombre = String(row.nombre ?? "").trim();
   const imgs = String(row.imagen ?? "")
@@ -170,6 +183,7 @@ export function buildProduct(row: Record<string, unknown>): Product {
     usage: String(row.modoUso ?? "").trim() || undefined,
     nutrition: String(row.infoNutricional ?? "").trim() || undefined,
     ingredients: String(row.ingredientes ?? "").trim() || undefined,
+    combo: parseCombo(row.combo),
     price: precio,
     oldPrice,
     discount: discountPercent(precio, oldPrice),
@@ -315,6 +329,7 @@ export interface ProductInput {
   modoUso?: string;
   infoNutricional?: string;
   ingredientes?: string;
+  combo?: string;
 }
 
 export async function saveProduct(row: ProductInput): Promise<boolean> {
@@ -334,6 +349,7 @@ export async function saveProduct(row: ProductInput): Promise<boolean> {
     modoUso: row.modoUso ?? "",
     infoNutricional: row.infoNutricional ?? "",
     ingredientes: row.ingredientes ?? "",
+    combo: row.combo ?? "",
   });
   const r = await api("productos_save", { data });
   return r.ok !== false;

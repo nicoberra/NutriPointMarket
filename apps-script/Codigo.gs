@@ -52,6 +52,7 @@ var TABLES = {
       ["modoUso", "Modo de uso"],
       ["infoNutricional", "Información nutricional"],
       ["ingredientes", "Ingredientes"],
+      ["combo", "Combo"],
     ],
     idField: "nombre",
   },
@@ -407,6 +408,7 @@ function listProductos() {
       modoUso: String(row[14] || "").trim(),
       infoNutricional: String(row[15] || "").trim(),
       ingredientes: String(row[16] || "").trim(),
+      combo: String(row[17] || "").trim(),
     });
   }
   return list;
@@ -700,6 +702,19 @@ function descontarProducto(nombre, cant, variante) {
   var iCant = keys.indexOf("cantidad");
   var iStock = keys.indexOf("stock");
   var iVar = keys.indexOf("variantes");
+
+  // Si es un COMBO, descuenta el stock de cada producto que lo compone
+  // (y no toca el stock propio del combo).
+  var iCombo = keys.indexOf("combo");
+  var comboRaw = iCombo >= 0 ? String(sh.getRange(n, iCombo + 1).getValue() || "").trim() : "";
+  if (comboRaw) {
+    var comps = [];
+    try { comps = JSON.parse(comboRaw); } catch (ec) {}
+    for (var ci = 0; ci < comps.length; ci++) {
+      descontarProducto(comps[ci].n, cant * (Number(comps[ci].q) || 1), comps[ci].v);
+    }
+    return;
+  }
 
   // Descontar de la variante específica (si corresponde).
   if (variante) {

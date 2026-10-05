@@ -11,6 +11,7 @@ import {
 } from "react";
 import type { Product, CategorySlug } from "@/lib/types";
 import { fetchProducts } from "@/lib/api";
+import { applyComboStock } from "@/lib/stock";
 
 /**
  * Provee TODOS los productos, que se cargan desde la planilla de Google Sheets.
@@ -43,7 +44,7 @@ export function ProductsProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    const live = await fetchProducts();
+    const live = applyComboStock(await fetchProducts());
     setProducts(live);
     try {
       localStorage.setItem(CACHE_KEY, JSON.stringify(live));
@@ -57,7 +58,7 @@ export function ProductsProvider({ children }: { children: ReactNode }) {
       const raw = localStorage.getItem(CACHE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as Product[];
-        if (Array.isArray(parsed)) setProducts(parsed);
+        if (Array.isArray(parsed)) setProducts(applyComboStock(parsed));
       }
     } catch {
       /* ignore */

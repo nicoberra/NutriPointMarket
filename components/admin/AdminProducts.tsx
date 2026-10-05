@@ -72,6 +72,7 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
       modoUso: p.usage ?? "",
       infoNutricional: p.nutrition ?? "",
       ingredientes: p.ingredients ?? "",
+      combo: p.combo && p.combo.length ? JSON.stringify(p.combo) : "",
     };
     const ok = await saveProduct(row);
     onToast(ok ? "Guardado ✓" : "Guardado (verificá)");
@@ -552,8 +553,12 @@ function ProductSheet({
   onSave: (row: ProductInput) => void;
 }) {
   const { categories } = useCategories();
+  const { products: allProducts } = useProducts();
   const isEdit = !!product;
   const [nombre, setNombre] = useState(product?.name ?? "");
+  const [comboRows, setComboRows] = useState<{ n: string; q: string }[]>(
+    product?.combo ? product.combo.map((c) => ({ n: c.n, q: String(c.q) })) : [],
+  );
   const [marca, setMarca] = useState(product?.brand ?? "");
   const [categoria, setCategoria] = useState<string>(
     product
@@ -624,6 +629,13 @@ function ProductSheet({
       modoUso: modoUso.trim(),
       infoNutricional: infoNutri.trim(),
       ingredientes: ingredientes.trim(),
+      combo: comboRows.filter((r) => r.n).length
+        ? JSON.stringify(
+            comboRows
+              .filter((r) => r.n)
+              .map((r) => ({ n: r.n, q: Number(r.q) || 1 })),
+          )
+        : "",
     });
   };
 
@@ -762,6 +774,69 @@ function ProductSheet({
               placeholder="Lista de ingredientes…"
             />
           </Field>
+
+          {/* Combo */}
+          <div className="lg:col-span-2">
+            <span className="mb-1 block text-xs font-semibold text-ink">
+              Combo (opcional) — productos que lo arman
+            </span>
+            <p className="mb-2 text-[11px] text-muted">
+              Si agregás productos acá, este producto es un <b>combo</b>: al venderse se
+              descuenta el stock de cada uno. El stock del combo se calcula solo según lo
+              que haya de cada producto.
+            </p>
+            <div className="space-y-2">
+              {comboRows.map((row, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <select
+                    value={row.n}
+                    onChange={(e) =>
+                      setComboRows((rs) =>
+                        rs.map((r, j) => (j === i ? { ...r, n: e.target.value } : r)),
+                      )
+                    }
+                    className="input h-11 flex-1 text-base"
+                  >
+                    <option value="">Elegí un producto…</option>
+                    {allProducts
+                      .filter((pr) => pr.name !== nombre && !(pr.combo && pr.combo.length))
+                      .map((pr) => (
+                        <option key={pr.id} value={pr.name}>
+                          {pr.name}
+                        </option>
+                      ))}
+                  </select>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={row.q}
+                    onChange={(e) =>
+                      setComboRows((rs) =>
+                        rs.map((r, j) => (j === i ? { ...r, q: e.target.value } : r)),
+                      )
+                    }
+                    className="input h-11 w-20 text-base"
+                    placeholder="Cant."
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setComboRows((rs) => rs.filter((_, j) => j !== i))}
+                    aria-label="Quitar"
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-muted hover:bg-page-soft"
+                  >
+                    <CloseIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setComboRows((rs) => [...rs, { n: "", q: "1" }])}
+              className="mt-2 text-sm font-semibold text-primary hover:underline"
+            >
+              + Agregar producto al combo
+            </button>
+          </div>
 
           <div className="lg:col-span-2">
             <span className="mb-1 block text-xs font-semibold text-ink">

@@ -39,6 +39,8 @@ export interface Product {
   nutrition?: string;
   /** Ingredientes (opcional; si está vacío no se muestra). */
   ingredients?: string;
+  /** Si es un combo: productos que lo componen y cuántos de cada uno. */
+  combo?: { n: string; q: number }[];
   price: number;
   oldPrice?: number;
   /** Porcentaje de descuento (0 si no tiene). Se puede calcular pero se guarda para control manual */
