@@ -660,6 +660,21 @@ function ProductSheet({
   const comboBrand = Array.from(
     new Set(comboCostDetail.map((d) => d.brand).filter(Boolean)),
   ).join(" / ");
+  // Modo de uso / info nutricional / ingredientes: se copian de los productos.
+  const comboProducts = comboCostDetail
+    .map((d) => allProducts.find((p) => p.name === d.name))
+    .filter((p): p is Product => !!p);
+  const joinInfo = (get: (p: Product) => string | undefined) =>
+    comboProducts
+      .map((p) => {
+        const v = get(p);
+        return v ? `${p.name}:\n${v}` : "";
+      })
+      .filter(Boolean)
+      .join("\n\n");
+  const comboUsage = joinInfo((p) => p.usage);
+  const comboNutrition = joinInfo((p) => p.nutrition);
+  const comboIngredients = joinInfo((p) => p.ingredients);
   const costoNum = costo === "" ? 0 : Number(costo);
   const costoPesos = isCombo ? comboCostTotal : costToPesos(costoNum, moneda, dollar);
   const ganancia = precioFinal - costoPesos;
@@ -693,9 +708,9 @@ function ProductSheet({
       costoMoneda: isCombo ? "ARS" : moneda,
       cantidad: isCombo ? 0 : totalStock,
       descripcion: descripcion.trim(),
-      modoUso: modoUso.trim(),
-      infoNutricional: infoNutri.trim(),
-      ingredientes: ingredientes.trim(),
+      modoUso: isCombo ? comboUsage : modoUso.trim(),
+      infoNutricional: isCombo ? comboNutrition : infoNutri.trim(),
+      ingredientes: isCombo ? comboIngredients : ingredientes.trim(),
       combo: comboRows.filter((r) => r.n).length
         ? JSON.stringify(
             comboRows
@@ -911,32 +926,43 @@ function ProductSheet({
             />
           </Field>
 
-          <Field label="Modo de uso (opcional)">
-            <textarea
-              value={modoUso}
-              onChange={(e) => setModoUso(e.target.value)}
-              className="input min-h-20 py-2 text-base"
-              placeholder="Cómo se toma / se usa…"
-            />
-          </Field>
+          {!isCombo && (
+            <>
+              <Field label="Modo de uso (opcional)">
+                <textarea
+                  value={modoUso}
+                  onChange={(e) => setModoUso(e.target.value)}
+                  className="input min-h-20 py-2 text-base"
+                  placeholder="Cómo se toma / se usa…"
+                />
+              </Field>
 
-          <Field label="Información nutricional (opcional — si lo dejás vacío no se muestra)">
-            <textarea
-              value={infoNutri}
-              onChange={(e) => setInfoNutri(e.target.value)}
-              className="input min-h-20 py-2 text-base"
-              placeholder="Ej: Energía 120 kcal · Proteínas 24 g · Carbohidratos 3 g…"
-            />
-          </Field>
+              <Field label="Información nutricional (opcional — si lo dejás vacío no se muestra)">
+                <textarea
+                  value={infoNutri}
+                  onChange={(e) => setInfoNutri(e.target.value)}
+                  className="input min-h-20 py-2 text-base"
+                  placeholder="Ej: Energía 120 kcal · Proteínas 24 g · Carbohidratos 3 g…"
+                />
+              </Field>
 
-          <Field label="Ingredientes (opcional — si lo dejás vacío no se muestra)">
-            <textarea
-              value={ingredientes}
-              onChange={(e) => setIngredientes(e.target.value)}
-              className="input min-h-20 py-2 text-base"
-              placeholder="Lista de ingredientes…"
-            />
-          </Field>
+              <Field label="Ingredientes (opcional — si lo dejás vacío no se muestra)">
+                <textarea
+                  value={ingredientes}
+                  onChange={(e) => setIngredientes(e.target.value)}
+                  className="input min-h-20 py-2 text-base"
+                  placeholder="Lista de ingredientes…"
+                />
+              </Field>
+            </>
+          )}
+
+          {isCombo && (
+            <p className="rounded-lg bg-accent-soft px-3 py-2 text-[11px] text-primary lg:col-span-2">
+              El <b>modo de uso, la info nutricional y los ingredientes</b> del combo se
+              copian solos de los productos que elegiste.
+            </p>
+          )}
 
           {isCombo && (
             <p className="rounded-lg bg-page-soft px-3 py-2 text-[11px] text-muted lg:col-span-2">
