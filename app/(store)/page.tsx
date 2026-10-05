@@ -36,8 +36,6 @@ export default function HomePage() {
 
       <PromoBannerRow />
 
-      <HomeCarousel kind="featured" />
-
       <HomeCarousel kind="bestSellers" />
 
       <Newsletter />
