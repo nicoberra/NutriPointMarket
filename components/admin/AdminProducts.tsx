@@ -246,7 +246,6 @@ function ProductRow({
   const [descVal, setDescVal] = useState<number | "">(
     product.oldPrice && product.oldPrice > product.price ? product.oldPrice - product.price : "",
   );
-  const [stock, setStock] = useState<boolean>(product.inStock !== false);
   const [destacado, setDestacado] = useState<boolean>(product.featured);
   const [costo, setCosto] = useState<number | "">(product.cost || "");
   const [moneda, setMoneda] = useState<"USD" | "ARS">(product.costCurrency ?? "ARS");
@@ -495,7 +494,6 @@ function ProductRow({
           onChange={(e) => setCantidad(e.target.value === "" ? "" : Number(e.target.value))}
           onBlur={() => {
             const n = cantidad === "" ? 0 : Number(cantidad);
-            setStock(n > 0);
             onSave(product, { cantidad: n, stock: n > 0 });
           }}
           className="input h-11 text-base"
@@ -503,16 +501,7 @@ function ProductRow({
         />
       </label>
 
-      <div className="mt-3 grid grid-cols-2 gap-3">
-        <Toggle
-          label="En stock"
-          checked={stock}
-          color="green"
-          onChange={(v) => {
-            setStock(v);
-            onSave(product, { stock: v });
-          }}
-        />
+      <div className="mt-3">
         <Toggle
           label="Destacado"
           checked={destacado}
@@ -586,7 +575,6 @@ function ProductSheet({
       ? product.variants.map((v) => ({ name: v.name, qty: v.qty == null ? "" : String(v.qty) }))
       : [],
   );
-  const [stock, setStock] = useState<boolean>(product?.inStock !== false);
   const [destacado, setDestacado] = useState<boolean>(product?.featured ?? false);
   const [costo, setCosto] = useState<number | "">(product?.cost || "");
   const [moneda, setMoneda] = useState<"USD" | "ARS">(product?.costCurrency ?? "ARS");
@@ -627,7 +615,7 @@ function ProductSheet({
       precio: precioFinal,
       precioML: descPesos > 0 ? precioNormal : undefined,
       variantes: variantesStr,
-      stock: hasVariantStock ? variantTotal > 0 : cantidad === "" ? stock : cantNum > 0,
+      stock: hasVariantStock ? variantTotal > 0 : cantNum > 0,
       destacado,
       costo: costoNum,
       costoMoneda: moneda,
@@ -648,7 +636,7 @@ function ProductSheet({
   return (
     <div className="fixed inset-0 z-[90] flex items-end justify-center sm:items-center">
       <div className="absolute inset-0 bg-black/50" onClick={closeAndSave} />
-      <div className="relative max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-page p-5 sm:rounded-2xl">
+      <div className="relative max-h-[95vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-page p-5 sm:rounded-2xl lg:max-w-4xl lg:p-7">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-display text-lg font-bold text-primary">
             {isEdit ? "Editar producto" : "Agregar producto"}
@@ -662,23 +650,25 @@ function ProductSheet({
           </button>
         </div>
 
-        <div className="space-y-3">
-          <Field label="Nombre del producto">
-            <input
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              readOnly={isEdit}
-              className={`input h-11 text-base ${isEdit ? "bg-page-soft text-muted" : ""}`}
-              placeholder="Ej: Whey Protein 1 Kg"
-            />
-          </Field>
+        <div className="space-y-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-6 lg:gap-y-3 lg:space-y-0">
+          <div className="lg:col-span-2">
+            <Field label="Nombre del producto">
+              <input
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                readOnly={isEdit}
+                className={`input h-11 text-base ${isEdit ? "bg-page-soft text-muted" : ""}`}
+                placeholder="Ej: Whey Protein 1 Kg"
+              />
+            </Field>
+          </div>
           {isEdit && (
-            <p className="-mt-1 text-[11px] text-muted">
+            <p className="-mt-1 text-[11px] text-muted lg:col-span-2">
               El nombre es la clave; no se puede cambiar desde acá.
             </p>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 lg:col-span-2">
             <Field label="Marca">
               <input
                 value={marca}
@@ -773,7 +763,7 @@ function ProductSheet({
             />
           </Field>
 
-          <div>
+          <div className="lg:col-span-2">
             <span className="mb-1 block text-xs font-semibold text-ink">
               Variantes (color / sabor) y stock de cada una
             </span>
@@ -893,9 +883,12 @@ function ProductSheet({
             )}
           </p>
 
-          <div className="space-y-2">
-            <Toggle label="Hay stock" checked={stock} color="green" onChange={setStock} />
+          <div className="lg:col-span-2">
             <Toggle label="Destacado" checked={destacado} color="accent" onChange={setDestacado} />
+            <p className="mt-1 text-[11px] text-muted">
+              El stock sale de la cantidad de cada variante (o del total). Cuando llega a
+              0, el producto queda sin stock solo.
+            </p>
           </div>
         </div>
 

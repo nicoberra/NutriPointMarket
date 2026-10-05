@@ -23,8 +23,9 @@ const CONFIG = {
 
 /** Carrusel de la home alimentado por los productos en vivo (planilla). */
 export function HomeCarousel({ kind }: { kind: keyof typeof CONFIG }) {
-  const { onSale, featured, bestSellers } = useProducts();
-  const list = kind === "onSale" ? onSale : kind === "featured" ? featured : bestSellers;
+  const { featured, bestSellers } = useProducts();
+  // "Elegidos del mes" y "Destacados" muestran lo mismo: los marcados destacado.
+  const list = kind === "bestSellers" ? bestSellers : featured;
   const c = CONFIG[kind];
 
   if (!list.length) return null;
