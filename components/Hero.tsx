@@ -10,7 +10,7 @@ import { ArrowRightIcon, ShieldIcon, PercentIcon, CardIcon } from "./Icons";
 export function Hero() {
   return (
     <section className="relative">
-      <div className="container-page relative grid items-center gap-8 py-12 sm:py-16 lg:grid-cols-2 lg:py-20">
+      <div className="container-page relative grid items-start gap-8 pb-10 pt-2 sm:pb-12 lg:grid-cols-2 lg:pb-14">
         {/* Texto */}
         <div className="max-w-xl">
           <span className="badge mb-4 bg-primary/10 text-primary">

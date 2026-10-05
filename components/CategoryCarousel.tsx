@@ -205,7 +205,7 @@ export function CategoryCarousel() {
   const items = [...categories, ...categories];
 
   return (
-    <section className="py-8 sm:py-10">
+    <section className="pb-2 pt-6 sm:pt-8">
       <div className="group/carousel relative">
         {/* Flecha anterior */}
         <button
