@@ -5,12 +5,18 @@ import { useCategories } from "@/context/CategoriesContext";
 import { useProducts } from "@/context/ProductsContext";
 import { ChevronDownIcon } from "./Icons";
 
-/** Ítems simples del menú (aparte del mega-menú de Productos). */
+/** Ítems simples del menú (aparte de los mega-menús). */
 const SIMPLE = [
-  { label: "Marcas", href: "/marcas" },
   { label: "Combos", href: "/productos?categoria=combos" },
   { label: "Ofertas", href: "/ofertas", highlight: true },
   { label: "Contacto", href: "/contacto" },
+];
+
+/** Marcas con las que trabajamos (menú desplegable). */
+const BRANDS = [
+  { label: "ENA", value: "ena" },
+  { label: "STAR", value: "star" },
+  { label: "GRANGER", value: "granger" },
 ];
 
 /**
@@ -70,6 +76,32 @@ export function Navbar() {
                   );
                 })}
               </div>
+            </div>
+          </div>
+        </li>
+
+        {/* Menú Marcas */}
+        <li className="group relative">
+          <Link
+            href="/marcas"
+            className="flex items-center gap-1 rounded-md px-3 py-2.5 text-sm font-semibold text-white/90 transition-colors hover:text-accent"
+          >
+            Marcas <ChevronDownIcon className="h-3.5 w-3.5" />
+          </Link>
+          <div className="invisible absolute left-0 top-full z-50 translate-y-1 pt-2 opacity-0 transition-all duration-200 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
+            <div className="w-56 rounded-2xl border border-line bg-white p-2 shadow-drawer">
+              <p className="px-3 pb-1 pt-2 text-[11px] font-bold uppercase tracking-wide text-muted">
+                Trabajamos con
+              </p>
+              {BRANDS.map((b) => (
+                <Link
+                  key={b.value}
+                  href={`/productos?marca=${b.value}`}
+                  className="block rounded-lg px-3 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-page-soft hover:text-primary"
+                >
+                  {b.label}
+                </Link>
+              ))}
             </div>
           </div>
         </li>
