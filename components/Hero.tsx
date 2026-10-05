@@ -28,7 +28,7 @@ export function Hero() {
               Ver productos <ArrowRightIcon className="h-5 w-5" />
             </Link>
             <Link href="/productos?orden=destacados" className="btn btn-secondary btn-lg">
-              Ver destacados
+              Ver elegidos del mes
             </Link>
           </div>
 
