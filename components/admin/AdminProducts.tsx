@@ -593,8 +593,19 @@ function ProductSheet({
   const descPesos = descMode === "%" ? Math.round((precioNormal * descValNum) / 100) : descValNum;
   const descPorc = precioNormal > 0 ? Math.round((descPesos / precioNormal) * 100) : 0;
   const precioFinal = Math.max(0, precioNormal - descPesos);
+  // Costo del combo: suma del costo (en pesos) de cada producto que lo arma.
+  const comboCostDetail = comboRows
+    .filter((r) => r.n)
+    .map((r) => {
+      const pr = allProducts.find((p) => p.name === r.n);
+      const q = Number(r.q) || 1;
+      const unit = pr ? costToPesos(pr.cost || 0, pr.costCurrency ?? "ARS", dollar) : 0;
+      return { name: r.n, brand: pr?.brand, q, unit, total: unit * q };
+    });
+  const isCombo = comboCostDetail.length > 0;
+  const comboCostTotal = comboCostDetail.reduce((a, d) => a + d.total, 0);
   const costoNum = costo === "" ? 0 : Number(costo);
-  const costoPesos = costToPesos(costoNum, moneda, dollar);
+  const costoPesos = isCombo ? comboCostTotal : costToPesos(costoNum, moneda, dollar);
   const ganancia = precioFinal - costoPesos;
 
   // Serializa las variantes a "Rojo:5, Azul:3" (o "Rojo" si no lleva stock).
@@ -622,8 +633,8 @@ function ProductSheet({
       variantes: variantesStr,
       stock: hasVariantStock ? variantTotal > 0 : cantNum > 0,
       destacado,
-      costo: costoNum,
-      costoMoneda: moneda,
+      costo: isCombo ? Math.round(comboCostTotal) : costoNum,
+      costoMoneda: isCombo ? "ARS" : moneda,
       cantidad: totalStock,
       descripcion: descripcion.trim(),
       modoUso: modoUso.trim(),
@@ -741,6 +752,27 @@ function ProductSheet({
             >
               + Agregar producto al combo
             </button>
+
+            {comboCostDetail.length > 0 && (
+              <div className="mt-3 border-t border-primary/20 pt-2 text-xs">
+                <p className="mb-1 font-semibold text-ink">Costo del combo</p>
+                {comboCostDetail.map((d, i) => (
+                  <div key={i} className="flex justify-between text-muted">
+                    <span className="min-w-0 truncate">
+                      {d.q}× {d.brand ? `${d.brand} · ` : ""}
+                      {d.name}
+                    </span>
+                    <span className="shrink-0">
+                      {formatPrice(Math.round(d.unit))} c/u · {formatPrice(Math.round(d.total))}
+                    </span>
+                  </div>
+                ))}
+                <div className="mt-1 flex justify-between border-t border-primary/20 pt-1 font-bold text-primary">
+                  <span>Costo total</span>
+                  <span>{formatPrice(Math.round(comboCostTotal))}</span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3 lg:col-span-2">
@@ -906,29 +938,37 @@ function ProductSheet({
           )}
 
           <Field label="Costo (para calcular ganancia)">
-            <div className="flex items-stretch gap-2">
+            {isCombo ? (
               <input
-                type="number"
-                inputMode="numeric"
-                value={costo}
-                onChange={(e) => setCosto(e.target.value ? Number(e.target.value) : "")}
-                className="input h-11 flex-1 text-base"
+                readOnly
+                value={`${formatPrice(Math.round(comboCostTotal))} (calculado del combo)`}
+                className="input h-11 bg-page-soft text-base text-muted"
               />
-              <div className="flex overflow-hidden rounded-lg border border-line">
-                {(["ARS", "USD"] as const).map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => setMoneda(m)}
-                    className={`px-3 text-sm font-bold transition-colors ${
-                      moneda === m ? "bg-primary text-white" : "bg-white text-muted"
-                    }`}
-                  >
-                    {m === "ARS" ? "$" : "US$"}
-                  </button>
-                ))}
+            ) : (
+              <div className="flex items-stretch gap-2">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={costo}
+                  onChange={(e) => setCosto(e.target.value ? Number(e.target.value) : "")}
+                  className="input h-11 flex-1 text-base"
+                />
+                <div className="flex overflow-hidden rounded-lg border border-line">
+                  {(["ARS", "USD"] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setMoneda(m)}
+                      className={`px-3 text-sm font-bold transition-colors ${
+                        moneda === m ? "bg-primary text-white" : "bg-white text-muted"
+                      }`}
+                    >
+                      {m === "ARS" ? "$" : "US$"}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </Field>
 
           {costoNum > 0 && (
