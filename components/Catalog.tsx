@@ -20,7 +20,9 @@ const SORTS: { key: SortKey; label: string }[] = [
   { key: "precio-desc", label: "Precio: mayor a menor" },
 ];
 
-const PRICE_MAX = 80000;
+/** Tope del filtro de precio si no hay productos cargados. */
+const PRICE_FALLBACK = 80000;
+const ceil5k = (n: number) => Math.ceil(n / 5000) * 5000;
 
 export function Catalog({ onlyOffers = false }: { onlyOffers?: boolean }) {
   const searchParams = useSearchParams();
@@ -28,14 +30,28 @@ export function Catalog({ onlyOffers = false }: { onlyOffers?: boolean }) {
   const pathname = usePathname();
   const { products: ALL, brands } = useProducts();
 
+  // El tope del precio se calcula con el producto más caro: así ningún
+  // producto queda escondido por defecto (antes había un tope fijo de $80.000
+  // y los más caros no aparecían en "Todos los productos").
+  const PRICE_MAX = useMemo(() => {
+    const m = Math.max(0, ...ALL.map((p) => p.price));
+    return m > 0 ? ceil5k(m) : PRICE_FALLBACK;
+  }, [ALL]);
+
+  // "?marca=star" (menú) debe matchear la marca completa ("star nutricion").
+  const resolveBrand = (s: string) =>
+    brands.find((b) => b.slug === s || b.slug.startsWith(s + " "))?.slug ?? s;
+
   const [search, setSearch] = useState(searchParams.get("buscar") ?? "");
   const [selectedCats, setSelectedCats] = useState<CategorySlug[]>(
     (searchParams.get("categoria")?.split(",").filter(Boolean) as CategorySlug[]) ?? [],
   );
   const [selectedBrands, setSelectedBrands] = useState<string[]>(
-    searchParams.get("marca")?.split(",").filter(Boolean) ?? [],
+    (searchParams.get("marca")?.split(",").filter(Boolean) ?? []).map(resolveBrand),
   );
-  const [maxPrice, setMaxPrice] = useState<number>(PRICE_MAX);
+  // null = el usuario no tocó el precio → se usa el tope (ve todo).
+  const [userMax, setUserMax] = useState<number | null>(null);
+  const maxPrice = userMax == null ? PRICE_MAX : Math.min(userMax, PRICE_MAX);
   const [sort, setSort] = useState<SortKey>(
     (searchParams.get("orden") as SortKey) || "destacados",
   );
@@ -47,10 +63,13 @@ export function Catalog({ onlyOffers = false }: { onlyOffers?: boolean }) {
     setSelectedCats(
       (searchParams.get("categoria")?.split(",").filter(Boolean) as CategorySlug[]) ?? [],
     );
-    setSelectedBrands(searchParams.get("marca")?.split(",").filter(Boolean) ?? []);
+    setSelectedBrands(
+      (searchParams.get("marca")?.split(",").filter(Boolean) ?? []).map(resolveBrand),
+    );
     const orden = searchParams.get("orden") as SortKey;
     if (orden) setSort(orden);
-  }, [searchParams]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, brands]);
 
   // Persistir orden en la URL (para poder compartir/volver)
   useEffect(() => {
@@ -75,7 +94,7 @@ export function Catalog({ onlyOffers = false }: { onlyOffers?: boolean }) {
   const clearFilters = () => {
     setSelectedCats([]);
     setSelectedBrands([]);
-    setMaxPrice(PRICE_MAX);
+    setUserMax(null);
     setSearch("");
   };
 
@@ -114,6 +133,7 @@ export function Catalog({ onlyOffers = false }: { onlyOffers?: boolean }) {
 
   const activeCount =
     selectedCats.length + selectedBrands.length + (maxPrice < PRICE_MAX ? 1 : 0);
+  void userMax;
 
   const FiltersPanel = (
     <div className="space-y-6">
@@ -180,7 +200,7 @@ export function Catalog({ onlyOffers = false }: { onlyOffers?: boolean }) {
           max={PRICE_MAX}
           step={1000}
           value={maxPrice}
-          onChange={(e) => setMaxPrice(Number(e.target.value))}
+          onChange={(e) => setUserMax(Number(e.target.value))}
           className="w-full accent-[rgb(var(--color-accent))]"
         />
         <p className="mt-1 text-sm text-muted">

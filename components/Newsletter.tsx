@@ -63,7 +63,7 @@ export function Newsletter() {
             </form>
           )}
           <p className="mt-3 text-[11px] text-white/50">
-            Podés desuscribirte cuando quieras. (Formulario de demostración)
+            Podés desuscribirte cuando quieras.
           </p>
         </div>
       </div>

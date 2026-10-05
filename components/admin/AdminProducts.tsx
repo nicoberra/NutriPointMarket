@@ -657,9 +657,19 @@ function ProductSheet({
   const comboCostTotal = comboCostDetail.reduce((a, d) => a + d.total, 0);
   const comboPriceTotal = comboCostDetail.reduce((a, d) => a + d.priceTotal, 0);
   // La marca del combo sale de las marcas de los productos elegidos.
-  const comboBrand = Array.from(
-    new Set(comboCostDetail.map((d) => d.brand).filter(Boolean)),
-  ).join(" / ");
+  // Marca del combo: une las marcas distintas (sin repetir por mayúsculas,
+  // ej. "Star nutricion" y "Star Nutricion" cuentan como una sola).
+  const comboBrand = (() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const b of comboCostDetail.map((d) => (d.brand ?? "").trim()).filter(Boolean)) {
+      if (!seen.has(b.toLowerCase())) {
+        seen.add(b.toLowerCase());
+        out.push(b);
+      }
+    }
+    return out.join(" / ");
+  })();
   // Modo de uso / info nutricional / ingredientes: se copian de los productos.
   const comboProducts = comboCostDetail
     .map((d) => allProducts.find((p) => p.name === d.name))

@@ -105,30 +105,42 @@ export default function ContactoPage() {
             <h2 className="font-display text-xl font-bold text-primary">Envianos un mensaje</h2>
             {sent ? (
               <div className="mt-6 flex items-center gap-2 rounded-lg bg-accent-soft px-4 py-3 text-sm font-semibold text-primary">
-                <CheckIcon className="h-5 w-5" /> ¡Mensaje enviado! Te responderemos pronto.
+                <CheckIcon className="h-5 w-5" /> ¡Listo! Te abrimos WhatsApp con tu mensaje. Te respondemos pronto.
               </div>
             ) : (
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
+                  // El mensaje se manda por WhatsApp (nuestro canal real):
+                  // se abre el chat con el texto ya armado.
+                  const f = new FormData(e.currentTarget);
+                  const v = (k: string) => String(f.get(k) ?? "").trim();
+                  const msg =
+                    `Hola Suple Market, soy ${v("nombre")}.\n` +
+                    (v("asunto") ? `Asunto: ${v("asunto")}\n` : "") +
+                    `${v("mensaje")}\n\nMi email: ${v("email")}`;
+                  window.open(whatsappLink(msg), "_blank", "noopener,noreferrer");
                   setSent(true);
                 }}
                 className="mt-5 space-y-4"
               >
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <input className="input h-11" placeholder="Nombre" required />
-                  <input className="input h-11" type="email" placeholder="Email" required />
+                  <input name="nombre" className="input h-11" placeholder="Nombre" required />
+                  <input name="email" className="input h-11" type="email" placeholder="Email" required />
                 </div>
-                <input className="input h-11" placeholder="Asunto" />
+                <input name="asunto" className="input h-11" placeholder="Asunto" />
                 <textarea
+                  name="mensaje"
                   className="input min-h-32 resize-y py-3"
                   placeholder="Tu mensaje"
                   required
                 />
                 <button type="submit" className="btn btn-primary btn-lg w-full sm:w-auto">
-                  Enviar mensaje
+                  Enviar por WhatsApp
                 </button>
-                <p className="text-[11px] text-muted">Formulario de demostración.</p>
+                <p className="text-[11px] text-muted">
+                  Se abre WhatsApp con tu mensaje listo para enviar.
+                </p>
               </form>
             )}
           </div>

@@ -24,6 +24,24 @@ export function localAsset(url: unknown): string {
   );
 }
 
+/**
+ * Limpia la marca: si viene "Star nutricion / Star Nutricion" (combos que
+ * juntaron la misma marca con distinta mayúscula), deja una sola.
+ */
+export function cleanBrand(raw: unknown): string {
+  const seen = new Set<string>();
+  const parts: string[] = [];
+  for (const p of String(raw ?? "").split("/")) {
+    const t = p.trim();
+    const k = t.toLowerCase();
+    if (t && !seen.has(k)) {
+      seen.add(k);
+      parts.push(t);
+    }
+  }
+  return parts.join(" / ");
+}
+
 /** Genera un slug de URL a partir del nombre del producto. */
 export function slugify(name: string): string {
   return deaccent(String(name))
@@ -61,11 +79,10 @@ export function jsonp<T = unknown>(url: string, timeoutMs = 8000): Promise<T> {
     let settled = false;
 
     const cleanup = () => {
-      try {
-        delete (window as unknown as Record<string, unknown>)[cb];
-      } catch {
-        (window as unknown as Record<string, unknown>)[cb] = undefined;
-      }
+      // Dejamos un no-op en vez de borrar el callback: si la respuesta llega
+      // tarde (después del timeout), el script igual se ejecuta y, si el
+      // callback no existiera, tiraría un ReferenceError en consola.
+      (window as unknown as Record<string, unknown>)[cb] = () => {};
       script.remove();
       clearTimeout(timer);
     };
@@ -195,7 +212,7 @@ export function buildProduct(row: Record<string, unknown>): Product {
     id: slugify(nombre),
     slug: slugify(nombre),
     name: nombre,
-    brand: String(row.marca ?? "").trim(),
+    brand: cleanBrand(row.marca),
     category,
     description: String(row.descripcion ?? "").trim(),
     usage: String(row.modoUso ?? "").trim() || undefined,

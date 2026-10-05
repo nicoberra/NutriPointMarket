@@ -20,7 +20,7 @@ export function Hero() {
             Potenciá tu <span className="text-secondary">rendimiento</span>
           </h1>
           <p className="mt-4 max-w-md text-base text-muted sm:text-lg">
-            Proteínas, creatinas, vitaminas y suplementos seleccionados para
+            Proteínas, creatinas, pancakes proteicos y suplementos seleccionados para
             acompañar tus objetivos. Productos 100% originales.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">

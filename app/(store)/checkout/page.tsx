@@ -205,7 +205,7 @@ export default function CheckoutPage() {
   }
 
   const metodos: { v: Metodo; label: string; hint?: string }[] = [
-    { v: "Transferencia", label: "Transferencia bancaria", hint: "10% de descuento. Enviás el comprobante por WhatsApp." },
+    { v: "Transferencia", label: "Transferencia bancaria", hint: "10% de descuento. Subís el comprobante acá al confirmar (o lo mandás por WhatsApp)." },
     { v: "Mercado Pago", label: "Mercado Pago", hint: "Dinero en cuenta, débito o crédito. Te lleva a Mercado Pago." },
   ];
 

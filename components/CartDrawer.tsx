@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useCart } from "@/context/CartContext";
 import { categoryMap } from "@/data/categories";
 import { brandName } from "@/data/brands";
@@ -12,13 +12,9 @@ import { QuantitySelector } from "./QuantitySelector";
 import { stockMax } from "@/lib/stock";
 import { CartIcon, CloseIcon, TrashIcon, TruckIcon, ArrowRightIcon } from "./Icons";
 
-const FREE_SHIPPING_THRESHOLD = 120000;
-
 export function CartDrawer() {
   const { items, isOpen, closeCart, subtotal, setQuantity, removeItem, count } =
     useCart();
-  const [zip, setZip] = useState("");
-  const [shippingMsg, setShippingMsg] = useState<string | null>(null);
 
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "";
@@ -26,22 +22,6 @@ export function CartDrawer() {
       document.body.style.overflow = "";
     };
   }, [isOpen]);
-
-  const remaining = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
-  const progress = Math.min(100, (subtotal / FREE_SHIPPING_THRESHOLD) * 100);
-
-  const calcShipping = () => {
-    if (zip.trim().length < 4) {
-      setShippingMsg("Ingresá un código postal válido.");
-      return;
-    }
-    // Maqueta: envío ficticio
-    setShippingMsg(
-      subtotal >= FREE_SHIPPING_THRESHOLD
-        ? "🎉 ¡Tenés envío gratis!"
-        : `Envío estimado a CP ${zip.trim()}: ${formatPrice(4500)} (2 a 5 días hábiles).`,
-    );
-  };
 
   return (
     <>
@@ -100,23 +80,12 @@ export function CartDrawer() {
           </div>
         ) : (
           <>
-            {/* Barra de envío gratis */}
+            {/* Entrega: política real (sin promesas inventadas) */}
             <div className="border-b border-line bg-accent-soft px-4 py-3">
-              {remaining > 0 ? (
-                <p className="text-xs font-medium text-primary">
-                  Te faltan <strong>{formatPrice(remaining)}</strong> para el envío gratis 🚚
-                </p>
-              ) : (
-                <p className="flex items-center gap-1.5 text-xs font-bold text-primary">
-                  <TruckIcon className="h-4 w-4" /> ¡Conseguiste el envío gratis!
-                </p>
-              )}
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white">
-                <div
-                  className="h-full rounded-full bg-accent transition-all duration-500"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
+              <p className="flex items-center gap-1.5 text-xs font-medium text-primary">
+                <TruckIcon className="h-4 w-4 shrink-0" />
+                Coordinamos la entrega por WhatsApp según tu zona.
+              </p>
             </div>
 
             {/* Items */}
@@ -198,33 +167,6 @@ export function CartDrawer() {
                   </li>
                 ))}
               </ul>
-
-              {/* Calcular envío */}
-              <div className="mt-4 rounded-lg border border-line bg-white p-3">
-                <label className="text-xs font-semibold text-ink" htmlFor="cart-zip">
-                  Calculá tu envío
-                </label>
-                <div className="mt-2 flex gap-2">
-                  <input
-                    id="cart-zip"
-                    value={zip}
-                    onChange={(e) => setZip(e.target.value)}
-                    inputMode="numeric"
-                    placeholder="Código postal"
-                    className="input h-10 flex-1"
-                  />
-                  <button
-                    type="button"
-                    onClick={calcShipping}
-                    className="btn btn-secondary btn-md shrink-0"
-                  >
-                    Calcular
-                  </button>
-                </div>
-                {shippingMsg && (
-                  <p className="mt-2 text-xs text-muted">{shippingMsg}</p>
-                )}
-              </div>
             </div>
 
             {/* Footer */}
@@ -251,9 +193,6 @@ export function CartDrawer() {
                   Finalizar <ArrowRightIcon className="h-4 w-4" />
                 </Link>
               </div>
-              <p className="mt-2 text-center text-[11px] text-muted">
-                El checkout es una demostración por ahora.
-              </p>
             </div>
           </>
         )}
