@@ -650,10 +650,12 @@ function ProductSheet({
       const pr = allProducts.find((p) => p.name === r.n);
       const q = Number(r.q) || 1;
       const unit = pr ? costToPesos(pr.cost || 0, pr.costCurrency ?? "ARS", dollar) : 0;
-      return { name: r.n, brand: pr?.brand, q, unit, total: unit * q };
+      const priceUnit = pr?.price ?? 0;
+      return { name: r.n, brand: pr?.brand, q, unit, total: unit * q, priceTotal: priceUnit * q };
     });
   const isCombo = comboCostDetail.length > 0;
   const comboCostTotal = comboCostDetail.reduce((a, d) => a + d.total, 0);
+  const comboPriceTotal = comboCostDetail.reduce((a, d) => a + d.priceTotal, 0);
   const costoNum = costo === "" ? 0 : Number(costo);
   const costoPesos = isCombo ? comboCostTotal : costToPesos(costoNum, moneda, dollar);
   const ganancia = precioFinal - costoPesos;
@@ -680,12 +682,12 @@ function ProductSheet({
       categoria,
       precio: precioFinal,
       precioML: descPesos > 0 ? precioNormal : undefined,
-      variantes: variantesStr,
-      stock: hasVariantStock ? variantTotal > 0 : cantNum > 0,
+      variantes: isCombo ? "" : variantesStr,
+      stock: isCombo ? true : hasVariantStock ? variantTotal > 0 : cantNum > 0,
       destacado,
       costo: isCombo ? Math.round(comboCostTotal) : costoNum,
       costoMoneda: isCombo ? "ARS" : moneda,
-      cantidad: totalStock,
+      cantidad: isCombo ? 0 : totalStock,
       descripcion: descripcion.trim(),
       modoUso: modoUso.trim(),
       infoNutricional: infoNutri.trim(),
@@ -805,20 +807,24 @@ function ProductSheet({
 
             {comboCostDetail.length > 0 && (
               <div className="mt-3 border-t border-primary/20 pt-2 text-xs">
-                <p className="mb-1 font-semibold text-ink">Costo del combo</p>
                 {comboCostDetail.map((d, i) => (
-                  <div key={i} className="flex justify-between text-muted">
+                  <div key={i} className="flex justify-between gap-2 text-muted">
                     <span className="min-w-0 truncate">
                       {d.q}× {d.brand ? `${d.brand} · ` : ""}
                       {d.name}
                     </span>
                     <span className="shrink-0">
-                      {formatPrice(Math.round(d.unit))} c/u · {formatPrice(Math.round(d.total))}
+                      venta {formatPrice(Math.round(d.priceTotal))} · costo{" "}
+                      {formatPrice(Math.round(d.total))}
                     </span>
                   </div>
                 ))}
-                <div className="mt-1 flex justify-between border-t border-primary/20 pt-1 font-bold text-primary">
-                  <span>Costo total</span>
+                <div className="mt-1 flex justify-between border-t border-primary/20 pt-1 font-semibold text-ink">
+                  <span>Precio de venta sumado (por separado)</span>
+                  <span>{formatPrice(Math.round(comboPriceTotal))}</span>
+                </div>
+                <div className="flex justify-between font-bold text-primary">
+                  <span>Costo total del combo</span>
                   <span>{formatPrice(Math.round(comboCostTotal))}</span>
                 </div>
               </div>
@@ -920,6 +926,14 @@ function ProductSheet({
             />
           </Field>
 
+          {isCombo && (
+            <p className="rounded-lg bg-page-soft px-3 py-2 text-[11px] text-muted lg:col-span-2">
+              Este producto es un <b>combo</b>: no se le carga stock ni variantes. El stock se
+              calcula solo según los productos que lo arman.
+            </p>
+          )}
+
+          {!isCombo && (
           <div className="lg:col-span-2">
             <span className="mb-1 block text-xs font-semibold text-ink">
               Variantes (color / sabor) y stock de cada una
@@ -973,8 +987,9 @@ function ProductSheet({
               </p>
             )}
           </div>
+          )}
 
-          {!hasVariantStock && (
+          {!isCombo && !hasVariantStock && (
             <Field label="Cantidad en stock">
               <input
                 type="number"
