@@ -12,6 +12,7 @@ import {
   type ProductInput,
 } from "@/lib/api";
 import { formatPrice } from "@/lib/format";
+import { listPrice } from "@/lib/config";
 import { categoryMap } from "@/data/categories";
 import { SearchIcon, CloseIcon, CheckIcon, PlusIcon, TrashIcon, ChevronDownIcon } from "@/components/Icons";
 import { AdminCategories } from "./AdminCategories";
@@ -61,8 +62,9 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
       nombre: p.name,
       marca: p.brand,
       categoria: categoryMap[p.category]?.name ?? "",
-      precio: ch.precio ?? p.price,
-      precioML: "precioML" in ch ? ch.precioML : p.oldPrice,
+      // La planilla guarda el precio CON transferencia (base), no el publicado.
+      precio: ch.precio ?? p.basePrice ?? p.price,
+      precioML: "precioML" in ch ? ch.precioML : p.baseOldPrice,
       // Conserva el stock por variante ("Rojo:3"), no solo los nombres.
       variantes:
         ch.variantes ??
@@ -272,11 +274,11 @@ function ProductRow({
   // "Foto por variante" arranca plegado (muestra 2); tocar el título abre todo.
   const [varsOpen, setVarsOpen] = useState(false);
   const [precioNormal, setPrecioNormal] = useState<number>(
-    product.oldPrice && product.oldPrice > product.price ? product.oldPrice : product.price,
+    product.baseOldPrice && product.baseOldPrice > (product.basePrice ?? product.price) ? product.baseOldPrice : (product.basePrice ?? product.price),
   );
   const [descMode, setDescMode] = useState<"$" | "%">("$");
   const [descVal, setDescVal] = useState<number | "">(
-    product.oldPrice && product.oldPrice > product.price ? product.oldPrice - product.price : "",
+    product.baseOldPrice && product.baseOldPrice > (product.basePrice ?? product.price) ? product.baseOldPrice - (product.basePrice ?? product.price) : "",
   );
   const [destacado, setDestacado] = useState<boolean>(product.featured);
   const [costo, setCosto] = useState<number | "">(product.cost || "");
@@ -465,7 +467,7 @@ function ProductRow({
 
       <div className="grid grid-cols-[1fr_1.35fr] gap-3">
         <label className="block">
-          <span className="mb-1 block text-xs font-semibold text-ink">Precio de lista</span>
+          <span className="mb-1 block text-xs font-semibold text-ink">Precio con transferencia</span>
           <input
             type="number"
             inputMode="numeric"
@@ -515,8 +517,10 @@ function ProductRow({
         }`}
       >
         <span className="text-xs font-semibold text-ink">
-          Precio final
-          <span className="block font-normal text-muted">lo que paga el cliente</span>
+          Precio final con transferencia
+          <span className="block font-normal text-muted">
+            en la web: {formatPrice(listPrice(precioFinal))} (sin transferencia)
+          </span>
         </span>
         <span className="text-right">
           <span className={`font-display text-xl font-black ${descPorc >= 50 ? "text-sale" : "text-primary"}`}>
@@ -704,12 +708,12 @@ function ProductSheet({
   );
   // Precio NORMAL + descuento (en $ o %). El precio final = normal − descuento.
   const [precioNormal, setPrecioNormal] = useState<number>(
-    product ? (product.oldPrice && product.oldPrice > product.price ? product.oldPrice : product.price) : 0,
+    product ? (product.baseOldPrice && product.baseOldPrice > (product.basePrice ?? product.price) ? product.baseOldPrice : (product.basePrice ?? product.price)) : 0,
   );
   const [descMode, setDescMode] = useState<"$" | "%">("$");
   const [descVal, setDescVal] = useState<number | "">(
-    product && product.oldPrice && product.oldPrice > product.price
-      ? product.oldPrice - product.price
+    product && product.baseOldPrice && product.baseOldPrice > (product.basePrice ?? product.price)
+      ? product.baseOldPrice - (product.basePrice ?? product.price)
       : "",
   );
   const [variantRows, setVariantRows] = useState<{ name: string; qty: string }[]>(
@@ -737,7 +741,7 @@ function ProductSheet({
       const pr = allProducts.find((p) => p.name === r.n);
       const q = Number(r.q) || 1;
       const unit = pr ? costToPesos(pr.cost || 0, pr.costCurrency ?? "ARS", dollar) : 0;
-      const priceUnit = pr?.price ?? 0;
+      const priceUnit = pr?.basePrice ?? pr?.price ?? 0;
       return { name: r.n, brand: pr?.brand, q, unit, total: unit * q, priceTotal: priceUnit * q };
     });
   const isCombo = comboCostDetail.length > 0;
@@ -928,7 +932,7 @@ function ProductSheet({
                     <tr className="bg-page-soft text-[10px] font-bold uppercase tracking-wide text-muted">
                       <th className="px-2 py-1.5 text-left">Producto</th>
                       <th className="px-2 py-1.5 text-right">Costo</th>
-                      <th className="px-2 py-1.5 text-right">Precio publicado</th>
+                      <th className="px-2 py-1.5 text-right">Precio (transf.)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -968,7 +972,7 @@ function ProductSheet({
                 </table>
                 <div className="flex items-center justify-between border-t border-line bg-accent-soft px-2 py-1.5">
                   <span className="font-semibold text-ink">
-                    Precio del combo
+                    Precio del combo (transf.)
                     <span className="block text-[10px] font-normal text-muted">
                       vs. {formatPrice(Math.round(comboPriceTotal))} comprando por separado
                     </span>
@@ -1016,7 +1020,7 @@ function ProductSheet({
                 ))}
               </select>
             </Field>
-            <Field label="Precio (normal)">
+            <Field label="Precio con transferencia (normal)">
               <input
                 type="number"
                 inputMode="numeric"
@@ -1025,7 +1029,7 @@ function ProductSheet({
                 className="input h-11 text-base"
               />
             </Field>
-            <Field label="Descuento">
+            <Field label="Descuento (se resta)">
               <div className="flex items-stretch gap-2">
                 <input
                   type="number"
@@ -1229,8 +1233,8 @@ function ProductSheet({
           <p className="text-xs">
             {descPesos > 0 ? (
               <span className="font-semibold text-secondary">
-                Descuento {formatPrice(descPesos)} ({descPorc}%) · Precio final:{" "}
-                {formatPrice(precioFinal)}
+                Descuento {formatPrice(descPesos)} ({descPorc}%) · Precio final (transf.):{" "}
+                {formatPrice(precioFinal)} · En la web: {formatPrice(listPrice(precioFinal))}
               </span>
             ) : (
               <span className="text-muted">Sin descuento</span>

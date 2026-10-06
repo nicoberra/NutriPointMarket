@@ -126,7 +126,7 @@ export function ProductCard({ product }: { product: Product }) {
           )}
         </div>
         <p className="mt-0.5 text-[11px] font-semibold text-green-700">
-          Con transferencia: {formatPrice(transferPrice(product.price))}
+          Con transferencia: {formatPrice(product.basePrice ?? transferPrice(product.price))}
         </p>
         {/* Selector de variante: píldora redondeada. Reserva el mismo alto en
             todas las tarjetas (tengan o no variantes) para que nada "salte". */}

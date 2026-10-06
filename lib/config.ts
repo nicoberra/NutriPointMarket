@@ -152,3 +152,13 @@ export const TRANSFER_DISCOUNT = 0.1;
 export function transferPrice(price: number): number {
   return Math.round(price * (1 - TRANSFER_DISCOUNT));
 }
+
+/**
+ * Precio PUBLICADO en la web a partir del precio con transferencia (el que se
+ * carga en el CRM): se le suma el margen para absorber el 10% de descuento
+ * (base / 0,9, redondeado a $100). Pagando por transferencia se vuelve al base.
+ */
+export function listPrice(base: number): number {
+  if (!base || base <= 0) return 0;
+  return Math.round(base / (1 - TRANSFER_DISCOUNT) / 100) * 100;
+}

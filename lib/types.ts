@@ -41,8 +41,13 @@ export interface Product {
   ingredients?: string;
   /** Si es un combo: productos que lo componen y cuántos de cada uno. */
   combo?: { n: string; q: number }[];
+  /** Precio publicado en la web (= basePrice + margen por transferencia). */
   price: number;
   oldPrice?: number;
+  /** Precio con transferencia: el que se carga en el CRM (columna precio). */
+  basePrice?: number;
+  /** Precio anterior (tachado) en términos de transferencia (columna precioML). */
+  baseOldPrice?: number;
   /** Porcentaje de descuento (0 si no tiene). Se puede calcular pero se guarda para control manual */
   discount: number;
   /** Nombres de imágenes / referencias. Como aún no hay fotos, usamos visuales generados. */

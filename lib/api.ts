@@ -1,5 +1,5 @@
 import type { Product, CategorySlug } from "./types";
-import { SHEETS_API_URL } from "./config";
+import { SHEETS_API_URL, listPrice } from "./config";
 import { discountPercent } from "./format";
 import { categories } from "@/data/categories";
 
@@ -217,8 +217,12 @@ export function buildProduct(row: Record<string, unknown>): Product {
     .split("|")
     .map((s) => localAsset(s.trim()))
     .filter(Boolean);
-  const precio = toNum(row.precio);
-  const precioML = toNum(row.precioML);
+  // La planilla guarda el precio CON transferencia (el del CRM). La web
+  // publica ese precio + margen (listPrice); con transferencia vuelve al base.
+  const base = toNum(row.precio);
+  const baseML = toNum(row.precioML);
+  const precio = listPrice(base);
+  const precioML = listPrice(baseML);
   const oldPrice = precioML > precio ? precioML : undefined;
   // El slug se genera del nombre de la categoría (categorías dinámicas).
   const categoriaTxt = String(row.categoria ?? "").trim();
@@ -236,6 +240,8 @@ export function buildProduct(row: Record<string, unknown>): Product {
     combo: parseCombo(row.combo),
     price: precio,
     oldPrice,
+    basePrice: base,
+    baseOldPrice: baseML > base ? baseML : undefined,
     discount: discountPercent(precio, oldPrice),
     image: imgs[0],
     images: imgs,

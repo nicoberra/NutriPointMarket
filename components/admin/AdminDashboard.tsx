@@ -169,7 +169,7 @@ export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
               >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-ink">{p.name}</p>
-                  <p className="text-xs text-muted">{formatPrice(p.price)}</p>
+                  <p className="text-xs text-muted">{formatPrice(p.basePrice ?? p.price)}</p>
                 </div>
                 <span className="shrink-0 rounded-full bg-sale/10 px-2.5 py-1 text-xs font-bold text-sale">
                   Sin stock

@@ -202,7 +202,7 @@ export function ProductDetail({ product: initial }: { product: Product }) {
             </div>
             <p className="mt-1.5 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
               <PercentIcon className="h-4.5 w-4.5" /> Con transferencia:{" "}
-              <b>{formatPrice(transferPrice(product.price))}</b> (10% de descuento)
+              <b>{formatPrice(product.basePrice ?? transferPrice(product.price))}</b> (10% de descuento)
             </p>
             {product.freeShipping && (
               <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">

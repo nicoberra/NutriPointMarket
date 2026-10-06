@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { formatPrice } from "@/lib/format";
-import { whatsappLink, TRANSFER } from "@/lib/config";
+import { whatsappLink, TRANSFER, transferPrice } from "@/lib/config";
 import { createOrder, mpCreatePreference, uploadComprobante } from "@/lib/api";
 import { PageBanner } from "@/components/PageBanner";
 import { CheckIcon, WhatsappIcon } from "@/components/Icons";
@@ -35,13 +35,17 @@ export default function CheckoutPage() {
   const shipping = subtotal === 0 ? 0 : SHIPPING;
   const total = subtotal + shipping;
 
-  // Descuento por pagar en efectivo o transferencia (no aplica a Mercado Pago).
-  // El 15% se calcula sobre CADA producto y se suma (redondeo por producto),
-  // nunca sobre el envío.
+  // Descuento por pagar con transferencia (no aplica a Mercado Pago): cada
+  // producto vuelve a su precio base (el del CRM). Nunca sobre el envío.
   const descuentoProductos = items.reduce(
-    (acc, i) => acc + Math.round(i.product.price * i.quantity * DESCUENTO_EF_TR),
+    (acc, i) =>
+      acc +
+      Math.round(
+        (i.product.price - (i.product.basePrice ?? transferPrice(i.product.price))) * i.quantity,
+      ),
     0,
   );
+  void DESCUENTO_EF_TR;
   const pagaConDescuento = method === "Transferencia";
   const descuento = pagaConDescuento ? descuentoProductos : 0;
   const totalFinal = total - descuento;
