@@ -223,7 +223,7 @@ export function ProductDetail({ product: initial }: { product: Product }) {
                         key={f}
                         onClick={() => !out && setFlavor(f)}
                         disabled={out}
-                        className={`rounded-lg border px-3.5 py-2 text-sm font-medium transition-colors ${
+                        className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
                           out
                             ? "cursor-not-allowed border-line bg-page-soft text-muted line-through opacity-50"
                             : flavor === f
@@ -262,7 +262,7 @@ export function ProductDetail({ product: initial }: { product: Product }) {
                           type="button"
                           onClick={() => !out && setChoices((c) => ({ ...c, [comp.name]: f }))}
                           disabled={out}
-                          className={`rounded-lg border px-3.5 py-2 text-sm font-medium transition-colors ${
+                          className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
                             out
                               ? "cursor-not-allowed border-line bg-page-soft text-muted line-through opacity-50"
                               : sel
@@ -291,7 +291,7 @@ export function ProductDetail({ product: initial }: { product: Product }) {
                     <button
                       key={pres}
                       onClick={() => setPresentation(pres)}
-                      className={`rounded-lg border px-3.5 py-2 text-sm font-medium transition-colors ${
+                      className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
                         presentation === pres
                           ? "border-accent bg-accent-soft text-primary"
                           : "border-line bg-white text-muted hover:border-accent"

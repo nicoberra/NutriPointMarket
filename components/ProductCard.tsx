@@ -85,7 +85,7 @@ export function ProductCard({ product }: { product: Product }) {
         </h3>
 
         {/* Precios */}
-        <div className="mt-2 flex items-end gap-2">
+        <div className="mt-2 flex min-h-[1.75rem] items-end gap-2">
           <span className="text-lg font-extrabold text-primary">
             {formatPrice(product.price)}
           </span>
@@ -95,27 +95,42 @@ export function ProductCard({ product }: { product: Product }) {
             </span>
           )}
         </div>
-        {/* Selector de sabor */}
-        {hasFlavors && (
-          <label className="mt-3 block">
-            <span className="sr-only">Sabor</span>
-            <select
-              value={flavor}
-              onChange={(e) => setFlavor(e.target.value)}
-              className="input h-9 cursor-pointer text-xs"
-              aria-label={`Sabor de ${product.name}`}
-            >
-              {product.flavors.map((f) => (
-                <option key={f} value={f}>
-                  {f}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
+        {/* Selector de variante: píldora redondeada. Reserva el mismo alto en
+            todas las tarjetas (tengan o no variantes) para que nada "salte". */}
+        <div className="mt-3 min-h-[2.5rem]">
+          {hasFlavors && (
+            <label className="relative block">
+              <span className="sr-only">Variante</span>
+              <select
+                value={flavor}
+                onChange={(e) => setFlavor(e.target.value)}
+                aria-label={`Variante de ${product.name}`}
+                className="h-10 w-full cursor-pointer appearance-none rounded-full border border-line bg-page-soft pl-4 pr-10 text-xs font-semibold text-ink transition-colors hover:border-accent focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+              >
+                {product.flavors.map((f) => (
+                  <option key={f} value={f}>
+                    {f}
+                  </option>
+                ))}
+              </select>
+              <svg
+                aria-hidden
+                viewBox="0 0 20 20"
+                className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-primary"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M6 8l4 4 4-4" />
+              </svg>
+            </label>
+          )}
+        </div>
 
-        {/* CTA */}
-        <div className="mt-3 space-y-2">
+        {/* CTA: siempre al pie de la tarjeta → botones alineados en toda la fila */}
+        <div className="mt-auto space-y-2 pt-3">
           {needsChoice ? (
             <button
               type="button"
