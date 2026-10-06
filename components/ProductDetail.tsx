@@ -313,13 +313,15 @@ export function ProductDetail({ product: initial }: { product: Product }) {
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <QuantitySelector value={qty} onChange={setQty} max={maxQty} />
             <span
-              className={`text-xs font-medium ${
-                soldOut ? "text-sale" : "text-primary"
+              className={`text-xs font-bold ${
+                soldOut || maxQty === 1 ? "text-sale" : "text-primary"
               }`}
             >
               {soldOut
                 ? "Sin stock"
-                : comboMax !== null
+                : maxQty === 1
+                  ? "¡Última unidad!"
+                  : comboMax !== null
                   ? comboMax < 99
                     ? `Quedan ${comboMax}`
                     : "En stock"

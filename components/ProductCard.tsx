@@ -10,7 +10,7 @@ import { formatPrice } from "@/lib/format";
 import { transferPrice } from "@/lib/config";
 import { useCart } from "@/context/CartContext";
 import { useProducts } from "@/context/ProductsContext";
-import { availableVariants, comboComponents } from "@/lib/stock";
+import { availableVariants, comboComponents, comboStockMax } from "@/lib/stock";
 import { ProductVisual } from "./ProductVisual";
 import { VariantSelect } from "./VariantSelect";
 import { FavoriteButton } from "./FavoriteButton";
@@ -41,6 +41,15 @@ export function ProductCard({ product }: { product: Product }) {
   });
   const [flavor, setFlavor] = useState<string>(product.flavors[0] ?? "");
   const shape = categoryMap[product.category]?.shape ?? "tub";
+  // "Última unidad": queda exactamente 1 (de la variante elegida, del combo
+  // según lo elegido, o del producto si no usa variantes).
+  const selVar = product.variants?.find((v) => v.name === flavor);
+  const lastOne =
+    product.combo && product.combo.length
+      ? comboStockMax(product, allProducts, choices) === 1
+      : selVar && selVar.qty != null
+        ? selVar.qty === 1
+        : (product.stockQty ?? 0) === 1;
 
   return (
     <article className="group flex h-full flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-card transition-all duration-300 hover:-translate-y-1 hover:border-accent/40 hover:shadow-card-hover">
@@ -52,6 +61,9 @@ export function ProductCard({ product }: { product: Product }) {
             <span className="badge bg-sale text-white shadow-soft">
               {product.discount}% OFF
             </span>
+          )}
+          {lastOne && product.inStock !== false && (
+            <span className="badge bg-primary text-white shadow-soft">¡Última unidad!</span>
           )}
           {product.freeShipping && (
             <span className="badge bg-accent text-primary shadow-soft">
