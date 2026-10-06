@@ -82,12 +82,19 @@ export function AdminRecords({
 
   useEffect(load, [config.tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Todas las acciones con try/catch: si la planilla tarda o falla, avisa y
+  // recarga (para volver a la verdad) en vez de quedar trabado o mentir.
   const handleAdd = async (obj: Row) => {
     setSaving(true);
-    const ok = await addRow(config.tab, obj);
-    setSaving(false);
-    setAdding(false);
-    onToast(ok ? "Guardado ✓" : "Guardado (verificá)");
+    try {
+      const ok = await addRow(config.tab, obj);
+      setAdding(false);
+      onToast(ok ? "Guardado ✓" : "No se pudo guardar (reintentá)");
+    } catch {
+      onToast("Tardó demasiado: verificá si se guardó");
+    } finally {
+      setSaving(false);
+    }
     // recargar tras un momento (la escritura es asíncrona)
     setTimeout(load, 1200);
   };
@@ -97,14 +104,25 @@ export function AdminRecords({
     setRows((prev) =>
       prev.map((r) => (r.id === row.id ? { ...r, estado: nuevo } : r)),
     );
-    await updateRow(config.tab, row.id, { estado: nuevo });
+    try {
+      const r = await updateRow(config.tab, row.id, { estado: nuevo });
+      if (r === false) throw new Error("no ok");
+    } catch {
+      onToast("No se pudo cambiar el estado (reintentá)");
+      load();
+    }
   };
 
   const eliminar = async (row: Row) => {
     if (!window.confirm("¿Eliminar este pedido? No se puede deshacer.")) return;
     setRows((prev) => prev.filter((r) => r.id !== row.id));
-    await deleteRow(config.tab, row.id);
-    onToast("Pedido eliminado ✓");
+    try {
+      await deleteRow(config.tab, row.id);
+      onToast("Pedido eliminado ✓");
+    } catch {
+      onToast("No se pudo eliminar (reintentá)");
+      load();
+    }
   };
 
   const aprobarPago = async (row: Row) => {
@@ -112,8 +130,14 @@ export function AdminRecords({
     setRows((prev) =>
       prev.map((r) => (r.id === row.id ? { ...r, descontado: "sí", estado: "pagado" } : r)),
     );
-    const ok = await aprobarPedido(row.id);
-    onToast(ok ? "Pago aprobado · stock descontado ✓" : "No se pudo aprobar");
+    try {
+      const ok = await aprobarPedido(row.id);
+      onToast(ok ? "Pago aprobado · stock descontado ✓" : "No se pudo aprobar");
+      if (!ok) load();
+    } catch {
+      onToast("Tardó demasiado: verificá el pedido");
+      load();
+    }
   };
 
   // Solapas por origen (Mis usuarios / Usuarios web)

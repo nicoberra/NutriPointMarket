@@ -24,6 +24,19 @@ export function localAsset(url: unknown): string {
   );
 }
 
+/** Base donde el backend guarda las fotos (debe coincidir con Codigo.gs). */
+const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/nicoberra/NutriPointMarket/main/public";
+
+/**
+ * Inversa de localAsset: la planilla guarda la URL completa de GitHub, así que
+ * para borrar/comparar hay que mandar esa misma URL, no la ruta local.
+ */
+export function rawAsset(url: unknown): string {
+  const s = String(url ?? "").trim();
+  if (!s) return "";
+  return s.startsWith("/") ? GITHUB_RAW_BASE + s : s;
+}
+
 /**
  * Limpia la marca: si viene "Star nutricion / Star Nutricion" (combos que
  * juntaron la misma marca con distinta mayúscula), deja una sola.
@@ -116,7 +129,9 @@ type ApiResult<T = unknown> = { ok?: boolean; error?: string; data?: T; [k: stri
 export function api<T = unknown>(
   action: string,
   params: Record<string, string | number | boolean> = {},
-  timeoutMs = 8000,
+  // Apps Script a veces tarda más de 8 s (sobre todo al escribir en la
+  // planilla); con 8 s el CRM daba por fallida una acción que sí se hizo.
+  timeoutMs = 15000,
 ): Promise<ApiResult<T>> {
   const qs = new URLSearchParams({ action });
   for (const [k, v] of Object.entries(params)) qs.set(k, String(v));
@@ -477,11 +492,17 @@ export async function deleteProductImage(
   nombre: string,
   opts: { url?: string; variante?: string },
 ): Promise<boolean> {
-  const r = await api("borrar_imagen", {
-    nombre,
-    url: opts.url ?? "",
-    variante: opts.variante ?? "",
-  });
+  const r = await api(
+    "borrar_imagen",
+    {
+      nombre,
+      // La planilla guarda la URL completa de GitHub: convertimos la ruta
+      // local (con la que se muestra) a esa URL para que el backend la encuentre.
+      url: rawAsset(opts.url),
+      variante: opts.variante ?? "",
+    },
+    20000,
+  );
   return r.ok !== false;
 }
 

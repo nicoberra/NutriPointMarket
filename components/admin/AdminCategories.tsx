@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 import { useCategories } from "@/context/CategoriesContext";
-import { addCategory, renameCategory, deleteCategory, uploadCategoryImage } from "@/lib/api";
+import {
+  addCategory,
+  renameCategory,
+  deleteCategory,
+  uploadCategoryImage,
+  deleteCategoryImage,
+} from "@/lib/api";
 import { CloseIcon, PlusIcon, TrashIcon, CheckIcon } from "@/components/Icons";
 
 /**
@@ -31,42 +37,84 @@ export function AdminCategories({
       onToast("Esa categoría ya existe");
       return;
     }
+    // try/finally: si la planilla tarda o falla, el panel NO queda trabado.
     setBusy(true);
-    const ok = await addCategory(name, categories.length + 1);
-    setBusy(false);
-    setNueva("");
-    onToast(ok ? "Categoría agregada ✓" : "Guardado (verificá)");
-    await refresh();
+    try {
+      const ok = await addCategory(name, categories.length + 1);
+      setNueva("");
+      onToast(ok ? "Categoría agregada ✓" : "No se pudo guardar (reintentá)");
+    } catch {
+      onToast("Tardó demasiado: verificá si se agregó");
+    } finally {
+      setBusy(false);
+    }
+    refresh().catch(() => {});
   };
 
   const saveRename = async (oldName: string) => {
     const to = editName.trim();
     setEditing(null);
-    if (!to || to === oldName) return;
+    if (!to || to === oldName || busy) return;
     setBusy(true);
-    const ok = await renameCategory(oldName, to);
-    setBusy(false);
-    onToast(ok ? "Renombrada ✓" : "Guardado (verificá)");
-    await refresh();
+    try {
+      const ok = await renameCategory(oldName, to);
+      onToast(ok ? "Renombrada ✓" : "No se pudo renombrar (reintentá)");
+    } catch {
+      onToast("Tardó demasiado: verificá si se renombró");
+    } finally {
+      setBusy(false);
+    }
+    refresh().catch(() => {});
     onChanged();
   };
 
+  // Subir a GitHub + escribir la planilla tarda distinto cada vez: refrescamos
+  // varias veces para que la foto aparezca sola, sin recargar.
+  const refreshLater = (...delays: number[]) =>
+    delays.forEach((ms) => setTimeout(() => refresh().catch(() => {}), ms));
+
   const subirFoto = async (catName: string, file: File) => {
+    if (busy) return;
     setBusy(true);
     onToast("Subiendo foto… ⏳");
-    await uploadCategoryImage(catName, file);
-    onToast("Foto subida ✓ (tarda unos segundos)");
-    setTimeout(() => refresh().catch(() => {}), 2500);
-    setBusy(false);
+    try {
+      await uploadCategoryImage(catName, file);
+      onToast("Foto subida ✓ (aparece en unos segundos)");
+      refreshLater(3000, 8000, 15000);
+    } catch {
+      onToast("No se pudo subir la foto");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const borrarFoto = async (catName: string) => {
+    if (busy || !window.confirm(`¿Quitar la foto de "${catName}"?`)) return;
+    setBusy(true);
+    onToast("Quitando foto… ⏳");
+    try {
+      const ok = await deleteCategoryImage(catName);
+      onToast(ok ? "Foto quitada ✓" : "No se pudo quitar (reintentá)");
+    } catch {
+      onToast("Tardó demasiado: verificá si se quitó");
+    } finally {
+      setBusy(false);
+    }
+    refreshLater(1000, 5000);
   };
 
   const remove = async (name: string) => {
-    if (!window.confirm(`¿Borrar la categoría "${name}"?`)) return;
+    if (busy || !window.confirm(`¿Borrar la categoría "${name}"?`)) return;
     setBusy(true);
-    const ok = await deleteCategory(name);
-    setBusy(false);
-    onToast(ok ? "Borrada ✓" : "Guardado (verificá)");
-    await refresh();
+    try {
+      const ok = await deleteCategory(name);
+      onToast(ok ? "Borrada ✓" : "No se pudo borrar (reintentá)");
+    } catch {
+      onToast("Tardó demasiado: verificá si se borró");
+    } finally {
+      setBusy(false);
+    }
+    refresh().catch(() => {});
     onChanged();
   };
 
@@ -131,25 +179,42 @@ export function AdminCategories({
                 </>
               ) : (
                 <>
-                  <label className="relative grid h-11 w-11 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-lg border border-line bg-page-soft">
-                    {c.image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={c.image} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <span className="text-[9px] font-semibold text-muted">Foto</span>
+                  <div className="relative shrink-0">
+                    {/* Tocar la foto = cambiarla (sube una nueva y reemplaza) */}
+                    <label
+                      title={c.image ? "Cambiar foto" : "Subir foto"}
+                      className="grid h-11 w-11 cursor-pointer place-items-center overflow-hidden rounded-lg border border-line bg-page-soft"
+                    >
+                      {c.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={c.image} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-[9px] font-semibold text-muted">Foto</span>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={busy}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = "";
+                          if (file) await subirFoto(c.name, file);
+                        }}
+                      />
+                    </label>
+                    {c.image && (
+                      <button
+                        type="button"
+                        onClick={() => borrarFoto(c.name)}
+                        disabled={busy}
+                        aria-label="Quitar foto"
+                        className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-sale text-xs font-bold text-white"
+                      >
+                        ×
+                      </button>
                     )}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      disabled={busy}
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        e.target.value = "";
-                        if (file) await subirFoto(c.name, file);
-                      }}
-                    />
-                  </label>
+                  </div>
                   <button
                     onClick={() => {
                       setEditing(c.slug);

@@ -80,27 +80,42 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
       ingredientes: p.ingredients ?? "",
       combo: p.combo && p.combo.length ? JSON.stringify(p.combo) : "",
     };
-    const ok = await saveProduct(row);
-    onToast(ok ? "Guardado ✓" : "Guardado (verificá)");
+    try {
+      const ok = await saveProduct(row);
+      onToast(ok ? "Guardado ✓" : "No se pudo guardar (reintentá)");
+    } catch {
+      onToast("Tardó demasiado: verificá si se guardó");
+    }
     setTimeout(() => refresh().catch(() => {}), 1000);
   };
 
   // Sube la foto de un producto (o de una variante) a GitHub y refresca.
+  // Refresca varias veces: subir a GitHub y escribir la planilla tarda
+  // distinto cada vez; así la foto aparece sola sin tener que recargar.
+  const refreshLater = (...delays: number[]) =>
+    delays.forEach((ms) => setTimeout(() => refresh().catch(() => {}), ms));
+
   const handleUpload = async (p: Product, file: File, variante?: string) => {
     onToast("Subiendo foto… ⏳");
     try {
       await uploadProductImage(p.name, file, variante);
-      onToast("Foto subida ✓ (puede tardar unos segundos en verse)");
-      setTimeout(() => refresh().catch(() => {}), 3000);
+      onToast("Foto subida ✓ (aparece en unos segundos)");
+      refreshLater(3000, 8000, 15000);
     } catch {
       onToast("No se pudo subir la foto");
     }
   };
 
   const handleDeleteImage = async (p: Product, opts: { url?: string; variante?: string }) => {
-    await deleteProductImage(p.name, opts);
-    onToast("Foto eliminada ✓");
-    setTimeout(() => refresh().catch(() => {}), 1500);
+    onToast("Eliminando foto… ⏳");
+    try {
+      const ok = await deleteProductImage(p.name, opts);
+      onToast(ok ? "Foto eliminada ✓" : "No se pudo eliminar (reintentá)");
+    } catch {
+      // Si tardó más de la cuenta, puede que igual se haya borrado: refrescamos.
+      onToast("Tardó demasiado: verificá si se borró");
+    }
+    refreshLater(1500, 6000);
   };
 
   // Guardado optimista: cierra al toque y guarda en segundo plano (se siente
@@ -109,17 +124,25 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
     setEditing(null);
     setAdding(false);
     onToast("Guardando…");
-    const ok = await saveProduct(row);
-    onToast(ok ? "Guardado ✓" : "Guardado (verificá la planilla)");
-    setTimeout(() => refresh().catch(() => {}), 800);
+    try {
+      const ok = await saveProduct(row);
+      onToast(ok ? "Guardado ✓" : "No se pudo guardar (reintentá)");
+    } catch {
+      onToast("Tardó demasiado: verificá si se guardó");
+    }
+    refreshLater(800, 5000);
   };
 
   const handleDelete = async (p: Product) => {
     if (!window.confirm(`¿Eliminar "${p.name}"? No se puede deshacer.`)) return;
     onToast("Eliminando…");
-    await deleteRow("Productos", p.name);
-    onToast("Producto eliminado ✓");
-    setTimeout(() => refresh().catch(() => {}), 800);
+    try {
+      await deleteRow("Productos", p.name);
+      onToast("Producto eliminado ✓");
+    } catch {
+      onToast("Tardó demasiado: verificá si se eliminó");
+    }
+    refreshLater(800, 5000);
   };
 
   // Grupos por categoría (solo cuando el filtro es "Todas").
