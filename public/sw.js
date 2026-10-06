@@ -1,20 +1,22 @@
 /* Service Worker de Suple Market (PWA).
- * Estrategia: network-first para lo propio del sitio (HTML/CSS/JS/imágenes del
- * mismo dominio). Estando online SIEMPRE se sirve lo último; sin conexión se usa
- * la copia guardada de la app.
  *
- * IMPORTANTE: los datos dinámicos (productos, pedidos, clientes, stock, panel)
- * vienen de la API de Google Apps Script y otros orígenes EXTERNOS. Esas
- * peticiones son cross-origin: el SW NO las intercepta ni las cachea, así que
- * siempre se leen frescas del servidor. Nunca se muestra info vieja.
+ * REGLAS (leer antes de tocar):
+ *  1. Las PÁGINAS (HTML) se piden SIEMPRE a la red, sin caché del navegador.
+ *     Solo si la red falla del todo se usa la copia guardada de ESA MISMA URL.
+ *     NUNCA se responde con otra página. (Antes, si fallaba la red, /admin/
+ *     devolvía la portada guardada de la tienda: el CRM "aparecía" como la
+ *     tienda, y encima en una versión vieja.)
+ *  2. Archivos con hash (/_next/static/...) no cambian nunca: cache-first.
+ *  3. Imágenes del sitio: se sirven de caché al instante y se actualizan de fondo.
+ *  4. Todo lo demás (datos, RSC, manifest, etc.): red directa, sin caché.
+ *  5. Al activarse una versión nueva se BORRAN todas las cachés viejas y toma el
+ *     control de inmediato; la página se recarga sola (ver PWARegister).
  *
- * Subí el número de versión cada vez que cambie el sitio para invalidar la
- * caché vieja automáticamente. */
-var VERSION = "v3";
+ * Subí VERSION en cada cambio del SW. */
+var VERSION = "v4";
 var CACHE = "suplemarket-" + VERSION;
 
-self.addEventListener("install", function (event) {
-  // Activa la versión nueva sin esperar a que se cierren las pestañas viejas.
+self.addEventListener("install", function () {
   self.skipWaiting();
 });
 
@@ -25,7 +27,7 @@ self.addEventListener("activate", function (event) {
       .then(function (keys) {
         return Promise.all(
           keys.map(function (k) {
-            if (k !== CACHE) return caches.delete(k); // borra cachés viejas
+            return k === CACHE ? null : caches.delete(k); // borra TODO lo viejo
           })
         );
       })
@@ -35,40 +37,112 @@ self.addEventListener("activate", function (event) {
   );
 });
 
+function isHashedAsset(url) {
+  return url.pathname.indexOf("/_next/static/") === 0;
+}
+function isImage(url) {
+  return /\.(png|jpe?g|webp|gif|svg|ico|avif)$/i.test(url.pathname);
+}
+
+function putInCache(req, res) {
+  if (res && res.status === 200 && res.type === "basic") {
+    var copy = res.clone();
+    caches.open(CACHE).then(function (c) {
+      c.put(req, copy);
+    });
+  }
+  return res;
+}
+
+function offlinePage() {
+  var html =
+    '<!doctype html><html lang="es"><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    "<title>Sin conexión</title>" +
+    "<style>body{font-family:system-ui,sans-serif;background:#f6f7fb;color:#1b1f3b;" +
+    "display:grid;place-items:center;min-height:100vh;margin:0;text-align:center;padding:24px}" +
+    "button{margin-top:16px;padding:12px 20px;border:0;border-radius:12px;background:#2129e3;" +
+    "color:#fff;font-weight:700;font-size:16px}</style></head>" +
+    "<body><div><h1>Sin conexión</h1>" +
+    "<p>No se pudo cargar la página. Revisá tu conexión e intentá de nuevo.</p>" +
+    '<button onclick="location.reload()">Reintentar</button></div></body></html>';
+  return new Response(html, {
+    status: 503,
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
 self.addEventListener("fetch", function (event) {
   var req = event.request;
-
-  // Solo GET del MISMO origen. Todo lo demás (POST, y las APIs externas como
-  // Apps Script / dólar / imágenes de GitHub) pasa de largo → red directa.
   if (req.method !== "GET") return;
   var url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  // Network-first: intento traerlo de la red y actualizo la caché. Si falla
-  // (sin conexión), respondo con la copia guardada.
-  event.respondWith(
-    fetch(req)
-      .then(function (res) {
-        if (res && res.status === 200 && res.type === "basic") {
-          var copy = res.clone();
-          caches.open(CACHE).then(function (cache) {
-            cache.put(req, copy);
+  // 1) Páginas: red SIEMPRE (sin caché HTTP). Fallback SOLO a la misma URL.
+  if (req.mode === "navigate") {
+    event.respondWith(
+      fetch(
+        new Request(req.url, {
+          cache: "no-store",
+          redirect: "manual",
+          credentials: "same-origin",
+        })
+      )
+        .then(function (res) {
+          // Redirecciones (ej. /admin → /admin/): las sigue el navegador.
+          if (res.type === "opaqueredirect") return res;
+          // Error del servidor/CDN: mejor la última copia buena de ESTA url.
+          if (res.status >= 500) {
+            return caches.match(req).then(function (cached) {
+              return cached || res;
+            });
+          }
+          return putInCache(req, res);
+        })
+        .catch(function () {
+          return caches.match(req).then(function (cached) {
+            return cached || offlinePage();
           });
-        }
-        return res;
+        })
+    );
+    return;
+  }
+
+  // 2) Archivos con hash: cache-first (son inmutables).
+  if (isHashedAsset(url)) {
+    event.respondWith(
+      caches.match(req).then(function (cached) {
+        return (
+          cached ||
+          fetch(req).then(function (res) {
+            return putInCache(req, res);
+          })
+        );
       })
-      .catch(function () {
-        return caches.match(req).then(function (cached) {
-          if (cached) return cached;
-          // Fallback para navegaciones offline: la home guardada.
-          if (req.mode === "navigate") return caches.match("/");
-          return Response.error();
-        });
+    );
+    return;
+  }
+
+  // 3) Imágenes: caché al instante + actualización de fondo.
+  if (isImage(url)) {
+    event.respondWith(
+      caches.match(req).then(function (cached) {
+        var net = fetch(req)
+          .then(function (res) {
+            return putInCache(req, res);
+          })
+          .catch(function () {
+            return cached;
+          });
+        return cached || net;
       })
-  );
+    );
+    return;
+  }
+
+  // 4) Todo lo demás: red directa (no se intercepta ni se cachea).
 });
 
-// Permite forzar la activación desde la página (botón "actualizar" si se quiere).
 self.addEventListener("message", function (event) {
   if (event.data === "skipWaiting") self.skipWaiting();
 });
