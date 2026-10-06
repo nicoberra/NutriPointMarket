@@ -157,9 +157,9 @@ export function ProductCard({ product }: { product: Product }) {
                 type="button"
                 disabled={product.inStock === false}
                 onClick={() => addItem(product, { flavor: flavor || undefined })}
-                className="btn btn-outline btn-md w-full"
+                className="btn btn-outline btn-md w-full whitespace-nowrap"
               >
-                <CartIcon className="h-4.5 w-4.5" /> Agregar al carrito
+                <CartIcon className="h-4.5 w-4.5" /> Agregar
               </button>
             </>
           )}
