@@ -7,7 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useCategories } from "@/context/CategoriesContext";
 import { Logo } from "./Logo";
 import { SearchBar } from "./SearchBar";
-import { ChevronDownIcon, CloseIcon, UserIcon } from "./Icons";
+import { ChevronDownIcon, CloseIcon, InstagramIcon, UserIcon } from "./Icons";
 
 const SIMPLE = [
   { label: "Marcas", href: "/marcas" },
@@ -138,6 +138,16 @@ export function MobileMenu({
             <UserIcon className="h-4.5 w-4.5" />
             {user ? `Hola, ${user.name.split(" ")[0]}` : "Mi cuenta"}
           </Link>
+          {/* Instagram: en celu no entra en el header, va acá */}
+          <a
+            href={SITE.instagram}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-outline btn-md mt-2 w-full"
+          >
+            <InstagramIcon className="h-4.5 w-4.5" />
+            Seguinos en Instagram
+          </a>
           <p className="mt-3 text-center text-xs text-muted">{SITE.tagline}</p>
         </div>
       </div>
