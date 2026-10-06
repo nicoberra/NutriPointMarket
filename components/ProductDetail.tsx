@@ -328,7 +328,7 @@ export function ProductDetail({ product: initial }: { product: Product }) {
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <button onClick={add} disabled={soldOut} className="btn btn-primary btn-lg">
+            <button onClick={() => add()} disabled={soldOut} className="btn btn-primary btn-lg">
               <CartIcon className="h-5 w-5" />
               {soldOut ? "Sin stock" : "Agregar al carrito"}
             </button>
