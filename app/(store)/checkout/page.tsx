@@ -30,7 +30,9 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const [compUp, setCompUp] = useState<"idle" | "up" | "done">("idle");
 
-  const shipping = subtotal >= 120000 || subtotal === 0 ? 0 : 4500;
+  // Envío fijo por ahora (sin "envío gratis" por monto).
+  const SHIPPING = 10000;
+  const shipping = subtotal === 0 ? 0 : SHIPPING;
   const total = subtotal + shipping;
 
   // Descuento por pagar en efectivo o transferencia (no aplica a Mercado Pago).
@@ -52,6 +54,12 @@ export default function CheckoutPage() {
     const fd = new FormData(e.currentTarget);
     const metodo = (String(fd.get("pago") || "Transferencia") as Metodo);
     const cliente = String(fd.get("nombre") || "").trim();
+    // Recordamos el nombre en este dispositivo para saludarlo la próxima vez.
+    try {
+      if (cliente) localStorage.setItem("sm-cliente-nombre", cliente);
+    } catch {
+      /* ignore */
+    }
     const email = String(fd.get("email") || "").trim();
     const telefono = String(fd.get("telefono") || "").trim();
     const direccion = [fd.get("direccion"), fd.get("ciudad"), fd.get("provincia"), fd.get("cp")]
@@ -147,8 +155,8 @@ export default function CheckoutPage() {
             <div className="mt-5 rounded-xl border border-line bg-page-soft p-4 text-left text-sm">
               <p className="font-semibold text-primary">Datos para transferir</p>
               <dl className="mt-2 space-y-1">
-                <Row k="Alias" v={TRANSFER.alias} />
-                {TRANSFER.cvu && <Row k="CVU" v={TRANSFER.cvu} />}
+                <Row k="Alias" v={TRANSFER.alias} copy />
+                {TRANSFER.cvu && <Row k="CVU" v={TRANSFER.cvu} copy />}
                 {TRANSFER.titular && <Row k="Titular" v={TRANSFER.titular} />}
                 {TRANSFER.banco && <Row k="Banco" v={TRANSFER.banco} />}
                 <Row k="Importe" v={formatPrice(done.total)} />
@@ -165,7 +173,7 @@ export default function CheckoutPage() {
                 el pedido a la brevedad.
               </div>
             ) : (
-              <label className="btn btn-primary btn-lg mt-4 w-full cursor-pointer">
+              <label className="btn btn-secondary btn-lg mt-4 w-full cursor-pointer font-bold">
                 {compUp === "up" ? "Subiendo…" : "📎 Subir comprobante"}
                 <input
                   type="file"
@@ -192,7 +200,7 @@ export default function CheckoutPage() {
               href={whatsappLink(waMsg)}
               target="_blank"
               rel="noopener noreferrer"
-              className="btn btn-md mt-3 w-full bg-[#25D366] text-white hover:brightness-105"
+              className="btn btn-md mt-3 w-full bg-[#25D366] font-bold text-white hover:brightness-105"
             >
               <WhatsappIcon className="h-5 w-5" /> O avisanos por WhatsApp
             </a>
@@ -276,7 +284,7 @@ export default function CheckoutPage() {
             <fieldset className="rounded-xl border border-line bg-white p-5">
               <legend className="px-2 font-display text-base font-bold text-primary">Envío</legend>
               <p className="mb-2 text-xs text-muted">
-                {formatPrice(4500)} · gratis en compras desde {formatPrice(120000)}.
+                Costo de envío: <b className="text-ink">{formatPrice(SHIPPING)}</b>.
               </p>
               <p className="mb-3 rounded-lg bg-page-soft px-3 py-2 text-xs text-muted">
                 🛵 Los envíos se hacen por <b>motomensajería / logística propia</b>, así que
@@ -355,17 +363,23 @@ export default function CheckoutPage() {
                 </p>
               )}
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="btn btn-primary btn-lg mt-5 w-full disabled:opacity-60"
-              >
-                {loading
-                  ? "Procesando…"
-                  : method === "Mercado Pago"
-                    ? "Pago seguro"
-                    : "Confirmar pedido"}
-              </button>
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="btn btn-primary btn-lg w-full sm:flex-1 disabled:opacity-60"
+                >
+                  {loading
+                    ? "Procesando…"
+                    : method === "Mercado Pago"
+                      ? "Pago seguro"
+                      : "Confirmar pedido"}
+                </button>
+                {/* Por si tocó "Comprar" sin querer: vuelve a la tienda sin perder el carrito */}
+                <Link href="/productos" className="btn btn-outline btn-lg w-full sm:w-auto">
+                  Seguir navegando
+                </Link>
+              </div>
             </div>
           </aside>
         </form>
@@ -374,11 +388,34 @@ export default function CheckoutPage() {
   );
 }
 
-function Row({ k, v }: { k: string; v: string }) {
+function Row({ k, v, copy }: { k: string; v: string; copy?: boolean }) {
+  const [ok, setOk] = useState(false);
+  const doCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(v);
+      setOk(true);
+      setTimeout(() => setOk(false), 1800);
+    } catch {
+      /* sin portapapeles: el valor igual se ve */
+    }
+  };
   return (
-    <div className="flex justify-between gap-3">
+    <div className="flex items-center justify-between gap-3">
       <dt className="text-muted">{k}</dt>
-      <dd className="font-semibold text-ink">{v}</dd>
+      <dd className="flex items-center gap-2 font-semibold text-ink">
+        <span className="break-all">{v}</span>
+        {copy && (
+          <button
+            type="button"
+            onClick={doCopy}
+            className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold transition-colors ${
+              ok ? "bg-green-100 text-green-700" : "bg-primary text-white hover:brightness-110"
+            }`}
+          >
+            {ok ? "Copiado ✓" : "Copiar"}
+          </button>
+        )}
+      </dd>
     </div>
   );
 }

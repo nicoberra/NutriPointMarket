@@ -102,9 +102,9 @@ export function Header() {
               rel="noopener noreferrer"
               aria-label="Instagram de Suple Market"
               title="Seguinos en Instagram"
-              className="hidden h-10 w-10 place-items-center rounded-lg text-white transition-colors hover:bg-white/10 sm:grid"
+              className="hidden h-9 w-9 place-items-center rounded-xl bg-[linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)] text-white shadow-soft transition-transform hover:scale-105 sm:grid"
             >
-              <InstagramIcon className="h-6 w-6" />
+              <InstagramIcon className="h-5 w-5" />
             </a>
           </div>
         </div>

@@ -103,16 +103,18 @@ export function ProductDetail({ product: initial }: { product: Product }) {
   // Variaciones de color para simular una galería (placeholder)
   const gallery = ["rgb(var(--color-accent))", "rgb(var(--color-secondary))", "rgb(var(--color-primary-soft))"];
 
-  const add = () =>
+  const add = (openDrawer?: boolean) =>
     addItem(product, {
       flavor: flavor || undefined,
       presentation: presentation || undefined,
       quantity: qty,
       comboChoices: comboComps.length ? choices : undefined,
+      openDrawer: openDrawer !== false,
     });
 
+  // "Comprar ahora": directo al checkout, sin abrir el cajón del carrito.
   const buyNow = () => {
-    add();
+    add(false);
     router.push("/checkout");
   };
 

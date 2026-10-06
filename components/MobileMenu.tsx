@@ -143,7 +143,7 @@ export function MobileMenu({
             href={SITE.instagram}
             target="_blank"
             rel="noopener noreferrer"
-            className="btn btn-outline btn-md mt-2 w-full"
+            className="btn btn-md mt-2 w-full bg-[linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)] font-bold text-white"
           >
             <InstagramIcon className="h-4.5 w-4.5" />
             Seguinos en Instagram

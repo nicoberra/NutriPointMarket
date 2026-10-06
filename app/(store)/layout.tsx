@@ -1,6 +1,7 @@
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { CartDrawer } from "@/components/CartDrawer";
+import { WelcomeToast } from "@/components/WelcomeToast";
 import { WhatsAppButton } from "@/components/WhatsAppButton";
 import { ToastHost } from "@/components/ToastHost";
 
@@ -16,6 +17,7 @@ export default function StoreLayout({
       <main className="flex-1">{children}</main>
       <Footer />
       <CartDrawer />
+      <WelcomeToast />
       <WhatsAppButton />
       <ToastHost />
     </div>

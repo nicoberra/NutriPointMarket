@@ -89,6 +89,8 @@ interface CartContextValue {
       quantity?: number;
       /** Combos: variante elegida por producto (nombre → variante). */
       comboChoices?: Record<string, string>;
+      /** false = no abrir el cajón del carrito (ej. "Comprar" va directo al checkout). */
+      openDrawer?: boolean;
     },
   ) => void;
   removeItem: (key: string) => void;
@@ -182,7 +184,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           },
         });
         setToast(`${product.name} agregado al carrito`);
-        setIsOpen(true);
+        if (opts?.openDrawer !== false) setIsOpen(true);
       },
       removeItem: (key) => dispatch({ type: "REMOVE", key }),
       setQuantity: (key, quantity) => dispatch({ type: "SET_QTY", key, quantity }),

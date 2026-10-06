@@ -129,7 +129,7 @@ export function ProductCard({ product }: { product: Product }) {
                 type="button"
                 disabled={product.inStock === false}
                 onClick={() => {
-                  addItem(product, { flavor: flavor || undefined });
+                  addItem(product, { flavor: flavor || undefined, openDrawer: false });
                   router.push("/checkout");
                 }}
                 className="btn btn-primary btn-md w-full"
