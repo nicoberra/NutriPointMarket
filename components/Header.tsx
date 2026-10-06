@@ -4,12 +4,12 @@ import Link from "next/link";
 import { useState } from "react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
-import { ASSET_PREFIX } from "@/lib/config";
+import { ASSET_PREFIX, SITE } from "@/lib/config";
 import { Logo } from "./Logo";
 import { Navbar } from "./Navbar";
 import { MobileMenu } from "./MobileMenu";
 import { SearchBar } from "./SearchBar";
-import { HeartIcon, MenuIcon, UserIcon } from "./Icons";
+import { HeartIcon, InstagramIcon, MenuIcon, UserIcon } from "./Icons";
 
 export function Header() {
   const { count, openCart, favorites } = useCart();
@@ -94,6 +94,18 @@ export function Header() {
                 </span>
               )}
             </button>
+
+            {/* Instagram (a la derecha del carrito; en celu va en el menú) */}
+            <a
+              href={SITE.instagram}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Instagram de Suple Market"
+              title="Seguinos en Instagram"
+              className="hidden h-10 w-10 place-items-center rounded-lg text-white transition-colors hover:bg-white/10 sm:grid"
+            >
+              <InstagramIcon className="h-6 w-6" />
+            </a>
           </div>
         </div>
 
