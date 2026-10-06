@@ -12,6 +12,7 @@ export function ProductCarousel({
   products,
   viewAllHref,
   bgImage,
+  id,
 }: {
   title: string;
   eyebrow?: string;
@@ -19,6 +20,8 @@ export function ProductCarousel({
   viewAllHref?: string;
   /** Imagen de fondo de toda la franja (de borde a borde). */
   bgImage?: string;
+  /** id para anclas (ej. /#elegidos). */
+  id?: string;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
 
@@ -31,7 +34,8 @@ export function ProductCarousel({
 
   return (
     <div
-      className={bgImage ? "bg-cover bg-no-repeat" : undefined}
+      id={id}
+      className={bgImage ? "scroll-mt-24 bg-cover bg-no-repeat" : "scroll-mt-24"}
       style={bgImage ? { backgroundImage: `url(${bgImage})`, backgroundPosition: "75% center" } : undefined}
     >
     <section className="container-page py-10 sm:py-14">

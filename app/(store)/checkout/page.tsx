@@ -287,9 +287,9 @@ export default function CheckoutPage() {
                 Costo de envío: <b className="text-ink">{formatPrice(SHIPPING)}</b>.
               </p>
               <p className="mb-3 rounded-lg bg-page-soft px-3 py-2 text-xs text-muted">
-                🛵 Los envíos se hacen por <b>motomensajería / logística propia</b>, así que
-                no hay código de seguimiento (tipo Andreani o Correo). Coordinamos la
-                entrega con vos por WhatsApp.
+                🛵 En la zona de entrega, el envío va por <b>motomensajería / logística
+                propia</b>. Fuera de la zona, va por <b>Vía Cargo</b>. En ambos casos
+                coordinamos la entrega con vos por WhatsApp.
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { listTable, addRow, updateRow, deleteRow, aprobarPedido } from "@/lib/api";
+import { listTable, addRow, updateRow, deleteRow, aprobarPedido, localAsset } from "@/lib/api";
+import { useProducts } from "@/context/ProductsContext";
 import { whatsappLink } from "@/lib/config";
 import { formatPrice } from "@/lib/format";
 import {
@@ -118,7 +119,8 @@ export function AdminRecords({
     setRows((prev) => prev.filter((r) => r.id !== row.id));
     try {
       await deleteRow(config.tab, row.id);
-      onToast("Pedido eliminado ✓");
+      // El backend repone el stock si el pago ya estaba aprobado (descontado).
+      onToast(row.descontado === "sí" ? "Pedido eliminado · stock repuesto ✓" : "Pedido eliminado ✓");
     } catch {
       onToast("No se pudo eliminar (reintentá)");
       load();
@@ -222,13 +224,19 @@ export function AdminRecords({
           {visible.map((r, i) => (
             <li
               key={r.id || i}
-              className="flex items-center gap-3 rounded-xl border border-line bg-white p-3"
+              onClick={() => config.detail && setDetailRow(r)}
+              className={`flex items-center gap-3 rounded-xl border border-line bg-white p-3 ${
+                config.detail ? "cursor-pointer transition-colors hover:border-accent" : ""
+              }`}
             >
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
                   {config.detail ? (
                     <button
-                      onClick={() => setDetailRow(r)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDetailRow(r);
+                      }}
                       className="truncate text-left hover:text-primary hover:underline"
                     >
                       {config.primary(r) || "—"}
@@ -245,7 +253,10 @@ export function AdminRecords({
                 <p className="truncate text-xs text-muted">{config.secondary(r)}</p>
                 {config.estado && (
                   <button
-                    onClick={() => toggleEstado(r)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleEstado(r);
+                    }}
                     className={`mt-1.5 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${
                       r.estado === "Entregado"
                         ? "bg-accent/15 text-primary"
@@ -279,7 +290,10 @@ export function AdminRecords({
                       );
                     return (
                       <button
-                        onClick={() => aprobarPago(r)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          aprobarPago(r);
+                        }}
                         className="ml-1.5 mt-1.5 inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-xs font-bold text-white hover:brightness-110"
                       >
                         {esTransfer ? "Comprobante ✓ · Aprobar" : "Aprobar pago"}
@@ -293,6 +307,7 @@ export function AdminRecords({
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="WhatsApp"
+                  onClick={(e) => e.stopPropagation()}
                   className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#25D366]/10 text-[#25D366]"
                 >
                   <WhatsappIcon className="h-5 w-5" />
@@ -300,7 +315,10 @@ export function AdminRecords({
               )}
               {config.deletable && (
                 <button
-                  onClick={() => eliminar(r)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    eliminar(r);
+                  }}
                   aria-label="Eliminar"
                   className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-sale hover:bg-sale/10"
                 >
@@ -329,12 +347,18 @@ export function AdminRecords({
 /* ------------------------- Detalle de un pedido --------------------------- */
 
 function DetailSheet({ row, onClose }: { row: Row; onClose: () => void }) {
-  let items: { n: string; v?: string; q: number }[] = [];
+  const { products } = useProducts();
+  const [foto, setFoto] = useState(false);
+  let items: { n: string; v?: string; q: number; cv?: Record<string, string> }[] = [];
   try {
     items = JSON.parse(row.items || "[]");
   } catch {
     /* ignore */
   }
+  const brandOf = (n: string) => products.find((p) => p.name === n)?.brand || "";
+  // La foto se sirve desde el dominio propio; si todavía no se publicó
+  // (recién subida), cae a la URL de GitHub.
+  const compLocal = localAsset(row.comprobante);
   const email = (row.notas || "").match(/Email:\s*([^\s|]+)/i)?.[1] || "";
   const esTransfer = (row.pago || "").toLowerCase().includes("transfer");
 
@@ -373,12 +397,28 @@ function DetailSheet({ row, onClose }: { row: Row; onClose: () => void }) {
           <DetailBox title="Productos">
             {items.length ? (
               <ul className="space-y-1">
-                {items.map((it, i) => (
-                  <li key={i} className="text-ink">
-                    {it.q}× {it.n}
-                    {it.v ? ` · ${it.v}` : ""}
-                  </li>
-                ))}
+                {items.map((it, i) => {
+                  const brand = brandOf(it.n);
+                  return (
+                    <li key={i} className="text-ink">
+                      <span className="font-semibold">{it.q}×</span>{" "}
+                      {brand && (
+                        <span className="text-[11px] font-bold uppercase tracking-wide text-primary">
+                          {brand} ·{" "}
+                        </span>
+                      )}
+                      {it.n}
+                      {it.v ? ` · ${it.v}` : ""}
+                      {it.cv && (
+                        <span className="block text-xs text-muted">
+                          {Object.entries(it.cv)
+                            .map(([n, v]) => `${n}: ${v}`)
+                            .join(" · ")}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <p className="text-muted">{row.detalle || "—"}</p>
@@ -400,14 +440,23 @@ function DetailSheet({ row, onClose }: { row: Row; onClose: () => void }) {
           {esTransfer && (
             <DetailBox title="Comprobante de transferencia">
               {row.comprobante ? (
-                <a href={row.comprobante} target="_blank" rel="noopener noreferrer">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={row.comprobante}
-                    alt="Comprobante"
-                    className="w-full rounded-lg border border-line"
-                  />
-                </a>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setFoto(true)}
+                    className="btn btn-secondary btn-md w-full font-bold"
+                  >
+                    📷 Ver foto del comprobante
+                  </button>
+                  <a
+                    href={row.comprobante}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 block text-center text-xs font-semibold text-primary underline"
+                  >
+                    Abrir en pestaña nueva
+                  </a>
+                </>
               ) : (
                 <p className="font-semibold text-sale">
                   ⚠️ Todavía no subió el comprobante.
@@ -423,6 +472,32 @@ function DetailSheet({ row, onClose }: { row: Row; onClose: () => void }) {
           )}
         </div>
       </div>
+
+      {/* Foto del comprobante a pantalla completa */}
+      {foto && row.comprobante && (
+        <div
+          className="fixed inset-0 z-[99] flex items-center justify-center bg-black/85 p-3"
+          onClick={() => setFoto(false)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={compLocal}
+            alt="Comprobante"
+            onError={(e) => {
+              if (e.currentTarget.src !== row.comprobante) e.currentTarget.src = row.comprobante;
+            }}
+            className="max-h-[92vh] max-w-full rounded-lg object-contain"
+          />
+          <button
+            type="button"
+            aria-label="Cerrar"
+            onClick={() => setFoto(false)}
+            className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white text-ink"
+          >
+            <CloseIcon className="h-5 w-5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

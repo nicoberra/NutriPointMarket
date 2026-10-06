@@ -922,26 +922,65 @@ function ProductSheet({
             </button>
 
             {comboCostDetail.length > 0 && (
-              <div className="mt-3 border-t border-primary/20 pt-2 text-xs">
-                {comboCostDetail.map((d, i) => (
-                  <div key={i} className="flex justify-between gap-2 text-muted">
-                    <span className="min-w-0 truncate">
-                      {d.q}× {d.brand ? `${d.brand} · ` : ""}
-                      {d.name}
+              <div className="mt-3 overflow-hidden rounded-lg border border-primary/20 bg-white text-xs">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-page-soft text-[10px] font-bold uppercase tracking-wide text-muted">
+                      <th className="px-2 py-1.5 text-left">Producto</th>
+                      <th className="px-2 py-1.5 text-right">Costo</th>
+                      <th className="px-2 py-1.5 text-right">Precio publicado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {comboCostDetail.map((d, i) => (
+                      <tr key={i} className="border-t border-line">
+                        <td className="px-2 py-1.5">
+                          <span className="font-semibold text-ink">
+                            {d.q > 1 ? `${d.q}× ` : ""}
+                            {d.name}
+                          </span>
+                          {d.brand && (
+                            <span className="block text-[10px] font-bold uppercase text-primary">
+                              {d.brand}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-2 py-1.5 text-right text-muted">
+                          {formatPrice(Math.round(d.total))}
+                        </td>
+                        <td className="px-2 py-1.5 text-right text-muted">
+                          {formatPrice(Math.round(d.priceTotal))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-primary/30 font-bold text-ink">
+                      <td className="px-2 py-1.5">Suma</td>
+                      <td className="px-2 py-1.5 text-right text-sale">
+                        {formatPrice(Math.round(comboCostTotal))}
+                      </td>
+                      <td className="px-2 py-1.5 text-right text-primary">
+                        {formatPrice(Math.round(comboPriceTotal))}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+                <div className="flex items-center justify-between border-t border-line bg-accent-soft px-2 py-1.5">
+                  <span className="font-semibold text-ink">
+                    Precio del combo
+                    <span className="block text-[10px] font-normal text-muted">
+                      vs. {formatPrice(Math.round(comboPriceTotal))} comprando por separado
                     </span>
-                    <span className="shrink-0">
-                      venta {formatPrice(Math.round(d.priceTotal))} · costo{" "}
-                      {formatPrice(Math.round(d.total))}
+                  </span>
+                  <span className="text-right">
+                    <span className="font-display text-base font-black text-primary">
+                      {formatPrice(precioFinal)}
                     </span>
-                  </div>
-                ))}
-                <div className="mt-1 flex justify-between border-t border-primary/20 pt-1 font-semibold text-ink">
-                  <span>Precio de venta sumado (por separado)</span>
-                  <span>{formatPrice(Math.round(comboPriceTotal))}</span>
-                </div>
-                <div className="flex justify-between font-bold text-primary">
-                  <span>Costo total del combo</span>
-                  <span>{formatPrice(Math.round(comboCostTotal))}</span>
+                    <span className="block text-[10px] font-semibold text-green-700">
+                      ganancia {formatPrice(Math.round(precioFinal - comboCostTotal))}
+                    </span>
+                  </span>
                 </div>
               </div>
             )}

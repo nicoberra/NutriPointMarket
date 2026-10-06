@@ -146,3 +146,9 @@ export const FOOTER_LEGAL = [
   { label: "Política de privacidad", href: "#" },
   { label: "Defensa de las y los consumidores", href: "#" },
 ];
+
+/** Descuento pagando por transferencia (10%). Se muestra el precio final en cada producto. */
+export const TRANSFER_DISCOUNT = 0.1;
+export function transferPrice(price: number): number {
+  return Math.round(price * (1 - TRANSFER_DISCOUNT));
+}

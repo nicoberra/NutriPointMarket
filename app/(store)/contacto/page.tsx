@@ -25,7 +25,7 @@ const INFO = [
     id: "envios",
     icon: TruckIcon,
     title: "Entregas",
-    text: "Coordinamos la entrega o el envío por WhatsApp según tu zona. Escribinos y lo arreglamos.",
+    text: "En la zona de entrega, por motomensajería / logística propia. Fuera de la zona, por Vía Cargo. Coordinamos todo por WhatsApp.",
   },
   {
     id: "pagos",
@@ -38,7 +38,7 @@ const INFO = [
 const FAQ = [
   { q: "¿Los productos son originales?", a: "Sí. Trabajamos únicamente con distribuidores oficiales de cada marca." },
   { q: "¿Hay descuento por transferencia?", a: "Sí, pagando por transferencia bancaria tenés un 10% de descuento. Consultanos por WhatsApp." },
-  { q: "¿Cómo recibo mi pedido?", a: "Coordinamos la entrega o el envío por WhatsApp según tu zona." },
+  { q: "¿Cómo recibo mi pedido?", a: "En la zona de entrega lo llevamos por motomensajería / logística propia; fuera de la zona lo mandamos por Vía Cargo. Coordinamos todo por WhatsApp." },
   { q: "¿Puedo cambiar o devolver un producto?", a: "Sí, dentro de los plazos legales y con el producto cerrado. Escribinos y te ayudamos." },
 ];
 

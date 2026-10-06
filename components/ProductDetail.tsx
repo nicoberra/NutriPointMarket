@@ -6,6 +6,7 @@ import type { Product } from "@/lib/types";
 import { brandName } from "@/data/brands";
 import { categoryMap } from "@/data/categories";
 import { formatPrice } from "@/lib/format";
+import { transferPrice } from "@/lib/config";
 import { useCart } from "@/context/CartContext";
 import { useProducts } from "@/context/ProductsContext";
 import { availableVariants, comboComponents, comboStockMax } from "@/lib/stock";
@@ -200,7 +201,8 @@ export function ProductDetail({ product: initial }: { product: Product }) {
               )}
             </div>
             <p className="mt-1.5 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
-              <PercentIcon className="h-4.5 w-4.5" /> 10% de descuento por transferencia
+              <PercentIcon className="h-4.5 w-4.5" /> Con transferencia:{" "}
+              <b>{formatPrice(transferPrice(product.price))}</b> (10% de descuento)
             </p>
             {product.freeShipping && (
               <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">

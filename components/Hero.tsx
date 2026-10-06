@@ -27,7 +27,7 @@ export function Hero() {
             <Link href="/productos" className="btn btn-primary btn-lg">
               Ver productos <ArrowRightIcon className="h-5 w-5" />
             </Link>
-            <Link href="/productos?orden=destacados" className="btn btn-secondary btn-lg">
+            <Link href="/#elegidos" className="btn btn-secondary btn-lg">
               Ver elegidos del mes
             </Link>
           </div>

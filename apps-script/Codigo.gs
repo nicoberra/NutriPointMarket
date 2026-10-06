@@ -323,8 +323,24 @@ function updateRowByNumber(tab, rowNumber, obj) {
 function deleteRow(tab, id) {
   var n = findRowById(tab, id);
   if (n < 0) throw new Error("No se encontró: " + id);
+  // Si es un pedido con el pago aprobado (stock ya descontado), repone el
+  // stock de cada producto antes de borrarlo.
+  if (tab === "Pedidos") reponerStockPedido(n);
   sheetFor(tab).deleteRow(n);
   return { deleted: id };
+}
+
+function reponerStockPedido(n) {
+  var sh = sheetFor("Pedidos");
+  var keys = keysOf("Pedidos");
+  var row = sh.getRange(n, 1, 1, keys.length).getValues()[0];
+  var desc = String(row[keys.indexOf("descontado")] || "").trim().toLowerCase();
+  if (desc !== "sí") return;
+  var items = [];
+  try { items = JSON.parse(row[keys.indexOf("items")] || "[]"); } catch (e) {}
+  for (var i = 0; i < items.length; i++) {
+    ajustarProducto(items[i].n, Number(items[i].q) || 0, items[i].v, items[i].cv, +1);
+  }
 }
 
 function findRowById(tab, id) {
@@ -707,6 +723,12 @@ function aprobarPedido(id) {
 // comboVars (opcional): si el producto es un combo, variante elegida por el
 // cliente para cada componente ({ nombreProducto: variante }).
 function descontarProducto(nombre, cant, variante, comboVars) {
+  ajustarProducto(nombre, cant, variante, comboVars, -1);
+}
+
+// Ajusta el stock de un producto: signo -1 descuenta (venta), +1 repone
+// (pedido eliminado). Maneja variantes y combos (recursivo).
+function ajustarProducto(nombre, cant, variante, comboVars, signo) {
   if (!nombre || !cant || cant <= 0) return;
   var n = findRowById("Productos", nombre);
   if (n < 0) return;
@@ -726,7 +748,7 @@ function descontarProducto(nombre, cant, variante, comboVars) {
     for (var ci = 0; ci < comps.length; ci++) {
       // La variante que eligió el cliente manda; si no eligió, la fija del combo.
       var cv = comboVars && comboVars[comps[ci].n] ? comboVars[comps[ci].n] : comps[ci].v;
-      descontarProducto(comps[ci].n, cant * (Number(comps[ci].q) || 1), cv, null);
+      ajustarProducto(comps[ci].n, cant * (Number(comps[ci].q) || 1), cv, null, signo);
     }
     return;
   }
@@ -740,7 +762,7 @@ function descontarProducto(nombre, cant, variante, comboVars) {
       var vname = idx > 0 ? parts[i].slice(0, idx).trim() : parts[i];
       if (vname.toLowerCase() === String(variante).trim().toLowerCase() && idx > 0) {
         var q = Number(parts[i].slice(idx + 1).trim()) || 0;
-        parts[i] = vname + ":" + Math.max(0, q - cant);
+        parts[i] = vname + ":" + Math.max(0, q + signo * cant);
       }
     }
     sh.getRange(n, iVar + 1).setValue(parts.join(", "));
@@ -748,7 +770,7 @@ function descontarProducto(nombre, cant, variante, comboVars) {
 
   // Descontar del total.
   var actual = Number(sh.getRange(n, iCant + 1).getValue()) || 0;
-  var nuevo = Math.max(0, actual - cant);
+  var nuevo = Math.max(0, actual + signo * cant);
   sh.getRange(n, iCant + 1).setValue(nuevo);
   sh.getRange(n, iStock + 1).setValue(nuevo > 0 ? "sí" : "no");
 }

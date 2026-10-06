@@ -40,6 +40,7 @@ export function HomeCarousel({ kind }: { kind: keyof typeof CONFIG }) {
       products={list}
       viewAllHref={c.viewAllHref}
       bgImage={c.bg || undefined}
+      id={kind === "onSale" ? "elegidos" : undefined}
     />
   );
 }

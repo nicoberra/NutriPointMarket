@@ -7,9 +7,10 @@ import type { Product } from "@/lib/types";
 import { brandName } from "@/data/brands";
 import { categoryMap } from "@/data/categories";
 import { formatPrice } from "@/lib/format";
+import { transferPrice } from "@/lib/config";
 import { useCart } from "@/context/CartContext";
 import { useProducts } from "@/context/ProductsContext";
-import { comboNeedsChoice } from "@/lib/stock";
+import { availableVariants, comboComponents } from "@/lib/stock";
 import { ProductVisual } from "./ProductVisual";
 import { VariantSelect } from "./VariantSelect";
 import { FavoriteButton } from "./FavoriteButton";
@@ -20,8 +21,24 @@ export function ProductCard({ product }: { product: Product }) {
   const { products: allProducts } = useProducts();
   const router = useRouter();
   const hasFlavors = product.flavors.length > 0;
-  // Combo con productos que tienen variantes: se eligen en la ficha.
-  const needsChoice = comboNeedsChoice(product, allProducts);
+  // Combo: por cada producto del combo que tenga variantes, un selector en la
+  // tarjeta (igual que un producto normal). Lo elegido viaja al carrito.
+  const comboComps = comboComponents(product, allProducts).filter(
+    ({ comp }) => comp.flavors.length > 0,
+  );
+  const [choices, setChoices] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      comboComps.map(({ comp }) => [
+        comp.name,
+        availableVariants(comp)[0] ?? comp.flavors[0] ?? "",
+      ]),
+    ),
+  );
+  const cartOpts = (openDrawer?: boolean) => ({
+    flavor: flavor || undefined,
+    comboChoices: comboComps.length ? choices : undefined,
+    ...(openDrawer === false ? { openDrawer: false } : {}),
+  });
   const [flavor, setFlavor] = useState<string>(product.flavors[0] ?? "");
   const shape = categoryMap[product.category]?.shape ?? "tub";
 
@@ -96,6 +113,9 @@ export function ProductCard({ product }: { product: Product }) {
             </span>
           )}
         </div>
+        <p className="mt-0.5 text-[11px] font-semibold text-green-700">
+          Con transferencia: {formatPrice(transferPrice(product.price))}
+        </p>
         {/* Selector de variante: píldora redondeada. Reserva el mismo alto en
             todas las tarjetas (tengan o no variantes) para que nada "salte". */}
         <div className="mt-3 min-h-[2.5rem]">
@@ -110,42 +130,43 @@ export function ProductCard({ product }: { product: Product }) {
               label={`Variante de ${product.name}`}
             />
           )}
+          {comboComps.map(({ comp }) => (
+            <div key={comp.name} className="mb-1.5 last:mb-0">
+              {comboComps.length > 1 && (
+                <p className="mb-0.5 truncate text-[10px] font-semibold text-muted">{comp.name}</p>
+              )}
+              <VariantSelect
+                value={choices[comp.name] ?? ""}
+                options={comp.flavors}
+                disabledOptions={comp.flavors.filter((f) => !availableVariants(comp).includes(f))}
+                onChange={(v) => setChoices((c) => ({ ...c, [comp.name]: v }))}
+                label={`${comp.name} de ${product.name}`}
+              />
+            </div>
+          ))}
         </div>
 
         {/* CTA: siempre al pie de la tarjeta → botones alineados en toda la fila */}
         <div className="mt-auto space-y-2 pt-3">
-          {needsChoice ? (
-            <button
-              type="button"
-              disabled={product.inStock === false}
-              onClick={() => router.push(`/producto?slug=${product.slug}`)}
-              className="btn btn-primary btn-md w-full"
-            >
-              {product.inStock === false ? "Sin stock" : "Elegir sabores"}
-            </button>
-          ) : (
-            <>
-              <button
-                type="button"
-                disabled={product.inStock === false}
-                onClick={() => {
-                  addItem(product, { flavor: flavor || undefined, openDrawer: false });
-                  router.push("/checkout");
-                }}
-                className="btn btn-primary btn-md w-full"
-              >
-                {product.inStock === false ? "Sin stock" : "Comprar"}
-              </button>
-              <button
-                type="button"
-                disabled={product.inStock === false}
-                onClick={() => addItem(product, { flavor: flavor || undefined })}
-                className="btn btn-outline btn-md w-full whitespace-nowrap"
-              >
-                <CartIcon className="h-4.5 w-4.5" /> Agregar
-              </button>
-            </>
-          )}
+          <button
+            type="button"
+            disabled={product.inStock === false}
+            onClick={() => {
+              addItem(product, cartOpts(false));
+              router.push("/checkout");
+            }}
+            className="btn btn-primary btn-md w-full"
+          >
+            {product.inStock === false ? "Sin stock" : "Comprar"}
+          </button>
+          <button
+            type="button"
+            disabled={product.inStock === false}
+            onClick={() => addItem(product, cartOpts())}
+            className="btn btn-outline btn-md w-full whitespace-nowrap"
+          >
+            <CartIcon className="h-4.5 w-4.5" /> Agregar
+          </button>
         </div>
       </div>
     </article>
