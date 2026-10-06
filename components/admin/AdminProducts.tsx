@@ -463,7 +463,7 @@ function ProductRow({
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-[1fr_1.35fr] gap-3">
         <label className="block">
           <span className="mb-1 block text-xs font-semibold text-ink">Precio de lista</span>
           <input
@@ -484,7 +484,7 @@ function ProductRow({
               value={descVal}
               onChange={(e) => setDescVal(e.target.value === "" ? "" : Number(e.target.value))}
               onBlur={savePrices}
-              className="input h-11 flex-1 text-base"
+              className="input h-11 min-w-0 flex-1 px-3 text-base"
               placeholder="0"
             />
             <div className="flex overflow-hidden rounded-lg border border-line">
@@ -496,7 +496,7 @@ function ProductRow({
                     setDescMode(m);
                     setTimeout(savePrices, 0);
                   }}
-                  className={`px-2.5 text-sm font-bold transition-colors ${
+                  className={`px-2 text-xs font-bold transition-colors ${
                     descMode === m ? "bg-primary text-white" : "bg-white text-muted"
                   }`}
                 >

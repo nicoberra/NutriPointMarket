@@ -163,12 +163,33 @@ export function AdminApp() {
             );
           })}
         </nav>
-        <button
-          onClick={logout}
-          className="m-3 flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold text-white/70 transition-colors hover:bg-white/10"
-        >
-          <LogoutIcon className="h-5 w-5" /> Salir
-        </button>
+        <div className="m-3 space-y-1">
+          <button
+            onClick={() => window.location.reload()}
+            title="Actualizar"
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold text-white/70 transition-colors hover:bg-white/10"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+              <path d="M21 3v6h-6" />
+            </svg>
+            Actualizar
+          </button>
+          <button
+            onClick={logout}
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold text-white/70 transition-colors hover:bg-white/10"
+          >
+            <LogoutIcon className="h-5 w-5" /> Salir
+          </button>
+        </div>
       </aside>
 
       {/* Columna principal */}
@@ -188,7 +209,7 @@ export function AdminApp() {
               onClick={() => window.location.reload()}
               aria-label="Actualizar"
               title="Actualizar"
-              className="grid h-9 w-9 place-items-center rounded-lg text-white/80 hover:bg-white/10 lg:text-muted lg:hover:bg-page-soft"
+              className="grid h-9 w-9 place-items-center rounded-lg text-white/80 hover:bg-white/10 lg:hidden"
             >
               <svg
                 viewBox="0 0 24 24"
