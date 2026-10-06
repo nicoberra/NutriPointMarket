@@ -121,10 +121,10 @@ export function ProductDetail({ product: initial }: { product: Product }) {
 
   return (
     <div className="container-page py-8">
-      <div className="grid gap-8 lg:grid-cols-2">
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-12">
         {/* Galería */}
         <div>
-          <div className="relative overflow-hidden rounded-2xl border border-line bg-page-soft">
+          <div className="relative mx-auto w-full max-w-[440px] overflow-hidden rounded-2xl border border-line bg-page-soft lg:max-w-[500px]">
             {product.discount > 0 && (
               <span className="badge absolute left-4 top-4 z-10 bg-sale text-white">
                 {product.discount}% OFF
@@ -151,7 +151,7 @@ export function ProductDetail({ product: initial }: { product: Product }) {
             )}
           </div>
           {displayPhotos.length > 1 && (
-            <div className="mt-3 flex flex-wrap gap-3">
+            <div className="mt-3 flex flex-wrap justify-center gap-3">
               {displayPhotos.map((src, i) => (
                 <button
                   key={src}
