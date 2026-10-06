@@ -9,11 +9,13 @@ import { ASSET_PREFIX } from "@/lib/config";
 import { PageBanner } from "@/components/PageBanner";
 import { ProductVisual } from "@/components/ProductVisual";
 import { QuantitySelector } from "@/components/QuantitySelector";
-import { stockMax } from "@/lib/stock";
+import { itemMax } from "@/lib/stock";
+import { useProducts } from "@/context/ProductsContext";
 import { TrashIcon, ArrowRightIcon } from "@/components/Icons";
 
 export default function CarritoPage() {
   const { items, subtotal, setQuantity, removeItem, count } = useCart();
+  const { products: allProducts } = useProducts();
 
   return (
     <>
@@ -80,11 +82,18 @@ export default function CarritoPage() {
                         {[item.flavor, item.presentation].filter(Boolean).join(" · ")}
                       </p>
                     )}
+                    {item.comboChoices && (
+                      <p className="mt-0.5 text-xs text-muted">
+                        {Object.entries(item.comboChoices)
+                          .map(([n, v]) => `${n}: ${v}`)
+                          .join(" · ")}
+                      </p>
+                    )}
                     <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-3">
                       <QuantitySelector
                         value={item.quantity}
                         onChange={(v) => setQuantity(item.key, v)}
-                        max={stockMax(item.product, item.flavor)}
+                        max={itemMax(item, allProducts)}
                       />
                       <div className="flex items-center gap-4">
                         <span className="font-display text-lg font-extrabold text-primary">

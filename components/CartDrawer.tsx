@@ -9,12 +9,14 @@ import { formatPrice } from "@/lib/format";
 import { ASSET_PREFIX } from "@/lib/config";
 import { ProductVisual } from "./ProductVisual";
 import { QuantitySelector } from "./QuantitySelector";
-import { stockMax } from "@/lib/stock";
+import { itemMax } from "@/lib/stock";
+import { useProducts } from "@/context/ProductsContext";
 import { CartIcon, CloseIcon, TrashIcon, TruckIcon, ArrowRightIcon } from "./Icons";
 
 export function CartDrawer() {
   const { items, isOpen, closeCart, subtotal, setQuantity, removeItem, count } =
     useCart();
+  const { products: allProducts } = useProducts();
 
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "";
@@ -142,6 +144,13 @@ export function CartDrawer() {
                                 .join(" · ")}
                             </p>
                           )}
+                          {item.comboChoices && (
+                            <p className="mt-0.5 text-xs text-muted">
+                              {Object.entries(item.comboChoices)
+                                .map(([n, v]) => `${n}: ${v}`)
+                                .join(" · ")}
+                            </p>
+                          )}
                         </div>
                         <button
                           type="button"
@@ -157,7 +166,7 @@ export function CartDrawer() {
                           size="sm"
                           value={item.quantity}
                           onChange={(v) => setQuantity(item.key, v)}
-                          max={stockMax(item.product, item.flavor)}
+                          max={itemMax(item, allProducts)}
                         />
                         <span className="text-sm font-extrabold text-primary">
                           {formatPrice(item.product.price * item.quantity)}

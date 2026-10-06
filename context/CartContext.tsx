@@ -83,7 +83,13 @@ interface CartContextValue {
   closeCart: () => void;
   addItem: (
     product: Product,
-    opts?: { flavor?: string; presentation?: string; quantity?: number },
+    opts?: {
+      flavor?: string;
+      presentation?: string;
+      quantity?: number;
+      /** Combos: variante elegida por producto (nombre → variante). */
+      comboChoices?: Record<string, string>;
+    },
   ) => void;
   removeItem: (key: string) => void;
   setQuantity: (key: string, quantity: number) => void;
@@ -155,7 +161,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
       addItem: (product, opts) => {
         const flavor = opts?.flavor;
         const presentation = opts?.presentation;
-        const key = [product.id, flavor ?? "", presentation ?? ""].join("|");
+        const comboChoices =
+          opts?.comboChoices && Object.keys(opts.comboChoices).length ? opts.comboChoices : undefined;
+        // Un combo con otras variantes elegidas es otra línea del carrito.
+        const key = [
+          product.id,
+          flavor ?? "",
+          presentation ?? "",
+          comboChoices ? JSON.stringify(comboChoices) : "",
+        ].join("|");
         dispatch({
           type: "ADD",
           item: {
@@ -164,6 +178,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
             quantity: opts?.quantity ?? 1,
             flavor,
             presentation,
+            comboChoices,
           },
         });
         setToast(`${product.name} agregado al carrito`);

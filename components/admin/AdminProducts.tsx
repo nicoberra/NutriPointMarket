@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Product } from "@/lib/types";
 import { useProducts } from "@/context/ProductsContext";
 import { useCategories } from "@/context/CategoriesContext";
@@ -286,16 +286,26 @@ function ProductRow({
       (product.variants ?? []).map((v) => [v.name, v.qty == null ? "" : String(v.qty)]),
     ),
   );
-  const saveVarStock = () => {
+  const saveVarStockWith = (map: Record<string, string>) => {
     const vars = (product.variants ?? []).map((v) => {
-      const q = varQty[v.name];
+      const q = map[v.name];
       return q === undefined || q === "" ? v.name : `${v.name}:${Number(q) || 0}`;
     });
     const total = (product.variants ?? []).reduce((a, v) => {
-      const q = varQty[v.name];
+      const q = map[v.name];
       return a + (q === undefined || q === "" ? 0 : Number(q) || 0);
     }, 0);
     onSave(product, { variantes: vars.join(", "), cantidad: total, stock: total > 0 });
+  };
+  const saveVarStock = () => saveVarStockWith(varQty);
+  // Botones − / + para ajustar rápido (ventas por fuera de la web): guarda
+  // solo, con una pausa corta para no mandar un pedido por cada toque.
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bumpVar = (name: string, d: number) => {
+    const next = { ...varQty, [name]: String(Math.max(0, (Number(varQty[name]) || 0) + d)) };
+    setVarQty(next);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => saveVarStockWith(next), 600);
   };
 
   const descValNum = descVal === "" ? 0 : Number(descVal);
@@ -540,8 +550,16 @@ function ProductRow({
           </span>
           <div className="space-y-1.5">
             {(product.variants ?? []).map((v) => (
-              <div key={v.name} className="flex items-center gap-2">
+              <div key={v.name} className="flex items-center gap-1.5">
                 <span className="flex-1 truncate text-sm text-ink">{v.name}</span>
+                <button
+                  type="button"
+                  onClick={() => bumpVar(v.name, -1)}
+                  aria-label={`Restar 1 a ${v.name}`}
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-line text-lg font-bold text-primary active:bg-page-soft"
+                >
+                  −
+                </button>
                 <input
                   type="number"
                   inputMode="numeric"
@@ -550,9 +568,20 @@ function ProductRow({
                     setVarQty((s) => ({ ...s, [v.name]: e.target.value }))
                   }
                   onBlur={saveVarStock}
-                  className="input h-10 w-24 text-base"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                  }}
+                  className="input h-10 w-16 text-center text-base"
                   placeholder="0"
                 />
+                <button
+                  type="button"
+                  onClick={() => bumpVar(v.name, 1)}
+                  aria-label={`Sumar 1 a ${v.name}`}
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-line text-lg font-bold text-primary active:bg-page-soft"
+                >
+                  +
+                </button>
               </div>
             ))}
           </div>

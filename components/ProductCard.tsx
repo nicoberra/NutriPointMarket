@@ -8,14 +8,19 @@ import { brandName } from "@/data/brands";
 import { categoryMap } from "@/data/categories";
 import { formatPrice } from "@/lib/format";
 import { useCart } from "@/context/CartContext";
+import { useProducts } from "@/context/ProductsContext";
+import { comboNeedsChoice } from "@/lib/stock";
 import { ProductVisual } from "./ProductVisual";
 import { FavoriteButton } from "./FavoriteButton";
 import { CartIcon, TruckIcon } from "./Icons";
 
 export function ProductCard({ product }: { product: Product }) {
   const { addItem } = useCart();
+  const { products: allProducts } = useProducts();
   const router = useRouter();
   const hasFlavors = product.flavors.length > 0;
+  // Combo con productos que tienen variantes: se eligen en la ficha.
+  const needsChoice = comboNeedsChoice(product, allProducts);
   const [flavor, setFlavor] = useState<string>(product.flavors[0] ?? "");
   const shape = categoryMap[product.category]?.shape ?? "tub";
 
@@ -111,25 +116,38 @@ export function ProductCard({ product }: { product: Product }) {
 
         {/* CTA */}
         <div className="mt-3 space-y-2">
-          <button
-            type="button"
-            disabled={product.inStock === false}
-            onClick={() => {
-              addItem(product, { flavor: flavor || undefined });
-              router.push("/checkout");
-            }}
-            className="btn btn-primary btn-md w-full"
-          >
-            {product.inStock === false ? "Sin stock" : "Comprar"}
-          </button>
-          <button
-            type="button"
-            disabled={product.inStock === false}
-            onClick={() => addItem(product, { flavor: flavor || undefined })}
-            className="btn btn-outline btn-md w-full"
-          >
-            <CartIcon className="h-4.5 w-4.5" /> Agregar al carrito
-          </button>
+          {needsChoice ? (
+            <button
+              type="button"
+              disabled={product.inStock === false}
+              onClick={() => router.push(`/producto?slug=${product.slug}`)}
+              className="btn btn-primary btn-md w-full"
+            >
+              {product.inStock === false ? "Sin stock" : "Elegir sabores"}
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                disabled={product.inStock === false}
+                onClick={() => {
+                  addItem(product, { flavor: flavor || undefined });
+                  router.push("/checkout");
+                }}
+                className="btn btn-primary btn-md w-full"
+              >
+                {product.inStock === false ? "Sin stock" : "Comprar"}
+              </button>
+              <button
+                type="button"
+                disabled={product.inStock === false}
+                onClick={() => addItem(product, { flavor: flavor || undefined })}
+                className="btn btn-outline btn-md w-full"
+              >
+                <CartIcon className="h-4.5 w-4.5" /> Agregar al carrito
+              </button>
+            </>
+          )}
         </div>
       </div>
     </article>

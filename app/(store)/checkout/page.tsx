@@ -58,11 +58,27 @@ export default function CheckoutPage() {
       .map((v) => String(v || "").trim())
       .filter(Boolean)
       .join(", ");
+    // Combos: las variantes elegidas van en el detalle (legible) y en items
+    // (cv) para que al aprobar el pago se descuente la variante correcta.
+    const choicesTxt = (i: (typeof items)[number]) =>
+      i.comboChoices
+        ? ` [${Object.entries(i.comboChoices)
+            .map(([n, v]) => `${n}: ${v}`)
+            .join(", ")}]`
+        : "";
     const detalle = items
-      .map((i) => `${i.quantity}x ${i.product.name}${i.flavor ? ` (${i.flavor})` : ""}`)
+      .map(
+        (i) =>
+          `${i.quantity}x ${i.product.name}${i.flavor ? ` (${i.flavor})` : ""}${choicesTxt(i)}`,
+      )
       .join(" | ");
     const itemsJson = JSON.stringify(
-      items.map((i) => ({ n: i.product.name, v: i.flavor ?? "", q: i.quantity })),
+      items.map((i) => ({
+        n: i.product.name,
+        v: i.flavor ?? "",
+        q: i.quantity,
+        ...(i.comboChoices ? { cv: i.comboChoices } : {}),
+      })),
     );
     const id = "ped" + Date.now();
 

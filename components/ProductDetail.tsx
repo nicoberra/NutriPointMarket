@@ -8,6 +8,7 @@ import { categoryMap } from "@/data/categories";
 import { formatPrice } from "@/lib/format";
 import { useCart } from "@/context/CartContext";
 import { useProducts } from "@/context/ProductsContext";
+import { availableVariants, comboComponents, comboStockMax } from "@/lib/stock";
 import { ProductVisual } from "./ProductVisual";
 import { Rating } from "./Rating";
 import { QuantitySelector } from "./QuantitySelector";
@@ -25,10 +26,26 @@ import {
 export function ProductDetail({ product: initial }: { product: Product }) {
   const router = useRouter();
   const { addItem } = useCart();
-  const { getBySlug } = useProducts();
+  const { getBySlug, products: allProducts } = useProducts();
   // Usa la versión en vivo de la planilla si está disponible; si no, el respaldo.
   const product = getBySlug(initial.slug) ?? initial;
   const shape = categoryMap[product.category]?.shape ?? "tub";
+
+  // Combos: el cliente elige la variante de cada producto que la tenga (solo
+  // se ofrecen las que tienen stock) y el stock del combo sale de esa elección.
+  const isCombo = !!product.combo?.length;
+  const comboComps = comboComponents(product, allProducts).filter(
+    ({ comp }) => comp.flavors.length > 0,
+  );
+  const [choices, setChoices] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      comboComps.map(({ comp }) => [
+        comp.name,
+        availableVariants(comp)[0] ?? comp.flavors[0] ?? "",
+      ]),
+    ),
+  );
+  const comboMax = isCombo ? comboStockMax(product, allProducts, choices) : null;
 
   const variantQty = (name: string): number | null => {
     const v = product.variants?.find((x) => x.name === name);
@@ -46,15 +63,26 @@ export function ProductDetail({ product: initial }: { product: Product }) {
   const [activeThumb, setActiveThumb] = useState(0);
 
   const selQty = variantQty(flavor);
-  const soldOut = product.inStock === false || (selQty !== null && selQty <= 0);
-  // Máximo que se puede comprar: el stock de la variante elegida, o el stock
-  // total del producto si no usa variantes. Sin seguimiento → 99.
+  const soldOut =
+    product.inStock === false ||
+    (selQty !== null && selQty <= 0) ||
+    (comboMax !== null && comboMax <= 0);
+  // Máximo que se puede comprar: en combos, según las variantes elegidas; si
+  // no, el stock de la variante elegida o el total del producto. Sin
+  // seguimiento → 99.
   const maxQty =
-    selQty !== null
-      ? Math.max(1, selQty)
-      : (product.stockQty ?? 0) > 0
-        ? (product.stockQty as number)
-        : 99;
+    comboMax !== null
+      ? Math.max(1, comboMax)
+      : selQty !== null
+        ? Math.max(1, selQty)
+        : (product.stockQty ?? 0) > 0
+          ? (product.stockQty as number)
+          : 99;
+
+  // Al cambiar la elección del combo, no pasarse del stock disponible.
+  useEffect(() => {
+    if (comboMax !== null) setQty((cur) => Math.min(Math.max(1, cur), Math.max(1, comboMax)));
+  }, [comboMax]);
 
   // Galería: por defecto las fotos principales; al elegir una variante con
   // fotos, se muestran las de esa variante.
@@ -80,6 +108,7 @@ export function ProductDetail({ product: initial }: { product: Product }) {
       flavor: flavor || undefined,
       presentation: presentation || undefined,
       quantity: qty,
+      comboChoices: comboComps.length ? choices : undefined,
     });
 
   const buyNow = () => {
@@ -211,6 +240,46 @@ export function ProductDetail({ product: initial }: { product: Product }) {
               </div>
             )}
 
+            {/* Combo: elegir la variante de cada producto que la tenga */}
+            {comboComps.map(({ comp, q }) => {
+              const avail = availableVariants(comp);
+              return (
+                <div key={comp.name}>
+                  <p className="mb-2 text-sm font-bold text-ink">
+                    {comp.name}
+                    {q > 1 ? ` ×${q}` : ""}:{" "}
+                    <span className="font-normal text-muted">
+                      {choices[comp.name] || "elegí una opción"}
+                    </span>
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {comp.flavors.map((f) => {
+                      const out = !avail.includes(f);
+                      const sel = choices[comp.name] === f;
+                      return (
+                        <button
+                          key={f}
+                          type="button"
+                          onClick={() => !out && setChoices((c) => ({ ...c, [comp.name]: f }))}
+                          disabled={out}
+                          className={`rounded-lg border px-3.5 py-2 text-sm font-medium transition-colors ${
+                            out
+                              ? "cursor-not-allowed border-line bg-page-soft text-muted line-through opacity-50"
+                              : sel
+                                ? "border-accent bg-accent-soft text-primary"
+                                : "border-line bg-white text-muted hover:border-accent"
+                          }`}
+                        >
+                          {f}
+                          {out ? " · sin stock" : ""}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+
             {product.presentations && product.presentations.length > 1 && (
               <div>
                 <p className="mb-2 text-sm font-bold text-ink">
@@ -246,9 +315,13 @@ export function ProductDetail({ product: initial }: { product: Product }) {
             >
               {soldOut
                 ? "Sin stock"
-                : selQty !== null
-                  ? `Quedan ${selQty}`
-                  : "En stock"}
+                : comboMax !== null
+                  ? comboMax < 99
+                    ? `Quedan ${comboMax}`
+                    : "En stock"
+                  : selQty !== null
+                    ? `Quedan ${selQty}`
+                    : "En stock"}
             </span>
           </div>
 

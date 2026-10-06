@@ -77,5 +77,7 @@ export interface CartItem {
   product: Product;
   quantity: number;
   flavor?: string;
+  /** Combos: variante elegida para cada producto que la tenga (nombre → variante). */
+  comboChoices?: Record<string, string>;
   presentation?: string;
 }

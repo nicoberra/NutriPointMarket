@@ -517,7 +517,7 @@ function borrarImagen(p) {
       // Quita una foto puntual de esa variante.
       var arr = vf[p.variante];
       if (Object.prototype.toString.call(arr) !== "[object Array]") arr = arr ? [arr] : [];
-      arr = arr.filter(function (u) { return u && u !== p.url; });
+      arr = arr.filter(function (u) { return u && !mismaImagen(u, p.url); });
       if (arr.length) vf[p.variante] = arr;
       else delete vf[p.variante];
     } else {
@@ -529,10 +529,19 @@ function borrarImagen(p) {
     var list = String(sh.getRange(n, iImg + 1).getValue() || "")
       .split("|")
       .map(function (s) { return s.trim(); })
-      .filter(function (u) { return u && u !== p.url; });
+      .filter(function (u) { return u && !mismaImagen(u, p.url); });
     sh.getRange(n, iImg + 1).setValue(list.join("|"));
   }
   return { ok: true };
+}
+
+// Compara dos URLs de imagen por NOMBRE DE ARCHIVO: la web puede mandar la
+// ruta local ("/productos/x.jpg") y la planilla guarda la URL completa de
+// GitHub. Así borrar una foto funciona siempre.
+function mismaImagen(a, b) {
+  var fa = String(a || "").split("?")[0].split("/").pop();
+  var fb = String(b || "").split("?")[0].split("/").pop();
+  return !!fa && fa === fb;
 }
 
 function slugImagen(s) {
@@ -684,7 +693,9 @@ function aprobarPedido(id) {
   var items = [];
   try { items = JSON.parse(row[iItems] || "[]"); } catch (e) {}
   for (var i = 0; i < items.length; i++) {
-    descontarProducto(items[i].n, Number(items[i].q) || 0, items[i].v);
+    // items[i].cv: en combos, la variante elegida por el cliente para cada
+    // producto del combo ({ "WHEY ...": "Vainilla" }).
+    descontarProducto(items[i].n, Number(items[i].q) || 0, items[i].v, items[i].cv);
   }
   updateRowByNumber("Pedidos", n, { estado: "pagado", descontado: "sí" });
   return { ok: true, descontados: items.length };
@@ -693,7 +704,9 @@ function aprobarPedido(id) {
 // Baja la cantidad de un producto (por nombre). Si se indica la variante, baja
 // el stock de esa variante en el texto "Rojo:5, Azul:3". Si el total llega a 0,
 // marca el producto sin stock.
-function descontarProducto(nombre, cant, variante) {
+// comboVars (opcional): si el producto es un combo, variante elegida por el
+// cliente para cada componente ({ nombreProducto: variante }).
+function descontarProducto(nombre, cant, variante, comboVars) {
   if (!nombre || !cant || cant <= 0) return;
   var n = findRowById("Productos", nombre);
   if (n < 0) return;
@@ -711,7 +724,9 @@ function descontarProducto(nombre, cant, variante) {
     var comps = [];
     try { comps = JSON.parse(comboRaw); } catch (ec) {}
     for (var ci = 0; ci < comps.length; ci++) {
-      descontarProducto(comps[ci].n, cant * (Number(comps[ci].q) || 1), comps[ci].v);
+      // La variante que eligió el cliente manda; si no eligió, la fija del combo.
+      var cv = comboVars && comboVars[comps[ci].n] ? comboVars[comps[ci].n] : comps[ci].v;
+      descontarProducto(comps[ci].n, cant * (Number(comps[ci].q) || 1), cv, null);
     }
     return;
   }
