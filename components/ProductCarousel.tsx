@@ -11,11 +11,14 @@ export function ProductCarousel({
   eyebrow,
   products,
   viewAllHref,
+  bgImage,
 }: {
   title: string;
   eyebrow?: string;
   products: Product[];
   viewAllHref?: string;
+  /** Imagen de fondo de toda la franja (de borde a borde). */
+  bgImage?: string;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
 
@@ -27,6 +30,10 @@ export function ProductCarousel({
   };
 
   return (
+    <div
+      className={bgImage ? "bg-cover bg-no-repeat" : undefined}
+      style={bgImage ? { backgroundImage: `url(${bgImage})`, backgroundPosition: "75% center" } : undefined}
+    >
     <section className="container-page py-10 sm:py-14">
       <div className="mb-6 flex items-end justify-between gap-4">
         <div>
@@ -89,5 +96,6 @@ export function ProductCarousel({
         </div>
       )}
     </section>
+    </div>
   );
 }
