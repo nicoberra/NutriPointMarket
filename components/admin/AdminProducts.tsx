@@ -441,7 +441,7 @@ function ProductRow({
 
       <div className="grid grid-cols-2 gap-3">
         <label className="block">
-          <span className="mb-1 block text-xs font-semibold text-ink">Precio (normal)</span>
+          <span className="mb-1 block text-xs font-semibold text-ink">Precio de lista</span>
           <input
             type="number"
             inputMode="numeric"
@@ -452,7 +452,7 @@ function ProductRow({
           />
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs font-semibold text-ink">Descuento</span>
+          <span className="mb-1 block text-xs font-semibold text-ink">Descuento <span className="font-normal text-muted">(se resta)</span></span>
           <div className="flex items-stretch gap-1.5">
             <input
               type="number"
@@ -484,15 +484,26 @@ function ProductRow({
         </label>
       </div>
 
-      <p className="mt-1.5 text-xs">
-        {descPesos > 0 ? (
-          <span className="font-semibold text-sale">
-            {descPorc}% OFF · {formatPrice(descPesos)} · Final {formatPrice(precioFinal)}
+      {/* Precio final bien visible: es lo que paga el cliente en la tienda */}
+      <div
+        className={`mt-2 flex items-center justify-between gap-3 rounded-lg px-3 py-2 ${
+          descPorc >= 50 ? "bg-sale/10" : "bg-accent-soft"
+        }`}
+      >
+        <span className="text-xs font-semibold text-ink">
+          Precio final
+          <span className="block font-normal text-muted">lo que paga el cliente</span>
+        </span>
+        <span className="text-right">
+          <span className={`font-display text-xl font-black ${descPorc >= 50 ? "text-sale" : "text-primary"}`}>
+            {formatPrice(precioFinal)}
           </span>
-        ) : (
-          <span className="text-muted">Sin descuento</span>
-        )}
-      </p>
+          <span className="block text-[11px] font-semibold text-muted">
+            {descPesos > 0 ? `${descPorc}% OFF · ahorra ${formatPrice(descPesos)}` : "Sin descuento"}
+            {descPorc >= 50 ? " · ¿seguro?" : ""}
+          </span>
+        </span>
+      </div>
 
       {/* Costo + moneda + ganancia */}
       <div className="mt-3 rounded-lg bg-page-soft p-3">

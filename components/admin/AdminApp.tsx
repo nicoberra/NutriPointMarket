@@ -137,7 +137,7 @@ export function AdminApp() {
     <div className="crm-app min-h-screen bg-page-soft lg:flex lg:select-auto">
       <PullToRefresh />
       {/* Sidebar (solo desktop) */}
-      <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:w-60 lg:flex-col lg:border-r lg:border-white/10 lg:bg-primary lg:text-white">
+      <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:w-52 lg:flex-col lg:border-r lg:border-white/10 lg:bg-primary lg:text-white">
         <div className="px-5 py-6">
           <p className="text-[10px] uppercase tracking-widest text-white/50">
             Suple Market
@@ -172,7 +172,7 @@ export function AdminApp() {
       </aside>
 
       {/* Columna principal */}
-      <div className="flex min-h-screen flex-1 flex-col lg:pl-60">
+      <div className="flex min-h-screen flex-1 flex-col lg:pl-52">
         {/* Top bar */}
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-primary px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] text-white lg:bg-white lg:px-8 lg:py-5">
           <div>
@@ -213,7 +213,7 @@ export function AdminApp() {
         </header>
 
         {/* Contenido */}
-        <main className="mx-auto w-full max-w-5xl flex-1 p-4 pb-24 lg:p-8 lg:pb-10">
+        <main className="w-full flex-1 p-4 pb-24 lg:p-8 lg:pb-10 2xl:px-12">
           {section === "dashboard" && (
             <AdminDashboard onGo={(s) => setSection(s)} />
           )}
@@ -249,7 +249,7 @@ export function AdminApp() {
 
       {/* Toast */}
       {toast && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-24 z-50 flex justify-center px-4 lg:bottom-8 lg:pl-60">
+        <div className="pointer-events-none fixed inset-x-0 bottom-24 z-50 flex justify-center px-4 lg:bottom-8 lg:pl-52">
           <div className="flex animate-toast-in items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-drawer">
             <span className="grid h-6 w-6 place-items-center rounded-full bg-accent text-primary">
               <CheckIcon className="h-4 w-4" />
