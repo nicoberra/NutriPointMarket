@@ -13,7 +13,7 @@ import {
 } from "@/lib/api";
 import { formatPrice } from "@/lib/format";
 import { categoryMap } from "@/data/categories";
-import { SearchIcon, CloseIcon, CheckIcon, PlusIcon, TrashIcon } from "@/components/Icons";
+import { SearchIcon, CloseIcon, CheckIcon, PlusIcon, TrashIcon, ChevronDownIcon } from "@/components/Icons";
 import { AdminCategories } from "./AdminCategories";
 
 /**
@@ -269,6 +269,8 @@ function ProductRow({
   onDelete: (p: Product) => void;
 }) {
   const [uploading, setUploading] = useState(false);
+  // "Foto por variante" arranca plegado (muestra 2); tocar el título abre todo.
+  const [varsOpen, setVarsOpen] = useState(false);
   const [precioNormal, setPrecioNormal] = useState<number>(
     product.oldPrice && product.oldPrice > product.price ? product.oldPrice : product.price,
   );
@@ -388,8 +390,21 @@ function ProductRow({
         {/* Foto por variante */}
         {product.flavors.length > 0 && (
           <div className="mt-2 space-y-1.5">
-            <p className="text-[11px] font-semibold text-muted">Foto por variante</p>
-            {product.flavors.map((f) => {
+            <button
+              type="button"
+              onClick={() => setVarsOpen((o) => !o)}
+              aria-expanded={varsOpen}
+              className="flex w-full items-center justify-between rounded-lg py-1 text-left text-[11px] font-semibold text-muted transition-colors hover:text-primary"
+            >
+              <span>
+                Foto por variante{" "}
+                <span className="font-normal">({product.flavors.length})</span>
+              </span>
+              <ChevronDownIcon
+                className={`h-4 w-4 transition-transform ${varsOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+            {(varsOpen ? product.flavors : product.flavors.slice(0, 2)).map((f) => {
               const vimgs = product.variantImages?.[f] ?? [];
               return (
                 <div key={f} className="rounded-lg border border-line p-2">
@@ -435,6 +450,15 @@ function ProductRow({
                 </div>
               );
             })}
+            {product.flavors.length > 2 && (
+              <button
+                type="button"
+                onClick={() => setVarsOpen((o) => !o)}
+                className="w-full rounded-lg border border-dashed border-line py-1.5 text-[11px] font-semibold text-primary transition-colors hover:bg-page-soft"
+              >
+                {varsOpen ? "Ver menos ▲" : `Ver las ${product.flavors.length} variantes ▼`}
+              </button>
+            )}
           </div>
         )}
       </div>
