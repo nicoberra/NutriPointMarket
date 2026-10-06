@@ -8,16 +8,19 @@ const CONFIG = {
     eyebrow: "Ofertas del mes",
     title: "Nuestros elegidos del mes",
     viewAllHref: "/ofertas",
+    bg: "/banner-elegidos.jpg", // banner de fondo (public/)
   },
   featured: {
     eyebrow: "Lo más elegido",
     title: "Productos destacados",
     viewAllHref: "/productos?orden=destacados",
+    bg: "",
   },
   bestSellers: {
     eyebrow: "Ranking",
     title: "Los más vendidos",
     viewAllHref: "/productos?orden=mas-vendidos",
+    bg: "",
   },
 } as const;
 
@@ -36,6 +39,7 @@ export function HomeCarousel({ kind }: { kind: keyof typeof CONFIG }) {
       title={c.title}
       products={list}
       viewAllHref={c.viewAllHref}
+      bgImage={c.bg || undefined}
     />
   );
 }
