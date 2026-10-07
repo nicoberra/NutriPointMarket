@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm } from "./useConfirm";
+import { ComboBreakdown } from "./ComboBreakdown";
 import type { Product } from "@/lib/types";
 import { useProducts } from "@/context/ProductsContext";
 import { useCategories } from "@/context/CategoriesContext";
@@ -302,6 +303,9 @@ function ProductRow({
   }, [product.cost, product.costCurrency]);
   const [cantidad, setCantidad] = useState<number | "">(product.stockQty ?? "");
   const hasVars = !!(product.variants && product.variants.length);
+  // Combos: detalle fijo (cada producto con costo y precio, sumas, ganancia).
+  const isComboRow = !!(product.combo && product.combo.length);
+  const { products: allForCombo } = useProducts();
   const [varQty, setVarQty] = useState<Record<string, string>>(
     Object.fromEntries(
       (product.variants ?? []).map((v) => [v.name, v.qty == null ? "" : String(v.qty)]),
@@ -551,7 +555,10 @@ function ProductRow({
         </span>
       </div>
 
-      {/* Costo + moneda + ganancia */}
+      {/* Costo: en combos, detalle fijo por producto; si no, costo editable */}
+      {isComboRow ? (
+        <ComboBreakdown product={product} all={allForCombo} dollar={dollar} toPesos={costToPesos} />
+      ) : (
       <div className="mt-3 rounded-lg bg-page-soft p-3">
         <div className="flex items-end gap-2">
           <label className="block flex-1">
@@ -598,8 +605,15 @@ function ProductRow({
           </div>
         )}
       </div>
+      )}
 
-      {hasVars ? (
+      {isComboRow ? (
+        <p className="mt-3 rounded-lg border border-dashed border-line bg-white px-3 py-2 text-xs text-muted">
+          Stock disponible según sus productos:{" "}
+          <b className="text-ink">{product.stockQty ?? 0}</b> (al vender se descuenta de cada
+          producto)
+        </p>
+      ) : hasVars ? (
         <div className="mt-3">
           <span className="mb-1 block text-xs font-semibold text-ink">
             Stock por variante{" "}
