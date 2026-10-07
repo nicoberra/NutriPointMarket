@@ -356,7 +356,15 @@ function ProductRow({
           <p className="text-[11px] font-bold uppercase text-muted">
             {product.brand || "—"}
           </p>
-          <p className="font-semibold text-ink">{product.name}</p>
+          {/* Tocar el nombre también abre el editor */}
+          <button
+            type="button"
+            onClick={onEdit}
+            title="Editar producto"
+            className="text-left font-semibold text-ink transition-colors hover:text-primary hover:underline"
+          >
+            {product.name}
+          </button>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <button
