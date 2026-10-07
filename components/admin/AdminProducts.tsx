@@ -75,8 +75,10 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
           : p.flavors.join(", ")),
       stock: ch.stock ?? p.inStock !== false,
       destacado: ch.destacado ?? p.featured,
-      costo: "costo" in ch ? ch.costo : p.cost,
-      costoMoneda: ch.costoMoneda ?? p.costCurrency ?? "ARS",
+      // Si el costo no está cargado en memoria (0), se manda "" para que la
+      // planilla conserve el que tiene (nunca se pisa con 0 por accidente).
+      costo: "costo" in ch ? ch.costo : (p.cost ?? 0) > 0 ? p.cost : "",
+      costoMoneda: ch.costoMoneda ?? ((p.cost ?? 0) > 0 ? (p.costCurrency ?? "ARS") : ""),
       cantidad: ch.cantidad ?? p.stockQty ?? 0,
       descripcion: p.description ?? "",
       modoUso: p.usage ?? "",
@@ -330,7 +332,8 @@ function ProductRow({
   const ganancia = precioFinal - costoPesos;
   const margen = precioFinal > 0 ? Math.round((ganancia / precioFinal) * 100) : 0;
 
-  const saveCosto = (m = moneda) => onSave(product, { costo: costoNum, costoMoneda: m });
+  const saveCosto = (m = moneda) =>
+    onSave(product, costo === "" ? { costoMoneda: m } : { costo: costoNum, costoMoneda: m });
 
   const savePrices = () => {
     onSave(product, { precio: precioFinal, precioML: descPesos > 0 ? precioNormal : undefined });
@@ -814,8 +817,8 @@ function ProductSheet({
       variantes: isCombo ? "" : variantesStr,
       stock: isCombo ? true : hasVariantStock ? variantTotal > 0 : cantNum > 0,
       destacado,
-      costo: isCombo ? Math.round(comboCostTotal) : costoNum,
-      costoMoneda: isCombo ? "ARS" : moneda,
+      costo: isCombo ? (comboCostTotal > 0 ? Math.round(comboCostTotal) : "") : costo === "" ? "" : costoNum,
+      costoMoneda: isCombo ? (comboCostTotal > 0 ? "ARS" : "") : costo === "" ? "" : moneda,
       cantidad: isCombo ? 0 : totalStock,
       descripcion: descripcion.trim(),
       modoUso: isCombo ? comboUsage : modoUso.trim(),

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { crmLogin, crmLogout, getCrmToken, setCrmToken, CRM_AUTH_EVENT } from "@/lib/api";
 import { AdminProducts } from "./AdminProducts";
+import { useProducts } from "@/context/ProductsContext";
 import { AdminRecords, type RecordsConfig } from "./AdminRecords";
 import { AdminDashboard } from "./AdminDashboard";
 import { AdminBilling } from "./AdminBilling";
@@ -79,6 +80,7 @@ const PEDIDOS_CFG: RecordsConfig = {
 export function AdminApp() {
   const [ready, setReady] = useState(false);
   const [authed, setAuthed] = useState(false);
+  const { refresh: refreshProducts } = useProducts();
   const [section, setSection] = useState<Section>("dashboard");
   const [toast, setToast] = useState<string | null>(null);
 
@@ -142,6 +144,9 @@ export function AdminApp() {
       /* ignore */
     }
     setAuthed(true);
+    // Con el token recién guardado, recarga los productos: así el CRM tiene
+    // los costos (la tienda pública no los recibe) antes de editar nada.
+    refreshProducts().catch(() => {});
   };
 
   const logout = () => {

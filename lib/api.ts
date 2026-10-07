@@ -433,8 +433,9 @@ export interface ProductInput {
   variantes?: string;
   stock: boolean;
   destacado: boolean;
-  costo?: number;
-  costoMoneda?: "USD" | "ARS";
+  /** "" = no tocar el costo guardado en la planilla (el backend ignora vacíos). */
+  costo?: number | "";
+  costoMoneda?: "USD" | "ARS" | "";
   cantidad?: number;
   descripcion?: string;
   modoUso?: string;
