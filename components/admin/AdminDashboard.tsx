@@ -96,6 +96,7 @@ export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
   }, []);
 
   const sinStock = products.filter((p) => p.inStock === false).slice(0, 8);
+  const sinFoto = products.filter((p) => !p.image);
   const clientesN = useCountUp(m.clientes);
   const pedidosN = useCountUp(m.pedidos);
 
@@ -154,6 +155,49 @@ export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
           Ver facturación completa
           <ChevronRightIcon className="h-5 w-5" />
         </button>
+      </section>
+
+      {/* Sin foto: ocultos en la web hasta que tengan foto */}
+      <section>
+        <h2 className="mb-2 flex items-center gap-2 text-sm font-bold text-ink">
+          Sin foto
+          {sinFoto.length > 0 && (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">
+              {sinFoto.length} · ocultos en la web
+            </span>
+          )}
+        </h2>
+        {sinFoto.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-line bg-white py-6 text-center text-sm text-muted">
+            Todos los productos tienen foto 📸
+          </p>
+        ) : (
+          <>
+            <ul className="space-y-2 sm:grid sm:grid-cols-2 sm:gap-2 sm:space-y-0 lg:grid-cols-3">
+              {sinFoto.slice(0, 8).map((p) => (
+                <li
+                  key={p.id}
+                  className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-ink">{p.name}</p>
+                    <p className="text-xs text-muted">{p.brand || "—"}</p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700">
+                    Falta foto
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <button
+              onClick={() => onGo("productos")}
+              className="mt-3 flex w-full items-center justify-between rounded-xl border border-line bg-white p-4 text-sm font-semibold text-primary"
+            >
+              Cargar fotos en Productos
+              <ChevronRightIcon className="h-5 w-5" />
+            </button>
+          </>
+        )}
       </section>
 
       {/* Sin stock */}

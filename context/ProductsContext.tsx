@@ -13,6 +13,7 @@ import type { Product, CategorySlug } from "@/lib/types";
 import { fetchProducts } from "@/lib/api";
 import { applyComboStock } from "@/lib/stock";
 import { productSeed } from "@/data/products-seed";
+import { usePathname } from "next/navigation";
 
 /**
  * Base instantánea: snapshot real de la tienda. Se ve completa al entrar aunque
@@ -80,12 +81,18 @@ export function ProductsProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, [refresh]);
 
+  // En la TIENDA, un producto sin foto no se muestra (catálogo, carruseles,
+  // menús, búsqueda, ficha). El CRM (/admin) ve todos, para poder arreglarlos.
+  const pathname = usePathname();
+  const isAdmin = !!pathname && pathname.startsWith("/admin");
+
   const value = useMemo<ProductsContextValue>(() => {
-    const bySlug = new Map(products.map((p) => [p.slug, p]));
+    const list = isAdmin ? products : products.filter((p) => !!p.image);
+    const bySlug = new Map(list.map((p) => [p.slug, p]));
 
     // Marcas derivadas de los productos cargados (para filtros y /marcas).
     const brandMap = new Map<string, string>();
-    for (const p of products) {
+    for (const p of list) {
       const name = p.brand?.trim();
       if (name) brandMap.set(name.toLowerCase(), name);
     }
@@ -94,17 +101,17 @@ export function ProductsProvider({ children }: { children: ReactNode }) {
       .map((name) => ({ slug: name.toLowerCase(), name }));
 
     return {
-      products,
+      products: list,
       brands,
       loading,
       refresh,
       getBySlug: (slug) => bySlug.get(slug),
-      byCategory: (c) => products.filter((p) => p.category === c),
-      featured: products.filter((p) => p.featured),
-      bestSellers: products.filter((p) => p.bestSeller),
-      onSale: products.filter((p) => p.discount > 0),
+      byCategory: (c) => list.filter((p) => p.category === c),
+      featured: list.filter((p) => p.featured),
+      bestSellers: list.filter((p) => p.bestSeller),
+      onSale: list.filter((p) => p.discount > 0),
     };
-  }, [products, loading, refresh]);
+  }, [products, loading, refresh, isAdmin]);
 
   return <ProductsContext.Provider value={value}>{children}</ProductsContext.Provider>;
 }
