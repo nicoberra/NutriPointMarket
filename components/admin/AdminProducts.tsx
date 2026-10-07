@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm } from "./useConfirm";
 import { ComboBreakdown } from "./ComboBreakdown";
+import { PhotoViewer } from "./PhotoViewer";
 import type { Product } from "@/lib/types";
 import { useProducts } from "@/context/ProductsContext";
 import { useCategories } from "@/context/CategoriesContext";
@@ -303,6 +304,8 @@ function ProductRow({
   }, [product.cost, product.costCurrency]);
   const [cantidad, setCantidad] = useState<number | "">(product.stockQty ?? "");
   const hasVars = !!(product.variants && product.variants.length);
+  // Visor de fotos (tocar una foto la abre grande, con descarga).
+  const [view, setView] = useState<{ src: string; label: string } | null>(null);
   // Combos: detalle fijo (cada producto con costo y precio, sumas, ganancia).
   const isComboRow = !!(product.combo && product.combo.length);
   const { products: allForCombo } = useProducts();
@@ -389,7 +392,15 @@ function ProductRow({
           {(product.images ?? []).map((src) => (
             <div key={src} className="relative">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={src} alt="" className="h-14 w-14 rounded-lg border border-line object-cover" />
+              <button
+                type="button"
+                onClick={() => setView({ src, label: product.name })}
+                title="Ver / descargar foto"
+                className="block"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt="" className="h-14 w-14 rounded-lg border border-line object-cover" />
+              </button>
               <button
                 type="button"
                 onClick={() => onDeleteImage(product, { url: src })}
@@ -418,6 +429,8 @@ function ProductRow({
             />
           </label>
         </div>
+
+        {view && <PhotoViewer src={view.src} label={view.label} onClose={() => setView(null)} />}
 
         {/* Foto por variante */}
         {product.flavors.length > 0 && (
@@ -464,7 +477,15 @@ function ProductRow({
                     {vimgs.map((src) => (
                       <div key={src} className="relative">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={src} alt="" className="h-9 w-9 rounded border border-line object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setView({ src, label: `${product.name} · ${f}` })}
+                          title="Ver / descargar foto"
+                          className="block"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={src} alt="" className="h-9 w-9 rounded border border-line object-cover" />
+                        </button>
                         <button
                           type="button"
                           onClick={() => onDeleteImage(product, { variante: f, url: src })}
