@@ -80,7 +80,7 @@ export function ProductCard({ product }: { product: Product }) {
         <FavoriteButton id={product.id} className="absolute right-2.5 top-2.5 z-10 h-9 w-9" />
 
         <Link
-          href={`/producto?slug=${product.slug}`}
+          href={`/producto/${product.slug}/`}
           className="block bg-page-soft"
           aria-label={product.name}
         >
@@ -112,7 +112,7 @@ export function ProductCard({ product }: { product: Product }) {
           {brandName(product.brand)}
         </p>
         <h3 className="mt-0.5 line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-snug text-ink">
-          <Link href={`/producto?slug=${product.slug}`} className="hover:text-primary">
+          <Link href={`/producto/${product.slug}/`} className="hover:text-primary">
             {product.name}
           </Link>
         </h3>

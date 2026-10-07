@@ -102,7 +102,7 @@ export function CartDrawer() {
                     }`}
                   >
                     <Link
-                      href={`/producto?slug=${item.product.slug}`}
+                      href={`/producto/${item.product.slug}/`}
                       onClick={closeCart}
                       className="shrink-0"
                     >
@@ -134,7 +134,7 @@ export function CartDrawer() {
                             {brandName(item.product.brand)}
                           </p>
                           <Link
-                            href={`/producto?slug=${item.product.slug}`}
+                            href={`/producto/${item.product.slug}/`}
                             onClick={closeCart}
                             className="line-clamp-2 text-sm font-semibold text-ink hover:text-primary"
                           >

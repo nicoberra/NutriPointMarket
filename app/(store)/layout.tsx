@@ -1,25 +1,6 @@
-import { Header } from "@/components/Header";
-import { Footer } from "@/components/Footer";
-import { CartDrawer } from "@/components/CartDrawer";
-import { WelcomeToast } from "@/components/WelcomeToast";
-import { WhatsAppButton } from "@/components/WhatsAppButton";
-import { ToastHost } from "@/components/ToastHost";
+import { StoreShell } from "@/components/StoreShell";
 
 /** Layout de la TIENDA pública (header, footer, carrito, WhatsApp, toasts). */
-export default function StoreLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex min-h-screen flex-col">
-      <Header />
-      <main className="flex-1">{children}</main>
-      <Footer />
-      <CartDrawer />
-      <WelcomeToast />
-      <WhatsAppButton />
-      <ToastHost />
-    </div>
-  );
+export default function StoreLayout({ children }: { children: React.ReactNode }) {
+  return <StoreShell>{children}</StoreShell>;
 }
