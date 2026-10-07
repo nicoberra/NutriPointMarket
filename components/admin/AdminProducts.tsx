@@ -830,8 +830,8 @@ function ProductSheet({
 
   return (
     <div className="fixed inset-0 z-[90] flex items-end justify-center sm:items-center">
-      <div className="absolute inset-0 bg-black/50" onClick={closeAndSave} />
-      <div className="relative max-h-[95vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-page p-5 sm:rounded-2xl lg:max-w-4xl lg:p-7">
+      <div className="absolute inset-0 animate-fade-in bg-black/50 motion-reduce:animate-none" onClick={closeAndSave} />
+      <div className="relative max-h-[95vh] w-full max-w-md animate-section-in overflow-y-auto rounded-t-2xl bg-page p-5 motion-reduce:animate-none sm:rounded-2xl lg:max-w-4xl lg:p-7">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-display text-lg font-bold text-primary">
             {isEdit ? "Editar producto" : "Agregar producto"}

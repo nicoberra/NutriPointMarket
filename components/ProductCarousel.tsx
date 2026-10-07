@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 import Link from "next/link";
+import { gsap, useGSAP, MOTION_OK, guardEntrance } from "@/lib/gsap";
 import type { Product } from "@/lib/types";
 import { ProductCard } from "./ProductCard";
 import { ChevronLeftIcon, ChevronRightIcon, ArrowRightIcon } from "./Icons";
@@ -24,6 +25,45 @@ export function ProductCarousel({
   id?: string;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Entrada de las tarjetas en stagger (una vez) + parallax suave del fondo.
+  useGSAP(
+    () => {
+      const mm = gsap.matchMedia();
+      mm.add(MOTION_OK, () => {
+        const root = rootRef.current;
+        if (!root) return;
+        const cards = scroller.current ? Array.from(scroller.current.children) : [];
+        if (cards.length) {
+          const tween = gsap.from(cards, {
+            autoAlpha: 0,
+            y: 24,
+            duration: 0.6,
+            ease: "power3.out",
+            stagger: 0.07,
+            clearProps: "transform,opacity,visibility",
+            scrollTrigger: { trigger: root, start: "top 85%", once: true },
+          });
+          guardEntrance(tween, 8000);
+        }
+        const bg = root.querySelector("[data-parallax-bg]");
+        if (bg) {
+          gsap.fromTo(
+            bg,
+            { yPercent: -6 },
+            {
+              yPercent: 6,
+              ease: "none",
+              scrollTrigger: { trigger: root, start: "top bottom", end: "bottom top", scrub: true },
+            },
+          );
+        }
+      });
+      return () => mm.revert();
+    },
+    { scope: rootRef },
+  );
 
   const scrollBy = (dir: 1 | -1) => {
     const el = scroller.current;
@@ -33,12 +73,16 @@ export function ProductCarousel({
   };
 
   return (
-    <div
-      id={id}
-      className={bgImage ? "scroll-mt-24 bg-cover bg-no-repeat" : "scroll-mt-24"}
-      style={bgImage ? { backgroundImage: `url(${bgImage})`, backgroundPosition: "75% center" } : undefined}
-    >
-    <section className="container-page py-10 sm:py-14">
+    <div id={id} ref={rootRef} className="relative isolate scroll-mt-24 overflow-hidden">
+      {bgImage && (
+        <div
+          data-parallax-bg
+          aria-hidden
+          className="pointer-events-none absolute inset-0 -z-10 scale-110 bg-cover bg-no-repeat"
+          style={{ backgroundImage: `url(${bgImage})`, backgroundPosition: "75% center" }}
+        />
+      )}
+    <section className="container-page relative py-10 sm:py-14">
       <div className="mb-6 flex items-end justify-between gap-4">
         <div>
           {eyebrow && (

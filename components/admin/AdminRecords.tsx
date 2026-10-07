@@ -209,8 +209,18 @@ export function AdminRecords({
         )}
       </div>
 
+      {config.searchable && query && !loading && (
+        <p className="px-1 text-xs font-semibold text-muted" aria-live="polite">
+          {visible.length} {visible.length === 1 ? "resultado" : "resultados"} para “{q.trim()}”
+        </p>
+      )}
+
       {loading ? (
-        <p className="py-10 text-center text-sm text-muted">Cargando…</p>
+        <ul className="space-y-2 sm:grid sm:grid-cols-2 sm:gap-2 sm:space-y-0 xl:grid-cols-3" aria-busy="true">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <li key={i} className="h-[76px] animate-pulse rounded-xl border border-line bg-white motion-reduce:animate-none" />
+          ))}
+        </ul>
       ) : visible.length === 0 ? (
         <div className="rounded-xl border border-dashed border-line bg-white py-12 text-center text-sm text-muted">
           {query
@@ -225,7 +235,8 @@ export function AdminRecords({
             <li
               key={r.id || i}
               onClick={() => config.detail && setDetailRow(r)}
-              className={`flex items-center gap-3 rounded-xl border border-line bg-white p-3 ${
+              style={{ animationDelay: `${Math.min(i, 8) * 30}ms` }}
+              className={`flex animate-section-in items-center gap-3 rounded-xl border border-line bg-white p-3 motion-reduce:animate-none ${
                 config.detail ? "cursor-pointer transition-colors hover:border-accent" : ""
               }`}
             >
@@ -364,8 +375,8 @@ function DetailSheet({ row, onClose }: { row: Row; onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-[95] flex items-end justify-center sm:items-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-page p-5 sm:rounded-2xl">
+      <div className="absolute inset-0 animate-fade-in bg-black/50 motion-reduce:animate-none" onClick={onClose} />
+      <div className="relative max-h-[92vh] w-full max-w-md animate-section-in overflow-y-auto rounded-t-2xl bg-page p-5 motion-reduce:animate-none sm:rounded-2xl">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="font-display text-lg font-bold text-primary">Detalle del pedido</h3>
           <button
@@ -541,10 +552,10 @@ function AddSheet({
 
   return (
     <div className="fixed inset-0 z-[90] flex items-end justify-center sm:items-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="absolute inset-0 animate-fade-in bg-black/50 motion-reduce:animate-none" onClick={onClose} />
       <form
         onSubmit={submit}
-        className="relative max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-page p-5 sm:rounded-2xl"
+        className="relative max-h-[92vh] w-full max-w-md animate-section-in overflow-y-auto rounded-t-2xl bg-page p-5 motion-reduce:animate-none sm:rounded-2xl"
       >
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-display text-lg font-bold text-primary">

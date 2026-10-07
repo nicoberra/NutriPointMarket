@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Product } from "@/lib/types";
 import { brandName } from "@/data/brands";
 import { categoryMap } from "@/data/categories";
@@ -11,6 +11,7 @@ import { transferPrice } from "@/lib/config";
 import { useCart } from "@/context/CartContext";
 import { useProducts } from "@/context/ProductsContext";
 import { availableVariants, comboComponents, comboStockMax } from "@/lib/stock";
+import { flyToCart } from "@/lib/motion";
 import { ProductVisual } from "./ProductVisual";
 import { VariantSelect } from "./VariantSelect";
 import { FavoriteButton } from "./FavoriteButton";
@@ -20,6 +21,7 @@ export function ProductCard({ product }: { product: Product }) {
   const { addItem } = useCart();
   const { products: allProducts } = useProducts();
   const router = useRouter();
+  const imgRef = useRef<HTMLImageElement>(null);
   const hasFlavors = product.flavors.length > 0;
   // Combo: por cada producto del combo que tenga variantes, un selector en la
   // tarjeta (igual que un producto normal). Lo elegido viaja al carrito.
@@ -52,7 +54,7 @@ export function ProductCard({ product }: { product: Product }) {
         : (product.stockQty ?? 0) === 1;
 
   return (
-    <article className="group flex h-full flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-card transition-all duration-300 hover:-translate-y-1 hover:border-accent/40 hover:shadow-card-hover">
+    <article className="group flex h-full flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-card transition-[transform,box-shadow,border-color] duration-300 ease-enter focus-within:ring-2 focus-within:ring-accent/40 hover:-translate-y-1 hover:border-accent/50 hover:shadow-card-hover motion-reduce:transition-none motion-reduce:hover:translate-y-0">
       {/* Media */}
       <div className="relative">
         {/* Etiquetas superiores */}
@@ -85,11 +87,12 @@ export function ProductCard({ product }: { product: Product }) {
           {product.image ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
+              ref={imgRef}
               src={product.image}
               alt={product.name}
               loading="lazy"
               decoding="async"
-              className="aspect-square w-full object-cover transition-transform duration-500 group-hover:scale-[1.06]"
+              className="aspect-square w-full object-cover transition-transform duration-500 ease-enter group-hover:scale-[1.06] motion-reduce:transition-none"
             />
           ) : (
             <ProductVisual
@@ -105,7 +108,7 @@ export function ProductCard({ product }: { product: Product }) {
 
       {/* Contenido */}
       <div className="flex flex-1 flex-col p-3.5">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-muted">
+        <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted">
           {brandName(product.brand)}
         </p>
         <h3 className="mt-0.5 line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-snug text-ink">
@@ -116,7 +119,7 @@ export function ProductCard({ product }: { product: Product }) {
 
         {/* Precios */}
         <div className="mt-2 flex min-h-[1.75rem] items-end gap-2">
-          <span className="text-lg font-extrabold text-primary">
+          <span className="font-display text-xl font-black leading-none text-primary">
             {formatPrice(product.price)}
           </span>
           {product.oldPrice && (
@@ -125,7 +128,7 @@ export function ProductCard({ product }: { product: Product }) {
             </span>
           )}
         </div>
-        <p className="mt-0.5 text-[11px] font-semibold text-green-700">
+        <p className="mt-1.5 inline-flex w-fit items-center rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-bold text-green-700">
           Con transferencia: {formatPrice(product.basePrice ?? transferPrice(product.price))}
         </p>
         {/* Selector de variante: píldora redondeada. Reserva el mismo alto en
@@ -174,7 +177,10 @@ export function ProductCard({ product }: { product: Product }) {
           <button
             type="button"
             disabled={product.inStock === false}
-            onClick={() => addItem(product, cartOpts())}
+            onClick={() => {
+              flyToCart(imgRef.current); // solo visual; addItem es el de siempre
+              addItem(product, cartOpts());
+            }}
             className="btn btn-outline btn-md w-full whitespace-nowrap"
           >
             <CartIcon className="h-4.5 w-4.5" /> Agregar

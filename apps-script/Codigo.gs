@@ -166,12 +166,21 @@ function handle(e) {
   var action = p.action || "version";
   var out;
   try {
+    // ---- Seguridad ---------------------------------------------------------
+    // Solo las acciones que necesita la tienda pública entran sin token (ver
+    // esAccionPublica). Todo lo demás (CRM) exige el token que devuelve
+    // crm_login; si falta o venció, responde {ok:false, error:"auth"}.
+    var esAdmin = tokenValido(p.token);
+    if (!esAdmin && !esAccionPublica(action, p)) {
+      return respond({ ok: false, error: "auth" }, p.callback);
+    }
     switch (action) {
       case "version":
         out = { ok: true, version: API_VERSION };
         break;
       case "productos_list":
-        out = { ok: true, data: listProductos() };
+        // Con token (CRM) incluye costos; público, sin costos.
+        out = { ok: true, data: listProductos(esAdmin) };
         break;
       case "productos_save":
         out = { ok: true, data: saveProducto(parseData(p)) };
@@ -218,8 +227,8 @@ function handle(e) {
       case "crm_login":
         out = crmLogin(p.pin);
         break;
-      case "evento_add":
-        out = { ok: true, data: addRow("Eventos", parseData(p)) };
+      case "crm_logout":
+        out = crmLogout(p.token);
         break;
       default:
         out = { ok: false, error: "Acción desconocida: " + action };
@@ -397,7 +406,9 @@ function siNo(v) {
 }
 
 // Devuelve los productos completos de la planilla.
-function listProductos() {
+// conCostos: true solo para el CRM (con token). La tienda pública no recibe
+// costo ni costoMoneda.
+function listProductos(conCostos) {
   var sh = sheetFor("Productos");
   var values = sh.getDataRange().getValues();
   if (values.length < 2) return [];
@@ -426,6 +437,12 @@ function listProductos() {
       ingredientes: String(row[16] || "").trim(),
       combo: String(row[17] || "").trim(),
     });
+  }
+  if (!conCostos) {
+    for (var j = 0; j < list.length; j++) {
+      delete list[j].costo;
+      delete list[j].costoMoneda;
+    }
   }
   return list;
 }
@@ -821,7 +838,7 @@ function registrar(obj) {
     email: obj.email,
     telefono: obj.telefono || "",
     origen: obj.origen || "web",
-    clave: hash(obj.password),
+    clave: nuevaClave(obj.password),
   });
   return { ok: true, user: { nombre: obj.nombre || "", email: obj.email } };
 }
@@ -836,8 +853,14 @@ function login(email, password) {
     iNom = keys.indexOf("nombre");
   for (var r = 1; r < data.length; r++) {
     if (low(data[r][iEmail]) === low(email)) {
-      if (String(data[r][iClave]) === hash(password))
+      if (verificarClave(data[r][iClave], password)) {
+        // Migración transparente: las claves viejas (sin salt) se regraban con
+        // el formato nuevo la primera vez que el cliente entra bien.
+        if (String(data[r][iClave]).indexOf("v2$") !== 0) {
+          sh.getRange(r + 1, iClave + 1).setValue(nuevaClave(password));
+        }
         return { ok: true, user: { nombre: data[r][iNom], email: data[r][iEmail] } };
+      }
       return { ok: false, error: "Contraseña incorrecta" };
     }
   }
@@ -852,7 +875,107 @@ function login(email, password) {
 function crmLogin(pin) {
   var stored = PropertiesService.getScriptProperties().getProperty("CRM_PIN");
   if (!stored) return { ok: false, error: "PIN no configurado" };
-  return { ok: String(pin || "").trim() === String(stored).trim() };
+  // Fuerza bruta: tras 5 PIN incorrectos se bloquea el login 15 minutos.
+  var cache = CacheService.getScriptCache();
+  var fails = Number(cache.get("crm_fails") || 0);
+  if (fails >= 5) return { ok: false, error: "bloqueado", minutos: 15 };
+  if (String(pin || "").trim() !== String(stored).trim()) {
+    cache.put("crm_fails", String(fails + 1), 15 * 60);
+    return { ok: false, error: "pin", restantes: Math.max(0, 4 - fails) };
+  }
+  cache.remove("crm_fails");
+  var t = crearToken();
+  return { ok: true, token: t.token, expires: t.expires };
+}
+
+function crmLogout(token) {
+  if (token) {
+    var t = leerTokens();
+    delete t[token];
+    guardarTokens(t);
+  }
+  return { ok: true };
+}
+
+/* ------------------------- Tokens de sesión del CRM ----------------------- */
+// crm_login devuelve un token aleatorio que vence a los 30 días. Se guardan en
+// la Propiedad del Script CRM_TOKENS ({ token: vencimientoMs }). Las acciones
+// de administración exigen un token válido (ver handle / esAccionPublica).
+
+var TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+function leerTokens() {
+  try {
+    return JSON.parse(PropertiesService.getScriptProperties().getProperty("CRM_TOKENS") || "{}");
+  } catch (e) {
+    return {};
+  }
+}
+function guardarTokens(t) {
+  PropertiesService.getScriptProperties().setProperty("CRM_TOKENS", JSON.stringify(t));
+}
+function tokenValido(token) {
+  if (!token) return false;
+  var t = leerTokens();
+  return Number(t[String(token)] || 0) > Date.now();
+}
+function crearToken() {
+  var t = leerTokens();
+  var now = Date.now();
+  for (var k in t) if (Number(t[k]) < now) delete t[k]; // limpia vencidos
+  var token = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, "");
+  t[token] = now + TOKEN_TTL_MS;
+  guardarTokens(t);
+  return { token: token, expires: t[token] };
+}
+
+// Acciones que la tienda pública puede llamar SIN token. Todo lo demás es del
+// CRM. "list" solo para Categorias; "add" solo para Pedidos y Suscriptores.
+function esAccionPublica(action, p) {
+  switch (action) {
+    case "version":
+    case "productos_list":
+    case "registrar":
+    case "login":
+    case "subir_comprobante":
+    case "mp_crear_pref":
+    case "mp_webhook":
+    case "crm_login":
+    case "crm_logout":
+      return true;
+    case "list":
+      return p.tab === "Categorias";
+    case "add":
+      return p.tab === "Pedidos" || p.tab === "Suscriptores";
+    default:
+      return false;
+  }
+}
+
+/* ------------------------- Contraseñas de clientes ------------------------ */
+// Formato nuevo: "v2$<salt>$<sha256(salt::password)>" (salt único por cuenta).
+// Las claves viejas (sha256 con prefijo fijo, sin salt) siguen validando y se
+// migran solas al formato nuevo en el primer login correcto.
+
+function hashV2(pwd, salt) {
+  var raw = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, salt + "::" + pwd);
+  return raw
+    .map(function (b) {
+      return ("0" + (b & 0xff).toString(16)).slice(-2);
+    })
+    .join("");
+}
+function nuevaClave(pwd) {
+  var salt = Utilities.getUuid().replace(/-/g, "");
+  return "v2$" + salt + "$" + hashV2(pwd, salt);
+}
+function verificarClave(stored, pwd) {
+  var s = String(stored || "");
+  if (s.indexOf("v2$") === 0) {
+    var parts = s.split("$");
+    return parts.length === 3 && hashV2(pwd, parts[1]) === parts[2];
+  }
+  return s === hash(pwd); // formato viejo
 }
 
 function hash(txt) {

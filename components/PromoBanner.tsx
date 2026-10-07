@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRightIcon } from "./Icons";
+import { Reveal } from "./motion/Reveal";
 
 /**
  * Banner promocional intermedio. Reutilizable y configurable.
@@ -21,24 +22,24 @@ export function PromoBanner({
   const isAccent = variant === "accent";
   return (
     <div
-      className={`relative flex flex-col items-start gap-4 overflow-hidden rounded-2xl p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8 ${
+      className={`relative flex flex-col items-start gap-5 overflow-hidden rounded-2xl p-7 shadow-card sm:flex-row sm:items-center sm:justify-between sm:p-9 ${
         isAccent ? "bg-accent text-primary" : "bg-primary text-white"
       }`}
     >
       <div
-        className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full opacity-20"
+        className="pointer-events-none absolute -right-12 -top-12 h-64 w-64 rounded-full opacity-25"
         style={{ background: isAccent ? "rgb(var(--color-primary))" : "rgb(var(--color-accent))" }}
         aria-hidden
       />
       <div className="relative max-w-lg">
-        <h3 className="font-display text-xl font-extrabold sm:text-2xl">{title}</h3>
-        <p className={`mt-1.5 text-sm ${isAccent ? "text-primary/80" : "text-white/80"}`}>
+        <h3 className="font-display text-2xl font-black leading-tight sm:text-3xl">{title}</h3>
+        <p className={`mt-2 text-sm sm:text-base ${isAccent ? "text-primary/80" : "text-white/85"}`}>
           {text}
         </p>
       </div>
       <Link
         href={ctaHref}
-        className={`btn btn-md relative shrink-0 ${
+        className={`btn btn-md relative shrink-0 font-bold ${
           isAccent
             ? "bg-primary text-white hover:brightness-110"
             : "bg-accent text-primary hover:brightness-105"
@@ -54,7 +55,7 @@ export function PromoBanner({
 export function PromoBannerRow() {
   return (
     <section className="container-page py-6">
-      <div className="grid gap-4 lg:grid-cols-2">
+      <Reveal className="grid gap-4 lg:grid-cols-2" y={20} stagger={0.12}>
         <PromoBanner
           variant="accent"
           title="Combos Suple Market"
@@ -69,7 +70,7 @@ export function PromoBannerRow() {
           ctaLabel="Cómo comprar"
           ctaHref="/contacto#pagos"
         />
-      </div>
+      </Reveal>
     </section>
   );
 }

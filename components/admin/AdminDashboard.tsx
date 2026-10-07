@@ -5,6 +5,7 @@ import { useProducts } from "@/context/ProductsContext";
 import { listTable } from "@/lib/api";
 import { formatPrice } from "@/lib/format";
 import { UserIcon, ClipboardIcon, ChevronRightIcon } from "@/components/Icons";
+import { useCountUp } from "./useCountUp";
 
 type Section = "productos" | "clientes" | "pedidos" | "facturacion";
 
@@ -95,6 +96,8 @@ export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
   }, []);
 
   const sinStock = products.filter((p) => p.inStock === false).slice(0, 8);
+  const clientesN = useCountUp(m.clientes);
+  const pedidosN = useCountUp(m.pedidos);
 
   return (
     <div className="space-y-5">
@@ -107,7 +110,7 @@ export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
           <span className="grid h-10 w-10 place-items-center rounded-lg bg-accent-soft text-primary">
             <UserIcon className="h-5 w-5" />
           </span>
-          <span className="font-display text-2xl font-black text-primary">{m.clientes}</span>
+          <span className="font-display text-2xl font-black tabular-nums text-primary">{clientesN}</span>
           <span className="text-xs font-medium text-muted">Clientes</span>
         </button>
         <button
@@ -117,7 +120,7 @@ export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
           <span className="grid h-10 w-10 place-items-center rounded-lg bg-accent-soft text-primary">
             <ClipboardIcon className="h-5 w-5" />
           </span>
-          <span className="font-display text-2xl font-black text-primary">{m.pedidos}</span>
+          <span className="font-display text-2xl font-black tabular-nums text-primary">{pedidosN}</span>
           <span className="text-xs font-medium text-muted">Pedidos</span>
         </button>
       </div>
@@ -194,6 +197,7 @@ function Mini({
   tone: "amber" | "sale";
   onClick: () => void;
 }) {
+  const v = useCountUp(value);
   const color =
     value === 0
       ? "text-muted"
@@ -205,7 +209,7 @@ function Mini({
       onClick={onClick}
       className="rounded-xl border border-line bg-white p-3 text-center transition-colors active:bg-page-soft"
     >
-      <p className={`font-display text-2xl font-black ${color}`}>{value}</p>
+      <p className={`font-display text-2xl font-black tabular-nums ${color}`}>{v}</p>
       <p className="mt-0.5 text-[11px] font-medium leading-tight text-muted">{label}</p>
     </button>
   );
@@ -222,6 +226,7 @@ function Money({
   sub?: string;
   green?: boolean;
 }) {
+  const v = useCountUp(value);
   return (
     <div
       className={`rounded-xl border p-4 ${
@@ -233,7 +238,7 @@ function Money({
           green ? "text-green-600" : "text-primary"
         }`}
       >
-        {formatPrice(value)}
+        {formatPrice(Math.round(v))}
       </p>
       <p className="mt-1 text-xs font-semibold text-ink">{label}</p>
       {sub && <p className="text-[11px] text-muted">{sub}</p>}

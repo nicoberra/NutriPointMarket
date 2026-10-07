@@ -10,6 +10,7 @@ import { transferPrice } from "@/lib/config";
 import { useCart } from "@/context/CartContext";
 import { useProducts } from "@/context/ProductsContext";
 import { availableVariants, comboComponents, comboStockMax } from "@/lib/stock";
+import { flyToCart } from "@/lib/motion";
 import { ProductVisual } from "./ProductVisual";
 import { Rating } from "./Rating";
 import { QuantitySelector } from "./QuantitySelector";
@@ -134,6 +135,7 @@ export function ProductDetail({ product: initial }: { product: Product }) {
             {mainImage ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
+                data-detail-image
                 src={mainImage}
                 alt={product.name}
                 decoding="async"
@@ -332,7 +334,14 @@ export function ProductDetail({ product: initial }: { product: Product }) {
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <button onClick={() => add()} disabled={soldOut} className="btn btn-primary btn-lg">
+            <button
+              onClick={() => {
+                flyToCart(document.querySelector("[data-detail-image]"));
+                add();
+              }}
+              disabled={soldOut}
+              className="btn btn-primary btn-lg"
+            >
               <CartIcon className="h-5 w-5" />
               {soldOut ? "Sin stock" : "Agregar al carrito"}
             </button>

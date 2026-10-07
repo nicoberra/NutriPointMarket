@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { ASSET_PREFIX, SITE } from "@/lib/config";
@@ -16,11 +16,36 @@ export function Header() {
   const { user } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // Se compacta al scrollear (menos alto, más sombra) y vuelve arriba de todo.
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setCompact(window.scrollY > 24);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // El contador del carrito rebota cuando suma un ítem.
+  const [bump, setBump] = useState(false);
+  const prevCount = useRef(count);
+  useEffect(() => {
+    if (count > prevCount.current) setBump(true);
+    prevCount.current = count;
+  }, [count]);
+
   return (
-    <header className="sticky top-0 z-50 bg-primary text-white shadow-md">
+    <header
+      className={`sticky top-0 z-50 bg-primary text-white transition-shadow duration-200 ${
+        compact ? "shadow-lg" : "shadow-md"
+      }`}
+    >
       <div className="container-page">
-        {/* Fila principal */}
-        <div className="flex items-center gap-2 py-3 sm:gap-3">
+        {/* Fila principal (el padding se achica al scrollear) */}
+        <div
+          className={`flex items-center gap-2 transition-[padding] duration-200 ease-move motion-reduce:transition-none sm:gap-3 ${
+            compact ? "py-1.5" : "py-3"
+          }`}
+        >
           {/* Hamburguesa (mobile) */}
           <button
             type="button"
@@ -78,6 +103,7 @@ export function Header() {
               type="button"
               onClick={openCart}
               aria-label="Abrir carrito"
+              data-cart-target
               className="relative grid h-10 w-10 place-items-center rounded-lg transition-colors hover:bg-white/10"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -89,7 +115,12 @@ export function Header() {
                 className="h-8 w-8 object-contain"
               />
               {count > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 grid h-4.5 min-w-4.5 place-items-center rounded-full bg-accent px-1 text-[10px] font-bold text-primary">
+                <span
+                  onAnimationEnd={() => setBump(false)}
+                  className={`absolute -right-0.5 -top-0.5 grid h-4.5 min-w-4.5 place-items-center rounded-full bg-accent px-1 text-[10px] font-bold text-primary ${
+                    bump ? "animate-badge-pop" : ""
+                  }`}
+                >
                   {count}
                 </span>
               )}
