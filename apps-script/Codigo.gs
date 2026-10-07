@@ -987,6 +987,40 @@ function hash(txt) {
     .join("");
 }
 
+/* ---------------------- Restaurar costos (una sola vez) ------------------ */
+// Ejecutar desde el editor (Ejecutar ▶ restaurarCostos) si los costos de la
+// planilla quedaron en 0: vuelve a escribir los costos de respaldo (ARS).
+// Es inofensivo repetirlo. No requiere redeploy.
+function restaurarCostos() {
+  var COSTOS = {
+    "Tape": 1000,
+    "WHEY PROTEIN TRUE MADE 1kg": 67545,
+    "WHEY PROTEIN DOYPACK 1kg": 69584.19,
+    "CREATINA MICRONIZADA SABOR NEUTRO 150gr": 15122,
+    "CREATINA MICRONIZADA SABOR NEUTRO 300gr": 19400,
+    "CREATINA MONOHIDRATO  300 gr": 20077,
+    "CREATINA MONOHIDRATO / DOYPACK. 300 gr DOYPACK": 18132,
+    "Pancakes Proteicos Dulces": 9832,
+    "Pancakes Proteicos salados": 9832,
+    "Proteína + Creatina": 89661,
+    "Shaker ENA True Made con compartimentos": 4165,
+    "Proteina + Creatina + Shaker": 125000
+  };
+  var ok = [], falta = [];
+  for (var nombre in COSTOS) {
+    var n = findRowById("Productos", nombre);
+    if (n > 0) {
+      updateRowByNumber("Productos", n, { costo: COSTOS[nombre], costoMoneda: "ARS" });
+      ok.push(nombre + " = " + COSTOS[nombre]);
+    } else {
+      falta.push(nombre);
+    }
+  }
+  Logger.log("Costos restaurados (" + ok.length + "):\n" + ok.join("\n"));
+  if (falta.length) Logger.log("No encontrados (renombrados?): " + falta.join(", "));
+  return { restaurados: ok.length, noEncontrados: falta };
+}
+
 /* -------------------------------- Utils ---------------------------------- */
 
 function parseData(p) {
