@@ -196,7 +196,7 @@ export function FeaturedVideoWall({
             {doubled.map((p, i) => (
               <Link
                 key={`${p.id}-${i}`}
-                href={`/producto?slug=${p.slug}`}
+                href={`/producto/${p.slug}/`}
                 title={p.name}
                 aria-label={p.name}
                 draggable={false}

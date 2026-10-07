@@ -96,7 +96,7 @@ export function Navbar() {
                         {prods.map((p) => (
                           <li key={p.id}>
                             <Link
-                              href={`/producto?slug=${p.slug}`}
+                              href={`/producto/${p.slug}/`}
                               className="block truncate text-sm text-muted transition-colors hover:text-primary"
                             >
                               {p.name}
@@ -136,7 +136,7 @@ export function Navbar() {
         <Menu label="Combos" href="/productos?categoria=combos" width="w-72">
           {combos.length > 0 ? (
             combos.map((p) => (
-              <Link key={p.id} href={`/producto?slug=${p.slug}`} className={ITEM}>
+              <Link key={p.id} href={`/producto/${p.slug}/`} className={ITEM}>
                 <span className="block truncate">{p.name}</span>
                 <span className="block text-xs font-bold text-primary">{formatPrice(p.price)}</span>
               </Link>
@@ -153,7 +153,7 @@ export function Navbar() {
         <Menu label="Ofertas" href="/ofertas" highlight width="w-80">
           {ofertas.length > 0 ? (
             ofertas.map((p) => (
-              <Link key={p.id} href={`/producto?slug=${p.slug}`} className={ITEM}>
+              <Link key={p.id} href={`/producto/${p.slug}/`} className={ITEM}>
                 <span className="flex items-center justify-between gap-2">
                   <span className="truncate">{p.name}</span>
                   <span className="shrink-0 rounded-full bg-sale px-2 py-0.5 text-[11px] font-bold text-white">

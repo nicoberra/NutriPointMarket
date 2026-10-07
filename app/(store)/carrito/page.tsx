@@ -45,7 +45,7 @@ export default function CarritoPage() {
                   key={item.key}
                   className="flex gap-4 rounded-xl border border-line bg-white p-3 sm:p-4"
                 >
-                  <Link href={`/producto?slug=${item.product.slug}`} className="shrink-0">
+                  <Link href={`/producto/${item.product.slug}/`} className="shrink-0">
                     {(() => {
                       const img =
                         item.product.variantImages?.[item.flavor ?? ""]?.[0] ??
@@ -72,7 +72,7 @@ export default function CarritoPage() {
                       {brandName(item.product.brand)}
                     </p>
                     <Link
-                      href={`/producto?slug=${item.product.slug}`}
+                      href={`/producto/${item.product.slug}/`}
                       className="text-sm font-semibold text-ink hover:text-primary sm:text-base"
                     >
                       {item.product.name}

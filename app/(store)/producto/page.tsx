@@ -1,64 +1,30 @@
 "use client";
 
-import { Suspense } from "react";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useProducts } from "@/context/ProductsContext";
-import { categoryMap } from "@/data/categories";
-import { ProductDetail } from "@/components/ProductDetail";
-import { RelatedProducts } from "@/components/RelatedProducts";
-import { PageBanner } from "@/components/PageBanner";
+import { Suspense, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ProductoView } from "@/components/ProductoView";
 
-function ProductoContent() {
+/**
+ * Compatibilidad con los links viejos /producto?slug=xxx: muestra el producto
+ * y redirige a su URL propia /producto/xxx/.
+ */
+function Legacy() {
   const params = useSearchParams();
+  const router = useRouter();
   const slug = params.get("slug") ?? "";
-  const { getBySlug, loading } = useProducts();
-  const product = getBySlug(slug);
 
-  if (!product) {
-    // Mientras carga la planilla o si el producto no existe
+  useEffect(() => {
+    if (slug) router.replace(`/producto/${slug}/`);
+  }, [slug, router]);
+
+  if (!slug) {
     return (
-      <div className="container-page py-20 text-center">
-        {loading ? (
-          <p className="text-sm text-muted">Cargando producto…</p>
-        ) : (
-          <>
-            <h1 className="font-display text-xl font-bold text-primary">
-              Producto no encontrado
-            </h1>
-            <p className="mt-2 text-sm text-muted">
-              Puede que ya no esté disponible.
-            </p>
-            <Link href="/productos" className="btn btn-primary btn-md mt-5">
-              Ver productos
-            </Link>
-          </>
-        )}
+      <div className="container-page py-20 text-center text-sm text-muted">
+        Producto no indicado.
       </div>
     );
   }
-
-  const category = categoryMap[product.category];
-
-  return (
-    <>
-      <PageBanner
-        title={product.name}
-        crumbs={[
-          { label: "Productos", href: "/productos" },
-          {
-            label: category?.name ?? "",
-            href: `/productos?categoria=${product.category}`,
-          },
-          { label: product.name },
-        ]}
-      />
-      <ProductDetail product={product} />
-      <div className="border-t border-line bg-page-soft">
-        <RelatedProducts slug={product.slug} />
-      </div>
-    </>
-  );
+  return <ProductoView slug={slug} />;
 }
 
 export default function ProductoPage() {
@@ -70,7 +36,7 @@ export default function ProductoPage() {
         </div>
       }
     >
-      <ProductoContent />
+      <Legacy />
     </Suspense>
   );
 }
