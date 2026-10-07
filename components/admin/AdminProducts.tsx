@@ -11,6 +11,7 @@ import {
   saveProduct,
   uploadProductImage,
   deleteProductImage,
+  renameProduct,
   deleteRow,
   type ProductInput,
 } from "@/lib/api";
@@ -758,6 +759,7 @@ function ProductSheet({
   const { products: allProducts } = useProducts();
   const isEdit = !!product;
   const [nombre, setNombre] = useState(product?.name ?? "");
+  const [renameError, setRenameError] = useState<string | null>(null);
   const [comboRows, setComboRows] = useState<{ n: string; q: string }[]>(
     product?.combo ? product.combo.map((c) => ({ n: c.n, q: String(c.q) })) : [],
   );
@@ -852,8 +854,17 @@ function ProductSheet({
     0,
   );
 
-  const submit = () => {
+  const submit = async () => {
     if (!nombre.trim()) return;
+    // Cambio de nombre: primero se renombra la fila (y los combos que lo
+    // usan) y recién después se guarda el resto con el nombre nuevo.
+    if (isEdit && product && nombre.trim() !== product.name) {
+      const ok = await renameProduct(product.name, nombre.trim());
+      if (!ok) {
+        setRenameError("No se pudo renombrar. ¿Ya existe otro producto con ese nombre?");
+        return;
+      }
+    }
     const cantNum = cantidad === "" ? 0 : Number(cantidad);
     // Si las variantes tienen stock, el total sale de la suma de ellas.
     const totalStock = hasVariantStock ? variantTotal : cantNum;
@@ -911,16 +922,21 @@ function ProductSheet({
             <Field label="Nombre del producto">
               <input
                 value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                readOnly={isEdit}
-                className={`input h-11 text-base ${isEdit ? "bg-page-soft text-muted" : ""}`}
+                onChange={(e) => {
+                  setNombre(e.target.value);
+                  setRenameError(null);
+                }}
+                className="input h-11 text-base"
                 placeholder="Ej: Whey Protein 1 Kg"
               />
             </Field>
           </div>
-          {isEdit && (
+          {renameError && (
+            <p className="-mt-1 text-[11px] font-semibold text-sale lg:col-span-2">{renameError}</p>
+          )}
+          {isEdit && !renameError && (
             <p className="-mt-1 text-[11px] text-muted lg:col-span-2">
-              El nombre es la clave; no se puede cambiar desde acá.
+              Si cambiás el nombre, se renombra en la planilla y en los combos que lo incluyen.
             </p>
           )}
 
