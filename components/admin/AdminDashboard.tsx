@@ -102,6 +102,73 @@ export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
 
   return (
     <div className="space-y-5">
+      {/* Avisos primero (solo los que tienen algo): sin foto / sin stock */}
+      {(sinFoto.length > 0 || sinStock.length > 0) && (
+        <section className="space-y-4">
+          {sinFoto.length > 0 && (
+            <div>
+              <h2 className="mb-2 flex items-center gap-2 text-sm font-bold text-ink">
+                Sin foto
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">
+                  {sinFoto.length} · ocultos en la web
+                </span>
+              </h2>
+              <ul className="space-y-2 sm:grid sm:grid-cols-2 sm:gap-2 sm:space-y-0 lg:grid-cols-3">
+                {sinFoto.slice(0, 8).map((p) => (
+                  <li
+                    key={p.id}
+                    className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-ink">{p.name}</p>
+                      <p className="text-xs text-muted">{p.brand || "—"}</p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700">
+                      Falta foto
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <button
+                onClick={() => onGo("productos")}
+                className="mt-2 flex w-full items-center justify-between rounded-xl border border-line bg-white p-3 text-sm font-semibold text-primary"
+              >
+                Cargar fotos en Productos
+                <ChevronRightIcon className="h-5 w-5" />
+              </button>
+            </div>
+          )}
+
+          {sinStock.length > 0 && (
+            <div>
+              <h2 className="mb-2 flex items-center gap-2 text-sm font-bold text-ink">
+                Sin stock
+                <span className="rounded-full bg-sale/10 px-2 py-0.5 text-[11px] font-bold text-sale">
+                  {sinStock.length}
+                </span>
+              </h2>
+              <ul className="space-y-2 sm:grid sm:grid-cols-2 sm:gap-2 sm:space-y-0 lg:grid-cols-3">
+                {sinStock.map((p) => (
+                  <li
+                    key={p.id}
+                    onClick={() => onGo("productos")}
+                    className="flex cursor-pointer items-center justify-between rounded-xl border border-line bg-white p-3 transition-colors hover:border-accent"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-ink">{p.name}</p>
+                      <p className="text-xs text-muted">{formatPrice(p.basePrice ?? p.price)}</p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-sale/10 px-2.5 py-1 text-xs font-bold text-sale">
+                      Sin stock
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Clientes y Pedidos */}
       <div className="grid grid-cols-2 gap-3">
         <button
@@ -136,96 +203,31 @@ export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
         </div>
       </section>
 
-      {/* Facturación y beneficio */}
+      {/* Facturación y beneficio: las tarjetas llevan a Facturación */}
       <section>
         <h2 className="mb-2 text-sm font-bold text-ink">Facturación y beneficio</h2>
         <div className="grid grid-cols-2 gap-3">
-          <Money label="Facturado este mes" value={m.mesRev} sub={`Semana: ${formatPrice(m.semRev)}`} />
+          <Money
+            label="Facturado este mes"
+            value={m.mesRev}
+            sub={`Semana: ${formatPrice(m.semRev)}`}
+            onClick={() => onGo("facturacion")}
+          />
           <Money
             label="Beneficio este mes"
             value={m.mesProf}
             sub={`Semana: ${formatPrice(m.semProf)}`}
             green
+            onClick={() => onGo("facturacion")}
           />
         </div>
-        <button
-          onClick={() => onGo("facturacion")}
-          className="mt-3 flex w-full items-center justify-between rounded-xl border border-line bg-white p-4 text-sm font-semibold text-primary"
-        >
-          Ver facturación completa
-          <ChevronRightIcon className="h-5 w-5" />
-        </button>
       </section>
 
-      {/* Sin foto: ocultos en la web hasta que tengan foto */}
-      <section>
-        <h2 className="mb-2 flex items-center gap-2 text-sm font-bold text-ink">
-          Sin foto
-          {sinFoto.length > 0 && (
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">
-              {sinFoto.length} · ocultos en la web
-            </span>
-          )}
-        </h2>
-        {sinFoto.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-line bg-white py-6 text-center text-sm text-muted">
-            Todos los productos tienen foto 📸
-          </p>
-        ) : (
-          <>
-            <ul className="space-y-2 sm:grid sm:grid-cols-2 sm:gap-2 sm:space-y-0 lg:grid-cols-3">
-              {sinFoto.slice(0, 8).map((p) => (
-                <li
-                  key={p.id}
-                  className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-3"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-ink">{p.name}</p>
-                    <p className="text-xs text-muted">{p.brand || "—"}</p>
-                  </div>
-                  <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700">
-                    Falta foto
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <button
-              onClick={() => onGo("productos")}
-              className="mt-3 flex w-full items-center justify-between rounded-xl border border-line bg-white p-4 text-sm font-semibold text-primary"
-            >
-              Cargar fotos en Productos
-              <ChevronRightIcon className="h-5 w-5" />
-            </button>
-          </>
-        )}
-      </section>
-
-      {/* Sin stock */}
-      <section>
-        <h2 className="mb-2 text-sm font-bold text-ink">Sin stock</h2>
-        {sinStock.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-line bg-white py-6 text-center text-sm text-muted">
-            Todos los productos con stock 👍
-          </p>
-        ) : (
-          <ul className="space-y-2 sm:grid sm:grid-cols-2 sm:gap-2 sm:space-y-0 lg:grid-cols-3">
-            {sinStock.map((p) => (
-              <li
-                key={p.id}
-                className="flex items-center justify-between rounded-xl border border-line bg-white p-3"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-ink">{p.name}</p>
-                  <p className="text-xs text-muted">{formatPrice(p.basePrice ?? p.price)}</p>
-                </div>
-                <span className="shrink-0 rounded-full bg-sale/10 px-2.5 py-1 text-xs font-bold text-sale">
-                  Sin stock
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {sinFoto.length === 0 && sinStock.length === 0 && (
+        <p className="rounded-xl border border-dashed border-line bg-white py-4 text-center text-sm text-muted">
+          Todo en orden: todos los productos tienen foto y stock 👍
+        </p>
+      )}
     </div>
   );
 }
@@ -264,16 +266,20 @@ function Money({
   value,
   sub,
   green,
+  onClick,
 }: {
   label: string;
   value: number;
   sub?: string;
   green?: boolean;
+  onClick?: () => void;
 }) {
   const v = useCountUp(value);
   return (
-    <div
-      className={`rounded-xl border p-4 ${
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-xl border p-4 text-left transition-colors active:bg-page-soft ${
         green ? "border-green-200 bg-green-50" : "border-line bg-white"
       }`}
     >
@@ -286,6 +292,9 @@ function Money({
       </p>
       <p className="mt-1 text-xs font-semibold text-ink">{label}</p>
       {sub && <p className="text-[11px] text-muted">{sub}</p>}
-    </div>
+      <p className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-primary">
+        Ver facturación <ChevronRightIcon className="h-3.5 w-3.5" />
+      </p>
+    </button>
   );
 }

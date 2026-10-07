@@ -346,6 +346,19 @@ function ProductRow({
     setCosto(product.cost || "");
     setMoneda(product.costCurrency ?? "ARS");
   }, [product.cost, product.costCurrency]);
+  // El precio del snapshot/caché puede estar viejo: cuando llega el dato
+  // real de la planilla, los campos se actualizan (si no, el CRM mostraba un
+  // precio desfasado y al tocar un campo lo guardaba).
+  const descModeRef = useRef(descMode);
+  descModeRef.current = descMode;
+  useEffect(() => {
+    const base = product.basePrice ?? product.price;
+    const old = product.baseOldPrice && product.baseOldPrice > base ? product.baseOldPrice : undefined;
+    setPrecioNormal(old ?? base);
+    setDescVal(
+      !old ? "" : descModeRef.current === "%" ? Math.round(((old - base) / old) * 100) : old - base,
+    );
+  }, [product.basePrice, product.baseOldPrice, product.price]);
   const [cantidad, setCantidad] = useState<number | "">(product.stockQty ?? "");
   const hasVars = !!(product.variants && product.variants.length);
   // Visor de fotos (tocar una foto la abre grande, con descarga).
