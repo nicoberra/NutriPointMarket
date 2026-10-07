@@ -203,8 +203,9 @@ export function FeaturedVideoWall({
                 onClickCapture={(e) => {
                   if (movedRef.current) e.preventDefault(); // fue un arrastre, no un toque
                 }}
-                className="block shrink-0 rounded-2xl bg-white/95 p-1.5 shadow-card transition-transform duration-200 ease-enter hover:scale-105 motion-reduce:transition-none"
+                className="block shrink-0 overflow-hidden rounded-2xl transition-transform duration-200 ease-enter hover:scale-105 motion-reduce:transition-none"
               >
+                {/* Solo la foto, con puntas redondeadas (sin marco) */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={p.image}
@@ -212,7 +213,7 @@ export function FeaturedVideoWall({
                   loading="lazy"
                   decoding="async"
                   draggable={false}
-                  className="aspect-square w-full rounded-xl object-cover"
+                  className="aspect-square w-full rounded-2xl object-cover"
                 />
               </Link>
             ))}
