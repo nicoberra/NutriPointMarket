@@ -294,6 +294,12 @@ function ProductRow({
   const [destacado, setDestacado] = useState<boolean>(product.featured);
   const [costo, setCosto] = useState<number | "">(product.cost || "");
   const [moneda, setMoneda] = useState<"USD" | "ARS">(product.costCurrency ?? "ARS");
+  // El costo llega recién con el token (1-2 s después de pintar desde el
+  // caché): cuando cambia en los datos, se refleja en el campo.
+  useEffect(() => {
+    setCosto(product.cost || "");
+    setMoneda(product.costCurrency ?? "ARS");
+  }, [product.cost, product.costCurrency]);
   const [cantidad, setCantidad] = useState<number | "">(product.stockQty ?? "");
   const hasVars = !!(product.variants && product.variants.length);
   const [varQty, setVarQty] = useState<Record<string, string>>(
