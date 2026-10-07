@@ -360,6 +360,11 @@ function ProductRow({
           <p className="text-[11px] font-bold uppercase text-muted">
             {product.brand || "—"}
           </p>
+          {!product.image && (
+            <span className="mb-0.5 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">
+              Sin foto · oculto en la web
+            </span>
+          )}
           {/* Tocar el nombre también abre el editor */}
           <button
             type="button"
