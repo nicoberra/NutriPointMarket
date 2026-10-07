@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import Link from "next/link";
-import { gsap, useGSAP, MOTION_OK } from "@/lib/gsap";
+import { gsap, useGSAP, MOTION_OK, guardEntrance } from "@/lib/gsap";
 import type { Product } from "@/lib/types";
 import { ProductCard } from "./ProductCard";
 import { ChevronLeftIcon, ChevronRightIcon, ArrowRightIcon } from "./Icons";
@@ -36,7 +36,7 @@ export function ProductCarousel({
         if (!root) return;
         const cards = scroller.current ? Array.from(scroller.current.children) : [];
         if (cards.length) {
-          gsap.from(cards, {
+          const tween = gsap.from(cards, {
             autoAlpha: 0,
             y: 24,
             duration: 0.6,
@@ -45,6 +45,7 @@ export function ProductCarousel({
             clearProps: "transform,opacity,visibility",
             scrollTrigger: { trigger: root, start: "top 85%", once: true },
           });
+          guardEntrance(tween, 8000);
         }
         const bg = root.querySelector("[data-parallax-bg]");
         if (bg) {

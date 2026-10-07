@@ -17,4 +17,17 @@ gsap.registerPlugin(useGSAP, ScrollTrigger, Flip, SplitText);
 export const MOTION_OK = "(prefers-reduced-motion: no-preference)";
 export const MOTION_REDUCE = "(prefers-reduced-motion: reduce)";
 
+/**
+ * Seguro anti "contenido invisible": si una animación de ENTRADA (que arranca
+ * con el elemento oculto) no terminó pasados `ms`, se fuerza al estado final.
+ * Cubre pestañas sin frames (segundo plano, visores) o cualquier traba del
+ * ticker: la tienda nunca queda con elementos ocultos.
+ */
+export function guardEntrance(anim: gsap.core.Animation, ms = 4000): void {
+  const id = setTimeout(() => {
+    if (anim.progress() < 1) anim.progress(1);
+  }, ms);
+  anim.then(() => clearTimeout(id)).catch(() => {});
+}
+
 export { gsap, useGSAP, ScrollTrigger, Flip, SplitText };

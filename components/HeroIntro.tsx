@@ -1,6 +1,6 @@
 "use client";
 
-import { gsap, useGSAP, SplitText, MOTION_OK } from "@/lib/gsap";
+import { gsap, useGSAP, SplitText, MOTION_OK, guardEntrance } from "@/lib/gsap";
 
 /**
  * Coreografía de entrada del hero (≈1,1 s): badge → título palabra por palabra
@@ -19,6 +19,7 @@ export function HeroIntro() {
       const title = q("[data-hero-title]")[0];
 
       const tl = gsap.timeline({ defaults: { ease: "power3.out", duration: 0.6 } });
+      guardEntrance(tl, 3500);
       tl.from(q("[data-hero-badge]"), { autoAlpha: 0, y: 12, duration: 0.4 });
 
       if (title) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, type ReactNode } from "react";
-import { gsap, useGSAP, MOTION_OK } from "@/lib/gsap";
+import { gsap, useGSAP, MOTION_OK, guardEntrance } from "@/lib/gsap";
 
 /**
  * Revela sus hijos directos al entrar en pantalla (una sola vez), en stagger.
@@ -30,7 +30,7 @@ export function Reveal({
         if (!el) return;
         const items = Array.from(el.children);
         if (!items.length) return;
-        gsap.from(items, {
+        const tween = gsap.from(items, {
           autoAlpha: 0,
           y,
           duration: 0.65,
@@ -39,6 +39,7 @@ export function Reveal({
           clearProps: "transform,opacity,visibility",
           scrollTrigger: { trigger: el, start: "top 88%", once: true },
         });
+        guardEntrance(tween, 8000);
       });
       return () => mm.revert();
     },
