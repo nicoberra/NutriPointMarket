@@ -26,6 +26,24 @@ export const SITE = {
 };
 
 /**
+ * Nutricionista recomendada (sección en la home).
+ * TODO: completar con los datos reales (nombre, matrícula, WhatsApp, foto).
+ * La foto va en public/ (por ejemplo /nutri.jpg); mientras tanto se usa un
+ * placeholder.
+ */
+export const NUTRI = {
+  name: "Nombre Apellido", // TODO
+  title: "Lic. en Nutrición",
+  license: "M.N. 00000", // TODO (o "" para ocultarla)
+  photo: "/nutri.svg", // TODO: reemplazar por la foto real (ej. /nutri.jpg)
+  whatsapp: "5491100000000", // TODO: número con 549 + código de área, sin + ni espacios
+  instagram: "", // TODO opcional: URL del perfil (vacío = no se muestra el botón)
+  bio: "Nutricionista especializada en nutrición deportiva. Planes personalizados según tu objetivo: ganar masa muscular, bajar grasa o mejorar tu rendimiento. Atención online y presencial.", // TODO
+  tags: ["Nutrición deportiva", "Planes personalizados", "Online y presencial"], // TODO
+  message: "Hola! Vengo de Suple Market y quería consultar por una consulta de nutrición.",
+};
+
+/**
  * Datos para pagos por TRANSFERENCIA. Reemplazá por los reales (te los muestra
  * la web al cliente cuando elige transferencia).
  */

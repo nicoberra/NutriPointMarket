@@ -5,6 +5,7 @@ import { ASSET_PREFIX } from "@/lib/config";
 import { HomeCarousel } from "@/components/HomeCarousel";
 import { PromoBannerRow } from "@/components/PromoBanner";
 import { Newsletter } from "@/components/Newsletter";
+import { NutriRecomendada } from "@/components/NutriRecomendada";
 
 export default function HomePage() {
   return (
@@ -37,6 +38,8 @@ export default function HomePage() {
       <HomeCarousel kind="onSale" />
 
       <PromoBannerRow />
+
+      <NutriRecomendada />
 
       <HomeCarousel kind="bestSellers" />
 
