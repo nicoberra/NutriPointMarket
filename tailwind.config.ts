@@ -106,7 +106,7 @@ const config: Config = {
         "toast-in": "toast-in 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
         "badge-pop": "badge-pop 0.5s cubic-bezier(0.22, 1, 0.36, 1)",
         shake: "shake 0.35s cubic-bezier(0.36, 0.07, 0.19, 0.97)",
-        "section-in": "slide-up 0.22s cubic-bezier(0.22, 1, 0.36, 1) both",
+        "section-in": "slide-up 0.22s cubic-bezier(0.22, 1, 0.36, 1)", // SIN fill-mode: un transform retenido rompe los modales fixed
         "toast-out": "toast-out 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards",
         "wa-pulse": "wa-pulse 5s ease-out infinite",
       },
