@@ -9,19 +9,22 @@ const CONFIG = {
     eyebrow: "Ofertas del mes",
     title: "Nuestros elegidos del mes",
     viewAllHref: "/ofertas",
-    bg: "/banner-elegidos.jpg", // banner de fondo (public/)
+    bg: "/banner-elegidos.jpg", // poster mientras carga el video
+    video: { desktop: "/videos/elegidos-compu.mp4", mobile: "/videos/elegidos-celu.mp4" },
   },
   featured: {
     eyebrow: "Lo más elegido",
     title: "Productos destacados",
     viewAllHref: "/productos?orden=destacados",
     bg: "",
+    video: null,
   },
   bestSellers: {
     eyebrow: "Ranking",
     title: "Los más vendidos",
     viewAllHref: "/productos?orden=mas-vendidos",
     bg: "",
+    video: null,
   },
 } as const;
 
@@ -41,6 +44,7 @@ export function HomeCarousel({ kind }: { kind: keyof typeof CONFIG }) {
       products={list}
       viewAllHref={c.viewAllHref}
       bgImage={c.bg || undefined}
+      bgVideo={c.video ?? undefined}
       id={kind === "onSale" ? "elegidos" : undefined}
     />
   );
