@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Product } from "@/lib/types";
 import { brandName } from "@/data/brands";
 import { categoryMap } from "@/data/categories";
@@ -11,6 +11,7 @@ import { transferPrice } from "@/lib/config";
 import { useCart } from "@/context/CartContext";
 import { useProducts } from "@/context/ProductsContext";
 import { availableVariants, comboComponents, comboStockMax } from "@/lib/stock";
+import { flyToCart } from "@/lib/motion";
 import { ProductVisual } from "./ProductVisual";
 import { VariantSelect } from "./VariantSelect";
 import { FavoriteButton } from "./FavoriteButton";
@@ -20,6 +21,7 @@ export function ProductCard({ product }: { product: Product }) {
   const { addItem } = useCart();
   const { products: allProducts } = useProducts();
   const router = useRouter();
+  const imgRef = useRef<HTMLImageElement>(null);
   const hasFlavors = product.flavors.length > 0;
   // Combo: por cada producto del combo que tenga variantes, un selector en la
   // tarjeta (igual que un producto normal). Lo elegido viaja al carrito.
@@ -85,11 +87,12 @@ export function ProductCard({ product }: { product: Product }) {
           {product.image ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
+              ref={imgRef}
               src={product.image}
               alt={product.name}
               loading="lazy"
               decoding="async"
-              className="aspect-square w-full object-cover transition-transform duration-500 group-hover:scale-[1.06]"
+              className="aspect-square w-full object-cover transition-transform duration-500 ease-enter group-hover:scale-[1.06] motion-reduce:transition-none"
             />
           ) : (
             <ProductVisual
@@ -174,7 +177,10 @@ export function ProductCard({ product }: { product: Product }) {
           <button
             type="button"
             disabled={product.inStock === false}
-            onClick={() => addItem(product, cartOpts())}
+            onClick={() => {
+              flyToCart(imgRef.current); // solo visual; addItem es el de siempre
+              addItem(product, cartOpts());
+            }}
             className="btn btn-outline btn-md w-full whitespace-nowrap"
           >
             <CartIcon className="h-4.5 w-4.5" /> Agregar

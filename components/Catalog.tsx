@@ -8,6 +8,7 @@ import { brandName } from "@/data/brands";
 import type { CategorySlug } from "@/lib/types";
 import { formatPrice } from "@/lib/format";
 import { ProductCard } from "./ProductCard";
+import { ProductSkeleton } from "./ProductSkeleton";
 import { FilterIcon, CloseIcon, SearchIcon } from "./Icons";
 
 type SortKey = "destacados" | "mas-vendidos" | "novedades" | "precio-asc" | "precio-desc";
@@ -28,7 +29,7 @@ export function Catalog({ onlyOffers = false }: { onlyOffers?: boolean }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const { products: ALL, brands } = useProducts();
+  const { products: ALL, brands, loading } = useProducts();
 
   // El tope del precio se calcula con el producto más caro: así ningún
   // producto queda escondido por defecto (antes había un tope fijo de $80.000
@@ -263,7 +264,16 @@ export function Catalog({ onlyOffers = false }: { onlyOffers?: boolean }) {
             </div>
           </div>
 
-          {filtered.length === 0 ? (
+          {filtered.length === 0 && loading && ALL.length === 0 ? (
+            <div
+              className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 xl:grid-cols-4"
+              aria-busy="true"
+            >
+              {Array.from({ length: 8 }).map((_, i) => (
+                <ProductSkeleton key={i} />
+              ))}
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="rounded-xl border border-dashed border-line bg-white py-20 text-center">
               <p className="font-semibold text-ink">No encontramos productos</p>
               <p className="mt-1 text-sm text-muted">Probá ajustando los filtros o la búsqueda.</p>

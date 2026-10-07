@@ -45,7 +45,7 @@ export function MobileMenu({
       />
 
       <div
-        className={`fixed left-0 top-0 z-[70] flex h-full w-[86%] max-w-sm flex-col bg-white shadow-drawer transition-transform duration-300 lg:hidden ${
+        className={`fixed left-0 top-0 z-[70] flex h-full w-[86%] max-w-sm flex-col bg-white shadow-drawer transition-transform duration-[420ms] ease-drawer motion-reduce:transition-none lg:hidden ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
         role="dialog"
@@ -71,7 +71,12 @@ export function MobileMenu({
         <nav className="flex-1 overflow-y-auto p-2" aria-label="Navegación mobile">
           <ul>
             {/* Productos (desplegable con categorías) */}
-            <li className="border-b border-line/60">
+            <li
+              style={{ transitionDelay: open ? "110ms" : "0ms" }}
+              className={`border-b border-line/60 transition-[transform,opacity] duration-300 ease-enter motion-reduce:transition-none ${
+                open ? "translate-x-0 opacity-100" : "-translate-x-4 opacity-0"
+              }`}
+            >
               <div className="flex items-center">
                 <Link
                   href="/productos"
@@ -117,8 +122,14 @@ export function MobileMenu({
               )}
             </li>
 
-            {SIMPLE.map((item) => (
-              <li key={item.label} className="border-b border-line/60 last:border-0">
+            {SIMPLE.map((item, i) => (
+              <li
+                key={item.label}
+                style={{ transitionDelay: open ? `${150 + i * 40}ms` : "0ms" }}
+                className={`border-b border-line/60 transition-[transform,opacity] duration-300 ease-enter last:border-0 motion-reduce:transition-none ${
+                  open ? "translate-x-0 opacity-100" : "-translate-x-4 opacity-0"
+                }`}
+              >
                 <Link
                   href={item.href}
                   onClick={onClose}

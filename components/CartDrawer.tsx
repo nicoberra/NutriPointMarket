@@ -36,7 +36,7 @@ export function CartDrawer() {
       />
 
       <aside
-        className={`fixed right-0 top-0 z-[90] flex h-full w-full max-w-md flex-col bg-page shadow-drawer transition-transform duration-300 ${
+        className={`fixed right-0 top-0 z-[90] flex h-full w-full max-w-md flex-col bg-page shadow-drawer transition-transform duration-[420ms] ease-drawer motion-reduce:transition-none ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
         role="dialog"
@@ -93,10 +93,13 @@ export function CartDrawer() {
             {/* Items */}
             <div className="flex-1 overflow-y-auto px-4 py-3">
               <ul className="space-y-3">
-                {items.map((item) => (
+                {items.map((item, i) => (
                   <li
                     key={item.key}
-                    className="flex gap-3 rounded-lg border border-line bg-white p-2.5"
+                    style={{ transitionDelay: isOpen ? `${120 + Math.min(i, 6) * 45}ms` : "0ms" }}
+                    className={`flex gap-3 rounded-lg border border-line bg-white p-2.5 transition-[transform,opacity] duration-300 ease-enter motion-reduce:transition-none ${
+                      isOpen ? "translate-x-0 opacity-100" : "translate-x-6 opacity-0"
+                    }`}
                   >
                     <Link
                       href={`/producto?slug=${item.product.slug}`}

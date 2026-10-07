@@ -78,6 +78,15 @@ const config: Config = {
           "0%": { transform: "translateX(0)" },
           "100%": { transform: "translateX(-50%)" },
         },
+        "toast-out": {
+          "0%": { transform: "translateY(0) scale(1)", opacity: "1" },
+          "100%": { transform: "translateY(14px) scale(0.97)", opacity: "0" },
+        },
+        "wa-pulse": {
+          "0%": { transform: "scale(1)", opacity: "0.55" },
+          "28%": { transform: "scale(1.75)", opacity: "0" },
+          "100%": { transform: "scale(1.75)", opacity: "0" },
+        },
         "badge-pop": {
           "0%": { transform: "scale(1)" },
           "35%": { transform: "scale(1.5)" },
@@ -91,6 +100,8 @@ const config: Config = {
         "slide-up": "slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
         "toast-in": "toast-in 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
         "badge-pop": "badge-pop 0.5s cubic-bezier(0.22, 1, 0.36, 1)",
+        "toast-out": "toast-out 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards",
+        "wa-pulse": "wa-pulse 5s ease-out infinite",
       },
     },
   },

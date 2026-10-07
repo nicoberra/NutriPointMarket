@@ -103,6 +103,7 @@ export function Header() {
               type="button"
               onClick={openCart}
               aria-label="Abrir carrito"
+              data-cart-target
               className="relative grid h-10 w-10 place-items-center rounded-lg transition-colors hover:bg-white/10"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}

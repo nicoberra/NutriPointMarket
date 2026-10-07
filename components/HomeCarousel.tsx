@@ -2,6 +2,7 @@
 
 import { useProducts } from "@/context/ProductsContext";
 import { ProductCarousel } from "./ProductCarousel";
+import { ProductSkeletonRow } from "./ProductSkeleton";
 
 const CONFIG = {
   onSale: {
@@ -26,12 +27,12 @@ const CONFIG = {
 
 /** Carrusel de la home alimentado por los productos en vivo (planilla). */
 export function HomeCarousel({ kind }: { kind: keyof typeof CONFIG }) {
-  const { featured, bestSellers } = useProducts();
+  const { featured, bestSellers, loading } = useProducts();
   // "Elegidos del mes" y "Destacados" muestran lo mismo: los marcados destacado.
   const list = kind === "bestSellers" ? bestSellers : featured;
   const c = CONFIG[kind];
 
-  if (!list.length) return null;
+  if (!list.length) return loading ? <ProductSkeletonRow /> : null;
 
   return (
     <ProductCarousel

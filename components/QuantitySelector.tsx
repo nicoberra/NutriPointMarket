@@ -29,7 +29,7 @@ export function QuantitySelector({
         onClick={dec}
         disabled={value <= min}
         aria-label="Restar"
-        className={`${btn} grid place-items-center rounded-l-lg text-ink transition-colors hover:bg-page-soft disabled:opacity-40`}
+        className={`${btn} grid place-items-center rounded-l-lg text-ink transition-[background-color,transform] hover:bg-page-soft active:scale-90 disabled:opacity-40 motion-reduce:transition-none`}
       >
         <MinusIcon className="h-4 w-4" />
       </button>
@@ -41,7 +41,7 @@ export function QuantitySelector({
         onClick={inc}
         disabled={value >= max}
         aria-label="Sumar"
-        className={`${btn} grid place-items-center rounded-r-lg text-ink transition-colors hover:bg-page-soft disabled:opacity-40`}
+        className={`${btn} grid place-items-center rounded-r-lg text-ink transition-[background-color,transform] hover:bg-page-soft active:scale-90 disabled:opacity-40 motion-reduce:transition-none`}
       >
         <PlusIcon className="h-4 w-4" />
       </button>
