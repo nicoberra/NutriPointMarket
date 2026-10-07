@@ -119,7 +119,16 @@ export function AdminBilling() {
   }, [sales]);
 
   if (loading) {
-    return <p className="py-10 text-center text-sm text-muted">Cargando…</p>;
+    return (
+      <div className="space-y-6" aria-busy="true">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-24 animate-pulse rounded-2xl border border-line bg-white motion-reduce:animate-none" />
+          ))}
+        </div>
+        <div className="h-40 animate-pulse rounded-2xl border border-line bg-white motion-reduce:animate-none" />
+      </div>
+    );
   }
   if (sales.length === 0) {
     return (
@@ -169,6 +178,9 @@ export function AdminBilling() {
         </div>
       </section>
 
+      {/* Gráfico: últimas 8 semanas (facturación y beneficio) */}
+      <WeeklyChart weeks={stats.weeks} />
+
       {/* Por año */}
       <Breakdown
         title="Por año"
@@ -206,6 +218,56 @@ export function AdminBilling() {
         })}
       />
     </div>
+  );
+}
+
+/** Barras simples (sin librerías) de las últimas 8 semanas con datos. */
+function WeeklyChart({
+  weeks,
+}: {
+  weeks: { start: Date; rev: number; prof: number; cnt: number }[];
+}) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), 30);
+    return () => clearTimeout(t);
+  }, []);
+  const data = weeks.slice(0, 8).reverse(); // cronológico
+  if (data.length < 2) return null;
+  const max = Math.max(...data.map((w) => w.rev), 1);
+  return (
+    <section className="rounded-2xl border border-line bg-white p-5">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-bold text-ink">Últimas semanas</h3>
+        <div className="flex items-center gap-3 text-[11px] font-semibold text-muted">
+          <span className="flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-primary" /> facturación</span>
+          <span className="flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-green-500" /> beneficio</span>
+        </div>
+      </div>
+      <div className="flex h-36 items-end gap-2">
+        {data.map((w) => (
+          <div key={w.start.getTime()} className="flex min-w-0 flex-1 flex-col items-center gap-1">
+            <div className="flex h-28 w-full items-end justify-center gap-1">
+              <div
+                title={`Facturación ${formatPrice(w.rev)}`}
+                style={{ height: `${Math.max(4, (w.rev / max) * 100)}%` }}
+                className={`w-1/2 origin-bottom rounded-t-md bg-primary transition-transform duration-200 ease-out motion-reduce:transition-none ${
+                  mounted ? "scale-y-100" : "scale-y-0"
+                }`}
+              />
+              <div
+                title={`Beneficio ${formatPrice(w.prof)}`}
+                style={{ height: `${Math.max(w.prof > 0 ? 4 : 0, (w.prof / max) * 100)}%` }}
+                className={`w-1/2 origin-bottom rounded-t-md bg-green-500 transition-transform duration-200 ease-out motion-reduce:transition-none ${
+                  mounted ? "scale-y-100" : "scale-y-0"
+                }`}
+              />
+            </div>
+            <span className="truncate text-[10px] font-semibold text-muted">{dm(w.start)}</span>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

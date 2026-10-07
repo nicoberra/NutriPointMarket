@@ -115,6 +115,25 @@ export function AdminApp() {
     return () => clearTimeout(t);
   }, [toast]);
 
+  // El toast conserva el texto mientras sale (entrada y salida animadas).
+  const [toastShown, setToastShown] = useState<string | null>(null);
+  const [toastLeaving, setToastLeaving] = useState(false);
+  useEffect(() => {
+    if (toast) {
+      setToastShown(toast);
+      setToastLeaving(false);
+      return;
+    }
+    if (!toastShown) return;
+    setToastLeaving(true);
+    const t = setTimeout(() => {
+      setToastShown(null);
+      setToastLeaving(false);
+    }, 230);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toast]);
+
   const login = () => {
     try {
       // Guarda la sesión por 30 días.
@@ -157,17 +176,21 @@ export function AdminApp() {
           </p>
           <p className="font-display text-2xl font-black leading-none">CRM</p>
         </div>
-        <nav className="flex-1 space-y-1 px-3">
+        <nav className="relative flex-1 space-y-1 px-3">
+          {/* Indicador del ítem activo: se desliza entre ítems (44px de paso) */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute left-3 right-3 top-0 h-10 rounded-lg bg-white/15 transition-transform duration-200 ease-move motion-reduce:transition-none"
+            style={{ transform: `translateY(${Math.max(0, NAV.findIndex((n) => n.id === section)) * 44}px)` }}
+          />
           {NAV.map(({ id, label, Icon }) => {
             const active = section === id;
             return (
               <button
                 key={id}
                 onClick={() => setSection(id)}
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${
-                  active
-                    ? "bg-white/15 text-white"
-                    : "text-white/70 hover:bg-white/10"
+                className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${
+                  active ? "text-white" : "text-white/70 hover:bg-white/10"
                 }`}
               >
                 <Icon className="h-5 w-5" />
@@ -248,6 +271,7 @@ export function AdminApp() {
 
         {/* Contenido */}
         <main className="w-full flex-1 p-4 pb-24 lg:p-8 lg:pb-10 2xl:px-12">
+          <div key={section} className="animate-section-in motion-reduce:animate-none">
           {section === "dashboard" && (
             <AdminDashboard onGo={(s) => setSection(s)} />
           )}
@@ -259,22 +283,28 @@ export function AdminApp() {
           {section === "pedidos" && (
             <AdminRecords config={PEDIDOS_CFG} onToast={setToast} />
           )}
+          </div>
         </main>
       </div>
 
       {/* Bottom nav (solo mobile) */}
       <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto flex max-w-lg items-stretch justify-around border-t border-line bg-white pb-[env(safe-area-inset-bottom)] lg:hidden">
+        <span
+          aria-hidden
+          className="pointer-events-none absolute left-0 top-0 h-0.5 w-1/5 rounded-full bg-primary transition-transform duration-200 ease-move motion-reduce:transition-none"
+          style={{ transform: `translateX(${Math.max(0, NAV.findIndex((n) => n.id === section)) * 100}%)` }}
+        />
         {NAV.map(({ id, label, Icon }) => {
           const active = section === id;
           return (
             <button
               key={id}
               onClick={() => setSection(id)}
-              className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[10px] font-semibold transition-colors ${
+              className={`flex min-h-[48px] flex-1 flex-col items-center gap-0.5 py-2.5 text-[10px] font-semibold transition-[color,transform] active:scale-95 motion-reduce:transition-none ${
                 active ? "text-primary" : "text-muted"
               }`}
             >
-              <Icon className="h-6 w-6" />
+              <Icon className={`h-6 w-6 transition-transform duration-200 ease-enter motion-reduce:transition-none ${active ? "-translate-y-0.5" : ""}`} />
               {label}
             </button>
           );
@@ -282,13 +312,18 @@ export function AdminApp() {
       </nav>
 
       {/* Toast */}
-      {toast && (
+      {toastShown && (
         <div className="pointer-events-none fixed inset-x-0 bottom-24 z-50 flex justify-center px-4 lg:bottom-8 lg:pl-52">
-          <div className="flex animate-toast-in items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-drawer">
+          <div
+            role="status"
+            className={`flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-drawer ${
+              toastLeaving ? "animate-toast-out" : "animate-toast-in"
+            }`}
+          >
             <span className="grid h-6 w-6 place-items-center rounded-full bg-accent text-primary">
               <CheckIcon className="h-4 w-4" />
             </span>
-            {toast}
+            {toastShown}
           </div>
         </div>
       )}
@@ -303,6 +338,10 @@ function Login({ onOk }: { onOk: () => void }) {
   const [showPin, setShowPin] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [shake, setShake] = useState(false);
+  useEffect(() => {
+    if (error) setShake(true);
+  }, [error]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -325,7 +364,11 @@ function Login({ onOk }: { onOk: () => void }) {
 
   return (
     <div className="flex min-h-screen items-center justify-center p-6">
-      <div className="w-full max-w-sm rounded-2xl border border-line bg-white p-7 shadow-card">
+      <div className="w-full max-w-sm animate-section-in motion-reduce:animate-none">
+      <div
+        onAnimationEnd={() => setShake(false)}
+        className={`w-full rounded-2xl border border-line bg-white p-7 shadow-card ${shake ? "animate-shake" : ""}`}
+      >
         <div className="mb-6 text-center">
           <span className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-accent font-display text-2xl font-black text-primary">
             N
@@ -377,7 +420,17 @@ function Login({ onOk }: { onOk: () => void }) {
             disabled={loading || pin.length < 4}
             className="btn btn-primary btn-lg w-full"
           >
-            {loading ? "Verificando…" : "Ingresar"}
+            {loading ? (
+              <>
+                <span
+                  aria-hidden
+                  className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+                />
+                Verificando…
+              </>
+            ) : (
+              "Ingresar"
+            )}
           </button>
         </form>
         <Link
@@ -386,6 +439,7 @@ function Login({ onOk }: { onOk: () => void }) {
         >
           ← Volver a la tienda
         </Link>
+      </div>
       </div>
     </div>
   );
