@@ -200,6 +200,9 @@ function handle(e) {
       case "categoria_rename":
         out = { ok: true, data: categoriaRename(p.from, p.to) };
         break;
+      case "producto_rename":
+        out = { ok: true, data: productoRename(p.from, p.to) };
+        break;
       case "subir_imagen":
         out = subirImagen(p);
         break;
@@ -985,6 +988,47 @@ function hash(txt) {
       return ("0" + (b & 0xff).toString(16)).slice(-2);
     })
     .join("");
+}
+
+/* ------------------------- Renombrar un producto ------------------------- */
+// El nombre es la clave del producto. Al renombrar, también se actualizan los
+// combos que lo incluyen (columna combo: [{n,q}]) para que no se rompan.
+function productoRename(from, to) {
+  from = String(from || "").trim();
+  to = String(to || "").trim();
+  if (!from || !to) throw new Error("Faltan datos");
+  if (from === to) return { renamed: false };
+  if (findRowById("Productos", to) > 0) throw new Error("Ya existe un producto con ese nombre");
+  var n = findRowById("Productos", from);
+  if (n < 0) throw new Error("No se encontró: " + from);
+  updateRowByNumber("Productos", n, { nombre: to });
+
+  var sh = sheetFor("Productos");
+  var keys = keysOf("Productos");
+  var iCombo = keys.indexOf("combo");
+  var combosActualizados = 0;
+  if (iCombo >= 0) {
+    var data = sh.getDataRange().getValues();
+    for (var r = 1; r < data.length; r++) {
+      var raw = String(data[r][iCombo] || "").trim();
+      if (!raw) continue;
+      try {
+        var comps = JSON.parse(raw);
+        var changed = false;
+        for (var i = 0; i < comps.length; i++) {
+          if (comps[i].n === from) {
+            comps[i].n = to;
+            changed = true;
+          }
+        }
+        if (changed) {
+          sh.getRange(r + 1, iCombo + 1).setValue(JSON.stringify(comps));
+          combosActualizados++;
+        }
+      } catch (e) {}
+    }
+  }
+  return { renamed: true, from: from, to: to, combosActualizados: combosActualizados };
 }
 
 /* ---------------------- Restaurar costos (una sola vez) ------------------ */

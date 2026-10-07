@@ -709,6 +709,12 @@ export async function addCategory(nombre: string, orden: number): Promise<boolea
 }
 
 /** Renombra una categoría (arrastra el cambio a los productos). */
+/** Renombra un producto (y actualiza los combos que lo incluyen). Acción de admin. */
+export async function renameProduct(from: string, to: string): Promise<boolean> {
+  const r = await api("producto_rename", { from, to: to.trim() }, 20000);
+  return r.ok !== false;
+}
+
 export async function renameCategory(from: string, to: string): Promise<boolean> {
   const r = await api("categoria_rename", { from, to: to.trim() });
   return r.ok !== false;
