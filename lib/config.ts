@@ -22,7 +22,7 @@ export const SITE = {
   email: "suplemarketargentina@gmail.com",
   phone: "+54 9 11 5164-0472",
   address: "Buenos Aires, Argentina", // placeholder
-  instagram: "https://instagram.com/suplemarket.ar",
+  instagram: "https://www.instagram.com/suplemarkett/",
 };
 
 /**
