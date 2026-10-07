@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useConfirm } from "./useConfirm";
 import type { Product } from "@/lib/types";
 import { useProducts } from "@/context/ProductsContext";
 import { useCategories } from "@/context/CategoriesContext";
@@ -45,6 +46,7 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showCats, setShowCats] = useState(false);
+  const { confirm, dialog } = useConfirm();
 
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -136,7 +138,13 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
   };
 
   const handleDelete = async (p: Product) => {
-    if (!window.confirm(`¿Eliminar "${p.name}"? No se puede deshacer.`)) return;
+    if (
+      !(await confirm({
+        title: `¿Eliminar "${p.name}"?`,
+        message: "Se borra de la planilla y de la tienda. No se puede deshacer.",
+      }))
+    )
+      return;
     onToast("Eliminando…");
     try {
       await deleteRow("Productos", p.name);
@@ -240,6 +248,7 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
         />
       )}
 
+      {dialog}
       {showCats && (
         <AdminCategories
           onClose={() => setShowCats(false)}

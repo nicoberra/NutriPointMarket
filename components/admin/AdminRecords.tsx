@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useConfirm } from "./useConfirm";
 import { listTable, addRow, updateRow, deleteRow, aprobarPedido, localAsset } from "@/lib/api";
 import { useProducts } from "@/context/ProductsContext";
 import { whatsappLink } from "@/lib/config";
@@ -69,6 +70,7 @@ export function AdminRecords({
   const [seg, setSeg] = useState<"mine" | "web">("mine");
   const [q, setQ] = useState("");
   const [detailRow, setDetailRow] = useState<Row | null>(null);
+  const { confirm, dialog } = useConfirm();
 
   const load = () => {
     setLoading(true);
@@ -115,7 +117,16 @@ export function AdminRecords({
   };
 
   const eliminar = async (row: Row) => {
-    if (!window.confirm("¿Eliminar este pedido? No se puede deshacer.")) return;
+    if (
+      !(await confirm({
+        title: "¿Eliminar este registro?",
+        message:
+          row.descontado === "sí"
+            ? "El stock de sus productos se repone. No se puede deshacer."
+            : "No se puede deshacer.",
+      }))
+    )
+      return;
     setRows((prev) => prev.filter((r) => r.id !== row.id));
     try {
       await deleteRow(config.tab, row.id);
@@ -350,6 +361,7 @@ export function AdminRecords({
         />
       )}
 
+      {dialog}
       {detailRow && <DetailSheet row={detailRow} onClose={() => setDetailRow(null)} />}
     </div>
   );
