@@ -2,6 +2,7 @@
 
 import { useProducts } from "@/context/ProductsContext";
 import { ProductCarousel } from "./ProductCarousel";
+import { FeaturedVideoWall } from "./FeaturedVideoWall";
 import { ProductSkeletonRow } from "./ProductSkeleton";
 
 const CONFIG = {
@@ -36,6 +37,21 @@ export function HomeCarousel({ kind }: { kind: keyof typeof CONFIG }) {
   const c = CONFIG[kind];
 
   if (!list.length) return loading ? <ProductSkeletonRow /> : null;
+
+  // "Elegidos del mes": video protagonista + tira vertical de fotos.
+  if (kind === "onSale" && c.video) {
+    return (
+      <FeaturedVideoWall
+        id="elegidos"
+        products={list}
+        eyebrow={c.eyebrow}
+        title={c.title}
+        viewAllHref={c.viewAllHref}
+        video={c.video}
+        poster={c.bg || undefined}
+      />
+    );
+  }
 
   return (
     <ProductCarousel
