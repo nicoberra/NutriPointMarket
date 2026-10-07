@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useLayoutEffect, useRef } from "react";
+import { gsap, Flip, MOTION_REDUCE } from "@/lib/gsap";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useProducts } from "@/context/ProductsContext";
 import { categories } from "@/data/categories";
@@ -131,6 +132,35 @@ export function Catalog({ onlyOffers = false }: { onlyOffers?: boolean }) {
 
     return list;
   }, [ALL, search, selectedCats, selectedBrands, maxPrice, sort, onlyOffers]);
+
+  // Flip: al cambiar filtros/orden, las tarjetas se reacomodan animadas.
+  // Se captura el estado ANTES de que React pinte el nuevo orden (en render,
+  // leyendo el DOM todavía viejo) y se anima en el layout effect.
+  const gridRef = useRef<HTMLDivElement>(null);
+  const flipKey = filtered.map((p) => p.id).join("|");
+  const lastFlipKey = useRef(flipKey);
+  const flipState = useRef<ReturnType<typeof Flip.getState> | null>(null);
+  if (
+    typeof window !== "undefined" &&
+    gridRef.current &&
+    lastFlipKey.current !== flipKey &&
+    !window.matchMedia(MOTION_REDUCE).matches
+  ) {
+    flipState.current = Flip.getState(Array.from(gridRef.current.children));
+  }
+  lastFlipKey.current = flipKey;
+  useLayoutEffect(() => {
+    const state = flipState.current;
+    flipState.current = null;
+    if (!state || !gridRef.current) return;
+    Flip.from(state, {
+      duration: 0.45,
+      ease: "power2.inOut",
+      stagger: 0.015,
+      onEnter: (els) =>
+        gsap.fromTo(els, { autoAlpha: 0, scale: 0.92 }, { autoAlpha: 1, scale: 1, duration: 0.35, clearProps: "transform,opacity,visibility" }),
+    });
+  }, [flipKey]);
 
   const activeCount =
     selectedCats.length + selectedBrands.length + (maxPrice < PRICE_MAX ? 1 : 0);
@@ -282,7 +312,10 @@ export function Catalog({ onlyOffers = false }: { onlyOffers?: boolean }) {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
+            <div
+              ref={gridRef}
+              className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 xl:grid-cols-4"
+            >
               {filtered.map((p) => (
                 <ProductCard key={p.id} product={p} />
               ))}

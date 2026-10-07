@@ -1,6 +1,6 @@
 "use client";
 
-import { gsap } from "gsap";
+import { gsap } from "@/lib/gsap";
 
 /**
  * Utilidades de movimiento de la tienda (GSAP). Solo transform/opacity.
@@ -54,9 +54,20 @@ export function flyToCart(from: Element | null | undefined): void {
   const dx = b.left + b.width / 2 - (a.left + a.width / 2);
   const dy = b.top + b.height / 2 - (a.top + a.height / 2);
 
-  const tl = gsap.timeline({ onComplete: () => clone.remove() });
+  const done = () => clone.remove();
+  // Tope de seguridad: si la pestaña queda en segundo plano (sin frames),
+  // igual se limpia el clon.
+  const guard = setTimeout(done, 2000);
+
+  const tl = gsap.timeline({
+    onComplete: () => {
+      clearTimeout(guard);
+      done();
+    },
+  });
   // Pequeño "salto" y luego vuela en arco hacia el carrito.
   tl.to(clone, { y: -24, scale: 1.08, duration: 0.18, ease: "power2.out" })
+    .addLabel("arc")
     .to(clone, { x: dx, duration: 0.6, ease: "power2.inOut" }, "arc")
     .to(clone, { y: dy, duration: 0.6, ease: "power1.in" }, "arc")
     .to(clone, { scale: 0.18, autoAlpha: 0.2, duration: 0.6, ease: "power2.in" }, "arc");

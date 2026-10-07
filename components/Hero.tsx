@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRightIcon, ShieldIcon, PercentIcon, CardIcon } from "./Icons";
 import { HeroShowcase } from "./HeroShowcase";
+import { HeroIntro } from "./HeroIntro";
 
 /**
  * Banner principal (hero). Fondo crema con el logo de NutriPoint.
@@ -9,7 +10,8 @@ import { HeroShowcase } from "./HeroShowcase";
  */
 export function Hero() {
   return (
-    <section className="relative">
+    <section data-hero className="relative">
+      <HeroIntro />
       <div className="container-page relative grid items-start gap-8 pb-10 pt-2 sm:pb-12 lg:grid-cols-2 lg:pb-14">
         {/* Texto */}
         <div className="max-w-xl">
@@ -20,13 +22,13 @@ export function Hero() {
             data-hero-title
             className="font-display text-4xl font-black leading-[1.05] tracking-tight text-primary sm:text-5xl lg:text-6xl"
           >
-            Potenciá tu <span className="text-secondary">rendimiento</span>
+            Potenciá tu <span className="inline-block text-secondary">rendimiento</span>
           </h1>
-          <p className="mt-4 max-w-md text-base text-muted sm:text-lg">
+          <p data-hero-text className="mt-4 max-w-md text-base text-muted sm:text-lg">
             Proteínas, creatinas, pancakes proteicos y suplementos seleccionados para
             acompañar tus objetivos. Productos 100% originales.
           </p>
-          <div className="mt-7 flex flex-wrap gap-3">
+          <div data-hero-cta className="mt-7 flex flex-wrap gap-3">
             <Link href="/productos" className="btn btn-primary btn-lg">
               Ver productos <ArrowRightIcon className="h-5 w-5" />
             </Link>
@@ -36,7 +38,10 @@ export function Hero() {
           </div>
 
           {/* Mini beneficios */}
-          <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-xs font-medium text-muted">
+          <ul
+            data-hero-benefits
+            className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-xs font-medium text-muted"
+          >
             <li className="flex items-center gap-1.5">
               <ShieldIcon className="h-4 w-4 text-primary" /> 100% originales
             </li>

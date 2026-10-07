@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRightIcon } from "./Icons";
+import { Reveal } from "./motion/Reveal";
 
 /**
  * Banner promocional intermedio. Reutilizable y configurable.
@@ -54,7 +55,7 @@ export function PromoBanner({
 export function PromoBannerRow() {
   return (
     <section className="container-page py-6">
-      <div className="grid gap-4 lg:grid-cols-2">
+      <Reveal className="grid gap-4 lg:grid-cols-2" y={20} stagger={0.12}>
         <PromoBanner
           variant="accent"
           title="Combos Suple Market"
@@ -69,7 +70,7 @@ export function PromoBannerRow() {
           ctaLabel="Cómo comprar"
           ctaHref="/contacto#pagos"
         />
-      </div>
+      </Reveal>
     </section>
   );
 }

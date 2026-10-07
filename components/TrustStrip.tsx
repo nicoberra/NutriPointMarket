@@ -1,5 +1,6 @@
 import { TRUST_ITEMS } from "@/lib/config";
 import { ShieldIcon, TruckIcon, CardIcon, StoreIcon, PercentIcon, WhatsappIcon } from "./Icons";
+import { Reveal } from "./motion/Reveal";
 
 const ICONS = {
   shield: ShieldIcon,
@@ -14,7 +15,7 @@ const ICONS = {
 export function TrustStrip() {
   return (
     <section className="border-y border-line bg-white/85 backdrop-blur-sm">
-      <div className="container-page grid grid-cols-2 gap-x-4 gap-y-6 py-7 sm:py-8 lg:grid-cols-4">
+      <Reveal className="container-page grid grid-cols-2 gap-x-4 gap-y-6 py-7 sm:py-8 lg:grid-cols-4" y={16}>
         {TRUST_ITEMS.map((item) => {
           const Icon = ICONS[item.icon as keyof typeof ICONS] ?? ShieldIcon;
           return (
@@ -29,7 +30,7 @@ export function TrustStrip() {
             </div>
           );
         })}
-      </div>
+      </Reveal>
     </section>
   );
 }

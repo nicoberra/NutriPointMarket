@@ -37,7 +37,10 @@ export function CategoryCarousel() {
 
     const isTouch =
       "ontouchstart" in window || navigator.maxTouchPoints > 0;
-    let autoPlay = true;
+    // Con "reducir movimiento" el carrusel no se mueve solo (se arrastra o
+    // se usan las flechas).
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let autoPlay = !reduceMotion;
     let resumeTimer: ReturnType<typeof setTimeout> | null = null;
     let raf = 0;
 
@@ -46,7 +49,7 @@ export function CategoryCarousel() {
       autoPlay = false;
       if (resumeTimer) clearTimeout(resumeTimer);
       resumeTimer = setTimeout(() => {
-        autoPlay = true;
+        autoPlay = !reduceMotion;
       }, ms);
     };
 
@@ -132,7 +135,7 @@ export function CategoryCarousel() {
         autoPlay = false;
       };
       const onLeave = () => {
-        if (!isDragging) autoPlay = true;
+        if (!isDragging) autoPlay = !reduceMotion;
       };
       const onDown = (e: MouseEvent) => {
         isDragging = true;
@@ -227,7 +230,7 @@ export function CategoryCarousel() {
                 key={`${c.slug}-${i}`}
                 href={`/productos?categoria=${c.slug}`}
                 draggable={false}
-                className="group/slide flex w-40 shrink-0 flex-col items-center gap-3 px-2 text-center transition-transform duration-200 hover:-translate-y-1"
+                className="group/slide flex w-40 shrink-0 flex-col items-center gap-3 px-2 text-center transition-transform duration-300 ease-enter hover:-translate-y-1 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
               >
                 <div className="grid h-[130px] w-[130px] place-items-center overflow-hidden rounded-2xl bg-page-soft ring-1 ring-line transition-all group-hover/slide:ring-accent">
                   {c.image ? (
@@ -236,7 +239,7 @@ export function CategoryCarousel() {
                       src={c.image}
                       alt={c.name}
                       decoding="async"
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover/slide:scale-110"
+                      className="h-full w-full object-cover transition-transform duration-500 ease-enter group-hover/slide:scale-110 motion-reduce:transition-none"
                     />
                   ) : (
                     <ProductVisual
