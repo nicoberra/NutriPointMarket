@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useConfirm } from "./useConfirm";
 import { useCategories } from "@/context/CategoriesContext";
 import {
   addCategory,
@@ -29,6 +30,7 @@ export function AdminCategories({
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const { confirm, dialog } = useConfirm();
 
   const add = async () => {
     const name = nueva.trim();
@@ -89,7 +91,8 @@ export function AdminCategories({
   };
 
   const borrarFoto = async (catName: string) => {
-    if (busy || !window.confirm(`¿Quitar la foto de "${catName}"?`)) return;
+    if (busy) return;
+    if (!(await confirm({ title: `¿Quitar la foto de "${catName}"?`, confirmLabel: "Sí, quitar" }))) return;
     setBusy(true);
     onToast("Quitando foto… ⏳");
     try {
@@ -104,7 +107,14 @@ export function AdminCategories({
   };
 
   const remove = async (name: string) => {
-    if (busy || !window.confirm(`¿Borrar la categoría "${name}"?`)) return;
+    if (busy) return;
+    if (
+      !(await confirm({
+        title: `¿Borrar la categoría "${name}"?`,
+        message: "Los productos no se borran, pero quedan sin esta categoría hasta que los edites.",
+      }))
+    )
+      return;
     setBusy(true);
     try {
       const ok = await deleteCategory(name);
@@ -121,6 +131,7 @@ export function AdminCategories({
   return (
     <div className="fixed inset-0 z-[90] flex items-end justify-center sm:items-center">
       <div className="absolute inset-0 animate-fade-in bg-black/50 motion-reduce:animate-none" onClick={onClose} />
+      {dialog}
       <div className="relative max-h-[92vh] w-full max-w-md animate-section-in overflow-y-auto rounded-t-2xl bg-page p-5 motion-reduce:animate-none sm:rounded-2xl">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-display text-lg font-bold text-primary">Categorías</h3>
