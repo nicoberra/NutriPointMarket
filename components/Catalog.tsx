@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState, useEffect, useLayoutEffect, useRef } from "react";
-import { gsap, Flip, MOTION_REDUCE } from "@/lib/gsap";
+import type { Flip as FlipPlugin } from "gsap/Flip";
+import { gsap, MOTION_REDUCE } from "@/lib/gsap";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useProducts } from "@/context/ProductsContext";
 import { categories } from "@/data/categories";
@@ -139,9 +140,20 @@ export function Catalog({ onlyOffers = false }: { onlyOffers?: boolean }) {
   const gridRef = useRef<HTMLDivElement>(null);
   const flipKey = filtered.map((p) => p.id).join("|");
   const lastFlipKey = useRef(flipKey);
-  const flipState = useRef<ReturnType<typeof Flip.getState> | null>(null);
+  const flipState = useRef<ReturnType<typeof FlipPlugin.getState> | null>(null);
+  // Flip se descarga recién en el catálogo (no suma peso al resto de la tienda).
+  // Hasta que llega, los filtros funcionan igual, solo que sin el reacomodo animado.
+  const flipRef = useRef<typeof FlipPlugin | null>(null);
+  useEffect(() => {
+    import("gsap/Flip").then(({ Flip }) => {
+      gsap.registerPlugin(Flip);
+      flipRef.current = Flip;
+    });
+  }, []);
+  const Flip = flipRef.current;
   if (
     typeof window !== "undefined" &&
+    Flip &&
     gridRef.current &&
     lastFlipKey.current !== flipKey &&
     !window.matchMedia(MOTION_REDUCE).matches
@@ -152,8 +164,8 @@ export function Catalog({ onlyOffers = false }: { onlyOffers?: boolean }) {
   useLayoutEffect(() => {
     const state = flipState.current;
     flipState.current = null;
-    if (!state || !gridRef.current) return;
-    Flip.from(state, {
+    if (!state || !gridRef.current || !flipRef.current) return;
+    flipRef.current.from(state, {
       duration: 0.45,
       ease: "power2.inOut",
       stagger: 0.015,

@@ -104,7 +104,7 @@ export function WelcomeToast() {
     <div
       role="status"
       aria-live="polite"
-      className={`pointer-events-none fixed inset-x-0 top-3 z-[70] flex justify-center px-3 transition-all duration-500 ${
+      className={`pointer-events-none fixed inset-x-0 top-3 z-[70] flex justify-center px-3 transition-[opacity,transform] duration-500 ease-enter motion-reduce:transition-none ${
         visible ? "translate-y-0 opacity-100" : "-translate-y-6 opacity-0"
       }`}
     >

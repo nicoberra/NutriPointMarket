@@ -1,6 +1,9 @@
 "use client";
 
-import { gsap, useGSAP, SplitText, MOTION_OK, guardEntrance } from "@/lib/gsap";
+import { SplitText } from "gsap/SplitText";
+import { gsap, useGSAP, MOTION_OK, guardEntrance } from "@/lib/gsap";
+
+gsap.registerPlugin(SplitText);
 
 /**
  * Coreografía de entrada del hero (≈1,1 s): badge → título palabra por palabra
