@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { crmLogin } from "@/lib/api";
+import { crmLogin, crmLogout, getCrmToken, setCrmToken, CRM_AUTH_EVENT } from "@/lib/api";
 import { AdminProducts } from "./AdminProducts";
 import { AdminRecords, type RecordsConfig } from "./AdminRecords";
 import { AdminDashboard } from "./AdminDashboard";
@@ -84,17 +84,29 @@ export function AdminApp() {
 
   useEffect(() => {
     try {
-      // Sesión persistente (sobrevive a cerrar la app). Vence a los 30 días.
-      const raw = localStorage.getItem(AUTH_KEY);
-      if (raw) {
-        const exp = Number(raw);
-        if (exp && Date.now() < exp) setAuthed(true);
-        else localStorage.removeItem(AUTH_KEY);
+      // Sesión persistente (30 días) + token de la API: sin token, el backend
+      // rechaza todo, así que se vuelve al login.
+      const exp = Number(localStorage.getItem(AUTH_KEY) || 0);
+      if (exp && Date.now() < exp && getCrmToken()) setAuthed(true);
+      else {
+        localStorage.removeItem(AUTH_KEY);
+        setCrmToken("");
       }
     } catch {
       /* ignore */
     }
     setReady(true);
+    // Si la API rechaza el token (vencido o revocado), vuelve al login.
+    const onAuth = () => {
+      try {
+        localStorage.removeItem(AUTH_KEY);
+      } catch {
+        /* ignore */
+      }
+      setAuthed(false);
+    };
+    window.addEventListener(CRM_AUTH_EVENT, onAuth);
+    return () => window.removeEventListener(CRM_AUTH_EVENT, onAuth);
   }, []);
 
   useEffect(() => {
@@ -119,6 +131,7 @@ export function AdminApp() {
     } catch {
       /* ignore */
     }
+    crmLogout().catch(() => {}); // revoca el token en el backend
     setAuthed(false);
   };
 
@@ -300,7 +313,14 @@ function Login({ onOk }: { onOk: () => void }) {
     if (res.ok) onOk();
     else if (res.reason === "conn")
       setError("No se pudo conectar. Revisá tu internet y probá de nuevo (tu PIN puede estar bien).");
-    else setError("PIN incorrecto. Probá de nuevo.");
+    else if (res.reason === "blocked")
+      setError("Demasiados intentos. Por seguridad el acceso queda bloqueado 15 minutos.");
+    else
+      setError(
+        res.restantes != null && Number.isFinite(res.restantes)
+          ? `PIN incorrecto. Te quedan ${res.restantes} intentos.`
+          : "PIN incorrecto. Probá de nuevo.",
+      );
   };
 
   return (

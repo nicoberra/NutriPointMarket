@@ -126,6 +126,28 @@ export function jsonp<T = unknown>(url: string, timeoutMs = 8000): Promise<T> {
 type ApiResult<T = unknown> = { ok?: boolean; error?: string; data?: T; [k: string]: unknown };
 
 /** Llamada genérica a la API por JSONP (leer y escribir). */
+/* ------------------------- Token de sesión del CRM ------------------------ */
+// El backend exige este token para toda acción de administración. Lo devuelve
+// crm_login (vence a los 30 días) y se guarda en este navegador.
+const CRM_TOKEN_KEY = "sm-crm-token";
+export function getCrmToken(): string {
+  try {
+    return localStorage.getItem(CRM_TOKEN_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+export function setCrmToken(token: string): void {
+  try {
+    if (token) localStorage.setItem(CRM_TOKEN_KEY, token);
+    else localStorage.removeItem(CRM_TOKEN_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+/** Evento que escucha el CRM: el backend rechazó el token → volver al login. */
+export const CRM_AUTH_EVENT = "sm-crm-auth";
+
 export function api<T = unknown>(
   action: string,
   params: Record<string, string | number | boolean> = {},
@@ -135,7 +157,21 @@ export function api<T = unknown>(
 ): Promise<ApiResult<T>> {
   const qs = new URLSearchParams({ action });
   for (const [k, v] of Object.entries(params)) qs.set(k, String(v));
-  return jsonp<ApiResult<T>>(`${SHEETS_API_URL}?${qs.toString()}`, timeoutMs);
+  // Si hay sesión de CRM en este navegador, se manda el token (las acciones
+  // públicas lo ignoran; las de admin lo exigen).
+  const token = getCrmToken();
+  if (token) qs.set("token", token);
+  return jsonp<ApiResult<T>>(`${SHEETS_API_URL}?${qs.toString()}`, timeoutMs).then((r) => {
+    if (r && r.ok === false && r.error === "auth") {
+      setCrmToken("");
+      try {
+        window.dispatchEvent(new Event(CRM_AUTH_EVENT));
+      } catch {
+        /* ignore */
+      }
+    }
+    return r;
+  });
 }
 
 /* =========================== PRODUCTOS (planilla) ========================= */
@@ -337,7 +373,21 @@ export async function loginUser(email: string, password: string): Promise<AuthRe
 
 /* ============================ API DEL CRM ================================= */
 
-export type CrmLoginResult = { ok: true } | { ok: false; reason: "pin" | "conn" };
+export type CrmLoginResult =
+  | { ok: true }
+  | { ok: false; reason: "pin" | "conn" | "blocked"; restantes?: number };
+
+/** Cierra la sesión del CRM: revoca el token en el backend y lo borra acá. */
+export async function crmLogout(): Promise<void> {
+  const token = getCrmToken();
+  setCrmToken("");
+  if (!token) return;
+  try {
+    await api("crm_logout", { token }, 8000);
+  } catch {
+    /* el token igual queda borrado localmente */
+  }
+}
 
 /**
  * Login del CRM: valida el PIN contra el backend. Distingue "PIN incorrecto" de
@@ -349,11 +399,16 @@ export async function crmLogin(pin: string): Promise<CrmLoginResult> {
   for (let i = 0; i < intentos; i++) {
     try {
       const r = await api("crm_login", { pin });
-      if (r.ok === true) return { ok: true };
+      if (r.ok === true) {
+        // Guarda el token de sesión: desde ahora viaja en cada llamada de admin.
+        setCrmToken(String((r as { token?: string }).token || ""));
+        return { ok: true };
+      }
       // El backend respondió: si es un problema de configuración, es de conexión
       // para el usuario, no un PIN mal.
       if (r.error && /no configurado/i.test(String(r.error))) return { ok: false, reason: "conn" };
-      return { ok: false, reason: "pin" }; // respuesta clara: PIN incorrecto
+      if (r.error === "bloqueado") return { ok: false, reason: "blocked" };
+      return { ok: false, reason: "pin", restantes: Number((r as { restantes?: number }).restantes) };
     } catch {
       // Falla de red/JSONP → reintenta; si se agotan, es problema de conexión.
       if (i === intentos - 1) return { ok: false, reason: "conn" };
@@ -489,7 +544,13 @@ export async function uploadProductImage(
     method: "POST",
     mode: "no-cors",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action: "subir_imagen", nombre, data, variante: variante ?? "" }),
+    body: JSON.stringify({
+      action: "subir_imagen",
+      nombre,
+      data,
+      variante: variante ?? "",
+      token: getCrmToken(),
+    }),
   });
 }
 
@@ -519,7 +580,13 @@ export async function uploadCategoryImage(categoria: string, file: File): Promis
     method: "POST",
     mode: "no-cors",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action: "subir_imagen", nombre: categoria, categoria, data }),
+    body: JSON.stringify({
+      action: "subir_imagen",
+      nombre: categoria,
+      categoria,
+      data,
+      token: getCrmToken(),
+    }),
   });
 }
 
