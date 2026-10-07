@@ -267,6 +267,49 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
 
 /* ------------------------- Tarjeta editable inline ------------------------ */
 
+/** Copia el link público del producto (confirma en el mismo botón). */
+function CopyLinkButton({ slug }: { slug: string }) {
+  const [ok, setOk] = useState(false);
+  const url = `https://suplemarket.com.ar/producto/${slug}/`;
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setOk(true);
+      setTimeout(() => setOk(false), 1800);
+    } catch {
+      // Sin portapapeles (algunos navegadores): compartir o abrir el link.
+      if (navigator.share) navigator.share({ url }).catch(() => {});
+      else window.open(url, "_blank", "noopener,noreferrer");
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      title={url}
+      aria-label="Copiar link del producto"
+      className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold transition-colors ${
+        ok ? "bg-green-100 text-green-700" : "text-primary hover:bg-page-soft"
+      }`}
+    >
+      <svg
+        viewBox="0 0 24 24"
+        className="h-4 w-4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+      >
+        <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5" />
+        <path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.5-1.5" />
+      </svg>
+      {ok ? "Copiado ✓" : "Link"}
+    </button>
+  );
+}
+
 function ProductRow({
   product,
   dollar,
@@ -376,6 +419,7 @@ function ProductRow({
           </button>
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          <CopyLinkButton slug={product.slug} />
           <button
             onClick={onEdit}
             className="rounded-lg px-2 py-1 text-xs font-semibold text-primary hover:bg-page-soft"
