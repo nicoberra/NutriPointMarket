@@ -52,6 +52,11 @@ const config: Config = {
       maxWidth: {
         content: "var(--content-width)",
       },
+      transitionTimingFunction: {
+        enter: "cubic-bezier(0.22, 1, 0.36, 1)",
+        move: "cubic-bezier(0.25, 1, 0.5, 1)",
+        drawer: "cubic-bezier(0.32, 0.72, 0, 1)",
+      },
       keyframes: {
         "fade-in": {
           "0%": { opacity: "0" },
@@ -73,12 +78,19 @@ const config: Config = {
           "0%": { transform: "translateX(0)" },
           "100%": { transform: "translateX(-50%)" },
         },
+        "badge-pop": {
+          "0%": { transform: "scale(1)" },
+          "35%": { transform: "scale(1.5)" },
+          "70%": { transform: "scale(0.92)" },
+          "100%": { transform: "scale(1)" },
+        },
       },
       animation: {
         "fade-in": "fade-in 0.3s ease",
         "slide-in-right": "slide-in-right 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
         "slide-up": "slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
         "toast-in": "toast-in 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
+        "badge-pop": "badge-pop 0.5s cubic-bezier(0.22, 1, 0.36, 1)",
       },
     },
   },

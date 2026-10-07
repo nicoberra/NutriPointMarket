@@ -22,6 +22,7 @@
   /* --- Fondos y superficies --- */
   --color-bg: 254 253 233; /* Crema #FEFDE9 (fondo general) */
   --color-bg-soft: 247 245 219; /* Crema un poco más profundo */
+  --color-page: var(--color-bg); /* alias: lo usan body y el fondo con doodles */
   --color-surface: 255 255 255; /* Tarjetas / superficies (blanco) */
 
   /* --- Texto --- */
@@ -52,7 +53,7 @@
   /* --- Sombras --- */
   --shadow-soft: 0 1px 2px rgb(15 27 42 / 0.04), 0 1px 3px rgb(15 27 42 / 0.06);
   --shadow-card: 0 1px 2px rgb(15 27 42 / 0.04), 0 6px 16px rgb(15 27 42 / 0.06);
-  --shadow-card-hover: 0 8px 30px rgb(15 27 42 / 0.12);
+  --shadow-card-hover: 0 10px 32px rgb(33 41 227 / 0.14);
   --shadow-drawer: -12px 0 40px rgb(15 27 42 / 0.18);
 
   /* --- Layout --- */
@@ -130,25 +131,31 @@
   /* --- Botones --- */
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-lg font-semibold
-      transition-all duration-200 focus-visible:outline-none focus-visible:ring-2
+      transition-[transform,box-shadow,background-color,color,filter,border-color]
+      duration-200 ease-enter focus-visible:outline-none focus-visible:ring-2
       focus-visible:ring-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed
-      disabled:opacity-50 select-none;
+      disabled:opacity-50 select-none motion-reduce:transition-none;
+    touch-action: manipulation;
+  }
+  /* Presión: inmediata (sin transición de ida), vuelve suave */
+  .btn:active:not(:disabled) {
+    transition-duration: 0ms;
   }
 
   .btn-primary {
     background: rgb(var(--btn-primary-bg));
     color: rgb(var(--btn-primary-text));
-    @apply shadow-soft hover:brightness-105 hover:shadow-card-hover active:scale-[0.98];
+    @apply shadow-soft hover:-translate-y-0.5 hover:brightness-105 hover:shadow-card-hover active:translate-y-0 active:scale-[0.97] motion-reduce:hover:translate-y-0;
   }
 
   .btn-secondary {
     background: rgb(var(--btn-secondary-bg));
     color: rgb(var(--btn-secondary-text));
-    @apply hover:brightness-110 active:scale-[0.98];
+    @apply hover:-translate-y-0.5 hover:brightness-110 hover:shadow-card-hover active:translate-y-0 active:scale-[0.97] motion-reduce:hover:translate-y-0;
   }
 
   .btn-outline {
-    @apply border-2 border-primary text-primary bg-transparent hover:bg-primary hover:text-white active:scale-[0.98];
+    @apply border-2 border-primary text-primary bg-transparent hover:bg-primary hover:text-white active:scale-[0.97];
   }
 
   .btn-ghost {
@@ -171,7 +178,7 @@
   }
 
   .card {
-    @apply rounded-lg bg-surface shadow-card;
+    @apply rounded-xl bg-surface shadow-card;
   }
 
   .input {
@@ -185,6 +192,24 @@
 
   .link-muted {
     @apply text-muted transition-colors hover:text-accent;
+  }
+}
+
+/* ============================================================================
+   ACCESIBILIDAD: menos movimiento
+   Con "reducir movimiento" activado: sin scroll suave y sin animaciones en
+   loop ni entradas; las transiciones de color/opacidad (feedback) se conservan
+   y las de transform se apagan por componente con motion-reduce:.
+   ============================================================================ */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
 

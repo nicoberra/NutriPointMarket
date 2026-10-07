@@ -52,7 +52,7 @@ export function ProductCard({ product }: { product: Product }) {
         : (product.stockQty ?? 0) === 1;
 
   return (
-    <article className="group flex h-full flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-card transition-all duration-300 hover:-translate-y-1 hover:border-accent/40 hover:shadow-card-hover">
+    <article className="group flex h-full flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-card transition-[transform,box-shadow,border-color] duration-300 ease-enter focus-within:ring-2 focus-within:ring-accent/40 hover:-translate-y-1 hover:border-accent/50 hover:shadow-card-hover motion-reduce:transition-none motion-reduce:hover:translate-y-0">
       {/* Media */}
       <div className="relative">
         {/* Etiquetas superiores */}
@@ -105,7 +105,7 @@ export function ProductCard({ product }: { product: Product }) {
 
       {/* Contenido */}
       <div className="flex flex-1 flex-col p-3.5">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-muted">
+        <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted">
           {brandName(product.brand)}
         </p>
         <h3 className="mt-0.5 line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-snug text-ink">
@@ -116,7 +116,7 @@ export function ProductCard({ product }: { product: Product }) {
 
         {/* Precios */}
         <div className="mt-2 flex min-h-[1.75rem] items-end gap-2">
-          <span className="text-lg font-extrabold text-primary">
+          <span className="font-display text-xl font-black leading-none text-primary">
             {formatPrice(product.price)}
           </span>
           {product.oldPrice && (
@@ -125,7 +125,7 @@ export function ProductCard({ product }: { product: Product }) {
             </span>
           )}
         </div>
-        <p className="mt-0.5 text-[11px] font-semibold text-green-700">
+        <p className="mt-1.5 inline-flex w-fit items-center rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-bold text-green-700">
           Con transferencia: {formatPrice(product.basePrice ?? transferPrice(product.price))}
         </p>
         {/* Selector de variante: píldora redondeada. Reserva el mismo alto en
