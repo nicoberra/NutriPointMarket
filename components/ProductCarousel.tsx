@@ -5,6 +5,7 @@ import Link from "next/link";
 import { gsap, useGSAP, MOTION_OK, guardEntrance } from "@/lib/gsap";
 import type { Product } from "@/lib/types";
 import { ProductCard } from "./ProductCard";
+import { BackgroundVideo } from "./BackgroundVideo";
 import { ChevronLeftIcon, ChevronRightIcon, ArrowRightIcon } from "./Icons";
 
 export function ProductCarousel({
@@ -13,6 +14,7 @@ export function ProductCarousel({
   products,
   viewAllHref,
   bgImage,
+  bgVideo,
   id,
 }: {
   title: string;
@@ -21,6 +23,8 @@ export function ProductCarousel({
   viewAllHref?: string;
   /** Imagen de fondo de toda la franja (de borde a borde). */
   bgImage?: string;
+  /** Video de fondo (compu / celu); la imagen queda como poster mientras carga. */
+  bgVideo?: { desktop: string; mobile?: string };
   /** id para anclas (ej. /#elegidos). */
   id?: string;
 }) {
@@ -74,13 +78,17 @@ export function ProductCarousel({
 
   return (
     <div id={id} ref={rootRef} className="relative isolate scroll-mt-24 overflow-hidden">
-      {bgImage && (
+      {(bgImage || bgVideo) && (
         <div
           data-parallax-bg
           aria-hidden
           className="pointer-events-none absolute inset-0 -z-10 scale-110 bg-cover bg-no-repeat"
-          style={{ backgroundImage: `url(${bgImage})`, backgroundPosition: "75% center" }}
-        />
+          style={bgImage ? { backgroundImage: `url(${bgImage})`, backgroundPosition: "75% center" } : undefined}
+        >
+          {bgVideo && (
+            <BackgroundVideo desktop={bgVideo.desktop} mobile={bgVideo.mobile} poster={bgImage} />
+          )}
+        </div>
       )}
     <section className="container-page relative py-10 sm:py-14">
       <div className="mb-6 flex items-end justify-between gap-4">
