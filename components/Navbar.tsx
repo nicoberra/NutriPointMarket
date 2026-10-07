@@ -18,7 +18,7 @@ const BRANDS = [
 const TRIGGER =
   "flex items-center gap-1 rounded-md px-3 py-2.5 text-sm font-semibold transition-colors";
 const PANEL =
-  "invisible absolute left-0 top-full z-50 translate-y-1 pt-2 opacity-0 transition-all duration-200 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100";
+  "invisible absolute left-0 top-full z-50 translate-y-1 pt-2 opacity-0 transition-[opacity,transform,visibility] duration-200 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100";
 const ITEM =
   "block rounded-lg px-3 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-page-soft hover:text-primary";
 const FOOT =

@@ -28,7 +28,7 @@ export function BrandCarousel() {
             <Link
               key={b.slug}
               href={`/productos?marca=${encodeURIComponent(b.slug)}`}
-              className="group flex h-20 items-center justify-center rounded-xl border border-line bg-white px-3 text-center shadow-soft transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-card"
+              className="group flex h-20 items-center justify-center rounded-xl border border-line bg-white px-3 text-center shadow-soft transition-[transform,border-color,box-shadow] duration-200 ease-enter hover:-translate-y-0.5 hover:border-accent hover:shadow-card"
               aria-label={b.name}
             >
               <span className="font-display text-sm font-black uppercase tracking-tight text-primary transition-colors group-hover:text-primary">

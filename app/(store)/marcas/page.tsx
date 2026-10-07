@@ -37,7 +37,7 @@ export default function MarcasPage() {
                 <Link
                   key={b.slug}
                   href={`/productos?marca=${encodeURIComponent(b.slug)}`}
-                  className="group flex flex-col items-center justify-center gap-3 rounded-xl border border-line bg-white p-8 text-center shadow-card transition-all hover:-translate-y-1 hover:border-accent hover:shadow-card-hover"
+                  className="group flex flex-col items-center justify-center gap-3 rounded-xl border border-line bg-white p-8 text-center shadow-card transition-[transform,border-color,box-shadow] duration-200 ease-enter hover:-translate-y-1 hover:border-accent hover:shadow-card-hover"
                 >
                   <span className="font-display text-2xl font-black tracking-tight text-primary transition-colors group-hover:text-primary">
                     {label}

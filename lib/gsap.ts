@@ -4,14 +4,14 @@
  * Punto único de registro de GSAP y sus plugins (todos gratuitos desde 3.13).
  * Importar SIEMPRE desde acá en componentes "use client": garantiza que los
  * plugins estén registrados una sola vez y que el bundle no los duplique.
+ * Flip y SplitText NO se registran acá: los importa solo el componente que los usa
+ * (Catalog en diferido y HeroIntro), así las demás páginas no cargan ese peso.
  */
 import { gsap } from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { Flip } from "gsap/Flip";
-import { SplitText } from "gsap/SplitText";
 
-gsap.registerPlugin(useGSAP, ScrollTrigger, Flip, SplitText);
+gsap.registerPlugin(useGSAP, ScrollTrigger);
 
 /** Media queries para gsap.matchMedia(): animar solo si el usuario lo permite. */
 export const MOTION_OK = "(prefers-reduced-motion: no-preference)";
@@ -30,4 +30,4 @@ export function guardEntrance(anim: gsap.core.Animation, ms = 4000): void {
   anim.then(() => clearTimeout(id)).catch(() => {});
 }
 
-export { gsap, useGSAP, ScrollTrigger, Flip, SplitText };
+export { gsap, useGSAP, ScrollTrigger };

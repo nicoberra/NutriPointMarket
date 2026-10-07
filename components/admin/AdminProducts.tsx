@@ -1337,8 +1337,8 @@ function Toggle({
         }`}
       >
         <span
-          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
-            checked ? "left-[22px]" : "left-0.5"
+          className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ease-enter motion-reduce:transition-none ${
+            checked ? "translate-x-5" : "translate-x-0"
           }`}
         />
       </span>
