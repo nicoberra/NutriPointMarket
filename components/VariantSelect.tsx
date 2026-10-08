@@ -49,7 +49,7 @@ export function VariantSelect({
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={label}
+        aria-label={`${label}: ${value}`}
         onClick={() => setOpen((o) => !o)}
         className={`flex h-10 w-full items-center justify-between rounded-full border bg-page-soft pl-4 pr-3.5 text-xs font-semibold text-ink transition-colors focus:outline-none focus:ring-2 focus:ring-accent/30 ${
           open ? "border-accent" : "border-line hover:border-accent"

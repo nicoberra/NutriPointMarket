@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { useCategories } from "@/context/CategoriesContext";
 import { ProductVisual } from "./ProductVisual";
+import { SmartImg } from "@/components/SmartImg";
 
 /**
  * Carrusel de categorías con auto-scroll infinito (derecha → izquierda).
@@ -234,10 +235,10 @@ export function CategoryCarousel() {
               >
                 <div className="grid h-[130px] w-[130px] place-items-center overflow-hidden rounded-2xl bg-page-soft ring-1 ring-line transition-shadow group-hover/slide:ring-accent">
                   {c.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <SmartImg
                       src={c.image}
-                      alt={c.name}
+                      alt=""
+                      sizes="130px"
                       decoding="async"
                       className="h-full w-full object-cover transition-transform duration-500 ease-enter group-hover/slide:scale-110 motion-reduce:transition-none"
                     />

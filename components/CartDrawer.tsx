@@ -35,7 +35,7 @@ export function CartDrawer() {
         aria-hidden
       />
 
-      <aside
+      <div
         className={`fixed right-0 top-0 z-[90] flex h-full w-full max-w-md flex-col bg-page shadow-drawer transition-transform duration-[420ms] ease-drawer motion-reduce:transition-none ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
@@ -208,7 +208,7 @@ export function CartDrawer() {
             </div>
           </>
         )}
-      </aside>
+      </div>
     </>
   );
 }

@@ -27,3 +27,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Versiones WebP generadas en el build (scripts/optimize-images.mjs)
+/public/_opt/

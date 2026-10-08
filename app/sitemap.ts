@@ -5,7 +5,7 @@ export const dynamic = "force-static";
 
 const BASE = "https://suplemarket.com.ar";
 
-/** sitemap.xml: páginas principales + la página propia de cada producto con foto. */
+/** sitemap.xml: páginas principales + la página propia de cada producto. */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
   const routes: MetadataRoute.Sitemap = ["/", "/productos/", "/marcas/", "/ofertas/", "/contacto/"].map(
@@ -16,9 +16,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: path === "/" ? 1 : 0.7,
     }),
   );
-  const products: MetadataRoute.Sitemap = (await getBuildProducts())
-    .filter((p) => p.image)
-    .map((p) => ({
+  const products: MetadataRoute.Sitemap = (await getBuildProducts()).map((p) => ({
       url: `${BASE}/producto/${p.slug}/`,
       lastModified: now,
       changeFrequency: "weekly",

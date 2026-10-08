@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 import type { Product } from "@/lib/types";
 import { BackgroundVideo } from "./BackgroundVideo";
 import { ArrowRightIcon } from "./Icons";
+import { SmartImg } from "@/components/SmartImg";
 
 /**
  * "Nuestros elegidos del mes": el video de fondo es el protagonista y a la
@@ -206,10 +207,10 @@ export function FeaturedVideoWall({
                 className="block shrink-0 overflow-hidden rounded-2xl transition-transform duration-200 ease-enter hover:scale-105 motion-reduce:transition-none"
               >
                 {/* Solo la foto, con puntas redondeadas (sin marco) */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <SmartImg
                   src={p.image}
                   alt={p.name}
+                  sizes="(max-width: 768px) 40vw, 200px"
                   loading="lazy"
                   decoding="async"
                   draggable={false}

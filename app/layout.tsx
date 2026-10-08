@@ -23,7 +23,6 @@ const sora = Sora({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://suplemarket.com.ar"),
-  alternates: { canonical: "/" },
   manifest: "/manifest.webmanifest",
   applicationName: SITE.name,
   appleWebApp: {

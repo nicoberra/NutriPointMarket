@@ -180,6 +180,7 @@ export function Catalog({ onlyOffers = false }: { onlyOffers?: boolean }) {
 
   const FiltersPanel = (
     <div className="space-y-6">
+      <h2 className="sr-only">Filtros</h2>
       {/* Buscar dentro */}
       <div>
         <label className="mb-2 block text-sm font-bold text-ink">Buscar</label>
@@ -239,6 +240,7 @@ export function Catalog({ onlyOffers = false }: { onlyOffers?: boolean }) {
         <h3 className="mb-2.5 text-sm font-bold text-ink">Precio máximo</h3>
         <input
           type="range"
+          aria-label="Precio máximo"
           min={5000}
           max={PRICE_MAX}
           step={1000}
@@ -292,6 +294,7 @@ export function Catalog({ onlyOffers = false }: { onlyOffers?: boolean }) {
               <label className="flex items-center gap-2 text-sm">
                 <span className="hidden text-muted sm:inline">Ordenar:</span>
                 <select
+                  aria-label="Ordenar productos"
                   value={sort}
                   onChange={(e) => setSort(e.target.value as SortKey)}
                   className="input h-10 w-auto cursor-pointer pr-8 text-sm"
@@ -324,14 +327,17 @@ export function Catalog({ onlyOffers = false }: { onlyOffers?: boolean }) {
               </button>
             </div>
           ) : (
+            <>
+            <h2 className="sr-only">Productos</h2>
             <div
               ref={gridRef}
               className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 xl:grid-cols-4"
             >
-              {filtered.map((p) => (
-                <ProductCard key={p.id} product={p} />
+              {filtered.map((p, i) => (
+                <ProductCard key={p.id} product={p} priority={i < 2} />
               ))}
             </div>
+            </>
           )}
         </div>
       </div>
@@ -344,7 +350,7 @@ export function Catalog({ onlyOffers = false }: { onlyOffers?: boolean }) {
         }`}
         aria-hidden
       />
-      <aside
+      <div
         className={`fixed left-0 top-0 z-[90] flex h-full w-[85%] max-w-xs flex-col bg-white shadow-drawer transition-transform lg:hidden ${
           drawerOpen ? "translate-x-0" : "-translate-x-full"
         }`}
@@ -368,7 +374,7 @@ export function Catalog({ onlyOffers = false }: { onlyOffers?: boolean }) {
             Ver {filtered.length} productos
           </button>
         </div>
-      </aside>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { ASSET_PREFIX } from "@/lib/config";
+import { SmartImg } from "@/components/SmartImg";
 
 /**
  * Lado derecho del hero (solo desktop): el logo con la mascota sobre blobs de
@@ -22,11 +23,11 @@ export function HeroShowcase() {
       />
 
       {/* Logo con la mascota */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <SmartImg
         data-hero-logo
         src={`${ASSET_PREFIX}/logo.png`}
         alt="Suple Market"
+        sizes="448px"
         fetchPriority="high"
         decoding="async"
         className="relative z-10 mx-auto w-full max-w-md object-contain"

@@ -5,6 +5,7 @@ import { PageBanner } from "@/components/PageBanner";
 
 export const metadata: Metadata = {
   title: "Productos",
+  alternates: { canonical: "/productos/" },
   description:
     "Todo el catálogo de Suple Market: proteínas, creatinas, pre entrenos, vitaminas, aminoácidos y más.",
 };

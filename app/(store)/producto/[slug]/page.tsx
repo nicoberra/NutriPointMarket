@@ -27,7 +27,7 @@ export async function generateMetadata({
     p.description.slice(0, 160) || `${p.brand ? p.brand + " · " : ""}${p.name} en Suple Market.`;
   const img = absoluteImage(p.image);
   return {
-    title: `${p.name} | Suple Market`,
+    title: p.name, // la plantilla del layout agrega "| Suple Market"
     description,
     alternates: { canonical: url },
     openGraph: {

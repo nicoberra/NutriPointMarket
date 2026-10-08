@@ -16,8 +16,9 @@ import { ProductVisual } from "./ProductVisual";
 import { VariantSelect } from "./VariantSelect";
 import { FavoriteButton } from "./FavoriteButton";
 import { CartIcon, TruckIcon } from "./Icons";
+import { SmartImg } from "@/components/SmartImg";
 
-export function ProductCard({ product }: { product: Product }) {
+export function ProductCard({ product, priority = false }: { product: Product; priority?: boolean }) {
   const { addItem } = useCart();
   const { products: allProducts } = useProducts();
   const router = useRouter();
@@ -85,12 +86,13 @@ export function ProductCard({ product }: { product: Product }) {
           aria-label={product.name}
         >
           {product.image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <SmartImg
               ref={imgRef}
               src={product.image}
               alt={product.name}
-              loading="lazy"
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 260px"
+              loading={priority ? "eager" : "lazy"}
+              fetchPriority={priority ? "high" : undefined}
               decoding="async"
               className="aspect-square w-full object-cover transition-transform duration-500 ease-enter group-hover:scale-[1.06] motion-reduce:transition-none"
             />

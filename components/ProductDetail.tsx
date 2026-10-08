@@ -15,6 +15,7 @@ import { ProductVisual } from "./ProductVisual";
 import { Rating } from "./Rating";
 import { QuantitySelector } from "./QuantitySelector";
 import { FavoriteButton } from "./FavoriteButton";
+import { SmartImg } from "@/components/SmartImg";
 import {
   CartIcon,
   ShieldIcon,
@@ -133,10 +134,11 @@ export function ProductDetail({ product: initial }: { product: Product }) {
             )}
             <FavoriteButton id={product.id} className="absolute right-4 top-4 z-10 h-11 w-11" />
             {mainImage ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <SmartImg
                 data-detail-image
                 src={mainImage}
+                sizes="(max-width: 1024px) 100vw, 560px"
+                fetchPriority="high"
                 alt={product.name}
                 decoding="async"
                 className="aspect-square w-full object-cover"
@@ -163,8 +165,7 @@ export function ProductDetail({ product: initial }: { product: Product }) {
                     activeThumb === i ? "border-accent" : "border-line"
                   }`}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={src} alt="" loading="lazy" decoding="async" className="h-20 w-20 object-cover" />
+                  <SmartImg src={src} alt="" sizes="80px" loading="lazy" decoding="async" className="h-20 w-20 object-cover" />
                 </button>
               ))}
             </div>

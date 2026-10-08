@@ -5,6 +5,7 @@ import { PageBanner } from "@/components/PageBanner";
 
 export const metadata: Metadata = {
   title: "Ofertas",
+  alternates: { canonical: "/ofertas/" },
   description: "Todas las ofertas y descuentos de Suple Market.",
 };
 

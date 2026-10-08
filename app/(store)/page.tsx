@@ -5,6 +5,10 @@ import { ASSET_PREFIX } from "@/lib/config";
 import { HomeCarousel } from "@/components/HomeCarousel";
 import { PromoBannerRow } from "@/components/PromoBanner";
 import { Newsletter } from "@/components/Newsletter";
+import { SmartImg } from "@/components/SmartImg";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 export default function HomePage() {
   return (
@@ -18,10 +22,10 @@ export default function HomePage() {
         <div className="relative">
           {/* Logo arriba de las categorías (solo en celular) */}
           <div className="flex justify-center px-4 pt-6 lg:hidden">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <SmartImg
               src={`${ASSET_PREFIX}/logo.png`}
               alt="Suple Market"
+              sizes="300px"
               fetchPriority="high"
               decoding="async"
               className="w-full max-w-[300px] object-contain"

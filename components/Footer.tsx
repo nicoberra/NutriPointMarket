@@ -108,13 +108,13 @@ export function Footer() {
         {/* Barra legal */}
         <div className="mt-10 border-t border-white/10 pt-6">
           <div className="flex flex-col items-center justify-between gap-4 text-center sm:flex-row sm:text-left">
-            <p className="text-xs text-white/50">
+            <p className="text-xs text-white/70">
               © 2026 {SITE.name}. Todos los derechos reservados.
             </p>
             <ul className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs">
               {FOOTER_LEGAL.map((l) => (
                 <li key={l.label}>
-                  <Link href={l.href} className="link-muted text-white/60">
+                  <Link href={l.href} className="link-muted text-white/75">
                     {l.label}
                   </Link>
                 </li>
