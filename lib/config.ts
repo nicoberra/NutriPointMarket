@@ -36,7 +36,7 @@ export const NUTRI = {
   photo: "/nutri.jpg",
   whatsapp: "5491137978217",
   instagram: "https://www.instagram.com/nutricionista.cj/",
-  bio: "Planes 100% personalizados según tu objetivo: rendimiento, descenso de grasa o aumento muscular. Evaluación antropométrica y seguimiento. Trabaja con deportistas y clubes (Argentinos de Castelar, Club 77). Atiende en Castelar.",
+  bio: "Planes 100% personalizados según tu objetivo: rendimiento, descenso de grasa o aumento muscular. Evaluación antropométrica y seguimiento. Trabaja con deportistas y clubes. Atiende en Castelar.",
   tags: [
     "Nutrición deportiva (mejora del rendimiento)",
     "Antropometría: descenso de grasa y/o aumento muscular",
