@@ -53,7 +53,7 @@ export const NUTRI = {
     "Nutrición integral en veganos y vegetarianos",
     "Suplementación en deportistas adolescentes",
   ],
-  message: "Hola! Vengo de Suple Market y quería consultar por una consulta de nutrición.",
+  message: "¡Hola Jesica! Vengo de Suple Market y quiero hacer una consulta de nutrición. ¿Cómo coordinamos un turno?",
 };
 
 /**
