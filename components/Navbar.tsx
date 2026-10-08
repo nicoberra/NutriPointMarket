@@ -211,6 +211,8 @@ export function Navbar() {
             Ver página de contacto →
           </Link>
         </Menu>
+        {/* Lleva a la sección de la nutricionista en la home */}
+        <Menu label="Nutricionista" href="/#nutricionista" />
       </ul>
     </nav>
   );

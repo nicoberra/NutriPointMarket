@@ -14,6 +14,7 @@ const SIMPLE = [
   { label: "Combos", href: "/productos?categoria=combos" },
   { label: "Ofertas", href: "/ofertas", highlight: true },
   { label: "Contacto", href: "/contacto" },
+  { label: "Nutricionista", href: "/#nutricionista" },
 ];
 
 export function MobileMenu({
