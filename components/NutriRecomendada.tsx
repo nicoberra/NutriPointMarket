@@ -17,7 +17,7 @@ export function NutriRecomendada() {
       ? `+54 9 ${d.slice(3, 5)} ${d.slice(5, 9)}-${d.slice(9)}`
       : "+" + d;
   return (
-    <section className="container-page py-8 sm:py-10" aria-labelledby="nutri-title">
+    <section id="nutricionista" className="container-page scroll-mt-28 py-8 sm:py-10" aria-labelledby="nutri-title">
       <Reveal y={20} stagger={0.1}>
         <h2 id="nutri-title" className="section-title">Nuestra nutri recomendada</h2>
         <p className="mt-1 max-w-xl text-sm text-muted sm:text-base">
