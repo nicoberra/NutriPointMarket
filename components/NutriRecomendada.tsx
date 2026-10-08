@@ -10,7 +10,12 @@ import { Reveal } from "./motion/Reveal";
 export function NutriRecomendada() {
   const wa = `https://wa.me/${NUTRI.whatsapp}?text=${encodeURIComponent(NUTRI.message)}`;
   const photo = NUTRI.photo.startsWith("http") ? NUTRI.photo : `${ASSET_PREFIX}${NUTRI.photo}`;
-  const waPretty = NUTRI.whatsapp.replace(/^549?(d{2,4})(d{4})(d{4})$/, "+54 9 $1 $2-$3");
+  // "5491137978217" → "+54 9 11 3797-8217"
+  const d = NUTRI.whatsapp.replace(/D/g, "");
+  const waPretty =
+    d.length === 13 && d.startsWith("549")
+      ? `+54 9 ${d.slice(3, 5)} ${d.slice(5, 9)}-${d.slice(9)}`
+      : "+" + d;
   return (
     <section className="container-page py-8 sm:py-10" aria-labelledby="nutri-title">
       <Reveal y={20} stagger={0.1}>
@@ -19,7 +24,7 @@ export function NutriRecomendada() {
           Si querés que alguien te arme el plan y te diga qué tomar y cuándo, trabajamos con ella.
         </p>
 
-        <div className="relative mt-8 rounded-3xl border border-line bg-white p-6 pt-20 shadow-card sm:mt-14 sm:p-8 sm:pl-56 sm:pt-8">
+        <div className="relative mt-20 rounded-3xl border border-line bg-white p-6 pt-24 shadow-card sm:mt-14 sm:p-8 sm:pl-56 sm:pt-8">
           {/* Foto redonda que "sale" de la ficha */}
           <div className="absolute -top-12 left-1/2 h-32 w-32 -translate-x-1/2 overflow-hidden rounded-full border-4 border-white shadow-card ring-4 ring-accent sm:-top-6 sm:left-8 sm:h-40 sm:w-40 sm:translate-x-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
