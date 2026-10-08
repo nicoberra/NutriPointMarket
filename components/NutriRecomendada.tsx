@@ -32,6 +32,9 @@ export function NutriRecomendada() {
               <p className="text-sm font-semibold text-muted">
                 {NUTRI.title}{NUTRI.license ? ` · ${NUTRI.license}` : ""}
               </p>
+              <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 font-display text-xs font-black uppercase tracking-wide text-primary">
+                ★ Especialista en nutrición deportiva
+              </span>
             </div>
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
               <a
@@ -60,9 +63,16 @@ export function NutriRecomendada() {
             <div>
               <p className="text-xs font-bold text-primary">Especialidad</p>
               <ul className="mt-1.5 space-y-1 text-sm text-ink">
-                {NUTRI.tags.map((t) => (
-                  <li key={t} className="flex items-start justify-center gap-1.5 sm:justify-start">
-                    <CheckIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" /> <span>{t}</span>
+                {NUTRI.tags.map((t, i) => (
+                  <li
+                    key={t}
+                    className={
+                      i === 0
+                        ? "-mx-2 flex items-start justify-center gap-1.5 rounded-lg bg-accent/25 px-2 py-1 font-bold text-primary sm:justify-start"
+                        : "flex items-start justify-center gap-1.5 sm:justify-start"
+                    }
+                  >
+                    <CheckIcon className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${i === 0 ? "text-primary" : "text-accent"}`} /> <span>{t}</span>
                   </li>
                 ))}
               </ul>
