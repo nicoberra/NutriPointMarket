@@ -32,12 +32,27 @@ export const SITE = {
 export const NUTRI = {
   name: "Jesica Cuevas",
   title: "Licenciada en Nutrición",
-  license: "", // matrícula: si la quiere mostrar, ponerla acá (ej. "M.N. 12345")
+  license: "M.N. 12233",
   photo: "/nutri.jpg",
   whatsapp: "5491137978217",
   instagram: "https://www.instagram.com/nutricionista.cj/",
-  bio: "Planes de alimentación personalizados según tu objetivo: ganar masa muscular, bajar grasa o mejorar tu rendimiento. Te acompaña para que los suplementos sumen de verdad.",
-  tags: ["Nutrición deportiva", "Planes personalizados", "Seguimiento por WhatsApp"],
+  bio: "Planes 100% personalizados según tu objetivo. Consultorio en Morón y seguimiento por WhatsApp. Agendá tu turno y contale que venís de Suple Market.",
+  tags: [
+    "Nutrición deportiva",
+    "Antropometría (composición corporal)",
+    "Dietas específicas: vegetarianos, veganos, celíacos",
+    "Nutrición clínica general",
+    "Cambio de hábitos",
+    "Planes infantiles, embarazo y lactancia",
+  ],
+  /** Formación destacada (certificados en la carpeta JESI). */
+  training: [
+    "Antropometrista ISAK nivel 1",
+    "Posgrado en nutrición en personas mayores (AADYND)",
+    "Abordaje nutricional del embarazo (Univ. Austral)",
+    "Nutrición integral en veganos y vegetarianos",
+    "Suplementación en deportistas adolescentes",
+  ],
   message: "Hola! Vengo de Suple Market y quería consultar por una consulta de nutrición.",
 };
 
