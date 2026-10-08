@@ -34,7 +34,7 @@ export const NUTRI = {
   title: "Licenciada en Nutrición",
   license: "M.N. 12233",
   photo: "/nutri.jpg",
-  whatsapp: "5491137978217",
+  whatsapp: "5491164072673",
   instagram: "https://www.instagram.com/nutricionista.cj/",
   bio: "Planes 100% personalizados según tu objetivo. Consultorio en Morón y seguimiento por WhatsApp. Agendá tu turno y contale que venís de Suple Market.",
   tags: [
