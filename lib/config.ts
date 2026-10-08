@@ -26,6 +26,22 @@ export const SITE = {
 };
 
 /**
+ * Nutricionista recomendada (sección en la home).
+ * Datos reales cargados; la foto está en public/nutri.jpg.
+ */
+export const NUTRI = {
+  name: "Jesica Cuevas",
+  title: "Licenciada en Nutrición",
+  license: "", // matrícula: si la quiere mostrar, ponerla acá (ej. "M.N. 12345")
+  photo: "/nutri.jpg",
+  whatsapp: "5491137978217",
+  instagram: "https://www.instagram.com/nutricionista.cj/",
+  bio: "Planes de alimentación personalizados según tu objetivo: ganar masa muscular, bajar grasa o mejorar tu rendimiento. Te acompaña para que los suplementos sumen de verdad.",
+  tags: ["Nutrición deportiva", "Planes personalizados", "Seguimiento por WhatsApp"],
+  message: "Hola! Vengo de Suple Market y quería consultar por una consulta de nutrición.",
+};
+
+/**
  * Datos para pagos por TRANSFERENCIA. Reemplazá por los reales (te los muestra
  * la web al cliente cuando elige transferencia).
  */
