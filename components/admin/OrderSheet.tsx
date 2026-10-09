@@ -37,6 +37,7 @@ export function OrderSheet({
   const [montoEnvio, setMontoEnvio] = useState<string>("");
   const [envio, setEnvio] = useState("");
   const [notas, setNotas] = useState("");
+  const [cobrado, setCobrado] = useState(true);
 
   const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const sorted = useMemo(
@@ -105,6 +106,7 @@ export function OrderSheet({
       notas: notas.trim(),
       items: JSON.stringify(items),
       descontado: "no",
+      cobrado: cobrado ? "sí" : "no",
     });
   };
 
@@ -286,6 +288,19 @@ export function OrderSheet({
               <input value={envio} onChange={(e) => setEnvio(e.target.value)} className="input h-11 text-base" />
             </label>
           </div>
+
+          <label className="flex items-center justify-between rounded-xl border border-line bg-white px-3 py-2.5">
+            <span>
+              <span className="block text-sm font-semibold text-ink">Ya está cobrado</span>
+              <span className="block text-xs text-muted">Si no, queda como "Sin cobrar" en la lista</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={cobrado}
+              onChange={(e) => setCobrado(e.target.checked)}
+              className="h-5 w-5 accent-[rgb(var(--color-accent))]"
+            />
+          </label>
 
           <label className="block">
             <span className="mb-1 block text-xs font-semibold text-ink">Notas</span>

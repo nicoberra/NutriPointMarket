@@ -107,6 +107,7 @@ var TABLES = {
       ["items", "Items"],
       ["descontado", "Descontado"],
       ["comprobante", "Comprobante"],
+      ["cobrado", "Cobrado"],
     ],
     idField: "id",
   },
@@ -1110,6 +1111,13 @@ function resetProductos() {
   sh.clear();
   writeHeader(sh, "Productos");
   SpreadsheetApp.getActive().toast("Pestaña Productos lista (vacía).", "NutriPointMarket", 5);
+}
+
+// Escribe (o actualiza) SOLO la fila de encabezados de Pedidos, sin tocar los
+// datos. Ejecutar una vez después de agregar la columna "Cobrado".
+function encabezadosPedidos() {
+  writeHeader(sheetFor("Pedidos"), "Pedidos");
+  SpreadsheetApp.getActive().toast("Encabezados de Pedidos actualizados (incluye Cobrado).", "Suple Market", 5);
 }
 
 function writeHeader(sh, tab) {

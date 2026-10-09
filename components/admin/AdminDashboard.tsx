@@ -59,7 +59,7 @@ export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
           const amount = num(r.monto);
           const cost = num(r.costo);
           const date = parseDate(r.fecha);
-          const pagado = low(r.descontado) === "sí" || low(r.estado) === "pagado";
+          const pagado = low(r.descontado) === "sí" || low(r.estado) === "pagado" || low(r.cobrado) === "sí";
           const entregado = low(r.estado) === "entregado";
           const esTransfer = low(r.pago).includes("transfer");
 
