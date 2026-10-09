@@ -148,6 +148,9 @@ export function setCrmToken(token: string): void {
 /** Evento que escucha el CRM: el backend rechazó el token → volver al login. */
 export const CRM_AUTH_EVENT = "sm-crm-auth";
 
+/** Último error devuelto por el backend (para mostrarlo en el CRM). */
+export let lastApiError = "";
+
 export function api<T = unknown>(
   action: string,
   params: Record<string, string | number | boolean> = {},
@@ -162,6 +165,7 @@ export function api<T = unknown>(
   const token = getCrmToken();
   if (token) qs.set("token", token);
   return jsonp<ApiResult<T>>(`${SHEETS_API_URL}?${qs.toString()}`, timeoutMs).then((r) => {
+    lastApiError = r && r.ok === false ? String(r.error || "error desconocido") : "";
     if (r && r.ok === false && r.error === "auth") {
       setCrmToken("");
       try {
@@ -469,7 +473,8 @@ export async function saveProduct(row: ProductInput): Promise<boolean> {
 
 /** Crea una fila en una pestaña. */
 export async function addRow(tab: string, obj: Record<string, unknown>): Promise<boolean> {
-  const r = await api("add", { tab, data: JSON.stringify(obj) });
+  // Escrituras: más margen (Apps Script a veces tarda al arrancar)
+  const r = await api("add", { tab, data: JSON.stringify(obj) }, 40000);
   return r.ok !== false;
 }
 
@@ -479,13 +484,13 @@ export async function updateRow(
   id: string,
   obj: Record<string, unknown>,
 ): Promise<boolean> {
-  const r = await api("update", { tab, id, data: JSON.stringify(obj) });
+  const r = await api("update", { tab, id, data: JSON.stringify(obj) }, 40000);
   return r.ok !== false;
 }
 
 /** Borra una fila por id. */
 export async function deleteRow(tab: string, id: string): Promise<boolean> {
-  const r = await api("delete", { tab, id });
+  const r = await api("delete", { tab, id }, 40000);
   return r.ok !== false;
 }
 
