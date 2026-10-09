@@ -65,7 +65,8 @@ export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
 
           if (!entregado) pendEntrega++;
           if (!pagado) pendPago++;
-          if (esTransfer && !String(r.comprobante ?? "").trim()) sinComprobante++;
+          const esWeb = String(r.id ?? "").startsWith("ped");
+          if (esWeb && esTransfer && !pagado && !String(r.comprobante ?? "").trim()) sinComprobante++;
 
           if (amount > 0 && date) {
             const prof = cost > 0 ? amount - cost : 0;
