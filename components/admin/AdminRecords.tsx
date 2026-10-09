@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useConfirm } from "./useConfirm";
+import { OrderSheet } from "./OrderSheet";
 import { listTable, addRow, updateRow, deleteRow, aprobarPedido, localAsset } from "@/lib/api";
 import { useProducts } from "@/context/ProductsContext";
 import { whatsappLink } from "@/lib/config";
@@ -432,14 +433,12 @@ export function AdminRecords({
         </ul>
       )}
 
-      {adding && (
-        <AddSheet
-          config={config}
-          saving={saving}
-          onClose={() => setAdding(false)}
-          onSave={handleAdd}
-        />
-      )}
+      {adding &&
+        (config.tab === "Pedidos" ? (
+          <OrderSheet saving={saving} onClose={() => setAdding(false)} onSave={handleAdd} />
+        ) : (
+          <AddSheet config={config} saving={saving} onClose={() => setAdding(false)} onSave={handleAdd} />
+        ))}
 
       {editRow && (
         <AddSheet
@@ -452,16 +451,14 @@ export function AdminRecords({
         />
       )}
       {orderFor && orderConfig && (
-        <AddSheet
-          config={orderConfig}
-          saving={saving}
+        <OrderSheet
           initial={{ cliente: orderFor.nombre ?? "", telefono: orderFor.telefono ?? "" }}
-          title={`Nuevo pedido · ${orderFor.nombre ?? ""}`}
+          saving={saving}
           onClose={() => setOrderFor(null)}
           onSave={handleAddOrder}
         />
       )}
-      {clientRow && (
+      {clientRow && !orderFor && !editRow && (
         <ClientSheet
           row={clientRow}
           orders={ordersOf(clientRow)}
