@@ -1367,7 +1367,7 @@ function ProductSheet({
 }
 
 /** Cotización del dólar blue (Argentina), en vivo, con caché de 3 h. */
-function useDollar(): number {
+export function useDollar(): number {
   const [rate, setRate] = useState<number>(0);
   useEffect(() => {
     try {
@@ -1398,7 +1398,7 @@ function useDollar(): number {
 }
 
 /** Convierte un costo a pesos según su moneda. */
-function costToPesos(costo: number, moneda: "USD" | "ARS", dollar: number): number {
+export function costToPesos(costo: number, moneda: "USD" | "ARS", dollar: number): number {
   return moneda === "USD" ? costo * dollar : costo;
 }
 
