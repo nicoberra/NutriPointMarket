@@ -283,7 +283,7 @@ export function AdminApp() {
           {section === "facturacion" && <AdminBilling />}
           {section === "productos" && <AdminProducts onToast={setToast} />}
           {section === "clientes" && (
-            <AdminRecords config={CLIENTES_CFG} onToast={setToast} />
+            <AdminRecords config={CLIENTES_CFG} orderConfig={PEDIDOS_CFG} onToast={setToast} />
           )}
           {section === "pedidos" && (
             <AdminRecords config={PEDIDOS_CFG} onToast={setToast} />

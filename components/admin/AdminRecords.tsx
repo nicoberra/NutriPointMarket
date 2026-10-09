@@ -9,6 +9,7 @@ import { formatPrice } from "@/lib/format";
 import {
   CloseIcon,
   PlusIcon,
+  ArrowRightIcon,
   WhatsappIcon,
   CheckIcon,
   SearchIcon,
@@ -59,9 +60,12 @@ type Row = Record<string, string>;
 export function AdminRecords({
   config,
   onToast,
+  orderConfig,
 }: {
   config: RecordsConfig;
   onToast: (m: string) => void;
+  /** Config de Pedidos (para crear un pedido desde la ficha de un cliente) */
+  orderConfig?: RecordsConfig;
 }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,6 +75,32 @@ export function AdminRecords({
   const [q, setQ] = useState("");
   const [detailRow, setDetailRow] = useState<Row | null>(null);
   const { confirm, dialog } = useConfirm();
+
+  // Clientes: sus pedidos (para contar y listar), ficha, edición y nuevo pedido
+  const isClientes = config.tab === "Clientes";
+  const [pedidos, setPedidos] = useState<Row[]>([]);
+  const [clientRow, setClientRow] = useState<Row | null>(null);
+  const [editRow, setEditRow] = useState<Row | null>(null);
+  const [orderFor, setOrderFor] = useState<Row | null>(null);
+  const loadPedidos = () => {
+    if (!isClientes) return;
+    listTable<Row>("Pedidos")
+      .then((d) => setPedidos([...d].reverse()))
+      .catch(() => {});
+  };
+  useEffect(loadPedidos, [config.tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Cruce cliente ↔ pedidos: por teléfono (últimos 10 dígitos) o por nombre exacto
+  const normTel = (v?: string) => String(v ?? "").replace(/\D/g, "").replace(/^549?/, "").replace(/^0/, "").slice(-10);
+  const ordersOf = (c: Row): Row[] => {
+    const tel = normTel(c.telefono);
+    const name = String(c.nombre ?? "").trim().toLowerCase();
+    return pedidos.filter(
+      (p) =>
+        (tel.length >= 8 && normTel(p.telefono) === tel) ||
+        (name !== "" && String(p.cliente ?? "").trim().toLowerCase() === name),
+    );
+  };
+  const openRow = (r: Row) => (config.detail ? setDetailRow(r) : setClientRow(r));
 
   const load = () => {
     setLoading(true);
@@ -102,6 +132,37 @@ export function AdminRecords({
     setTimeout(load, 1200);
   };
 
+  const handleEdit = async (obj: Row) => {
+    if (!editRow) return;
+    setSaving(true);
+    try {
+      const r = await updateRow(config.tab, editRow.id, obj);
+      onToast(r === false ? "No se pudo guardar (reintentá)" : "Datos actualizados ✓");
+      setEditRow(null);
+      setClientRow((c) => (c && c.id === editRow.id ? { ...c, ...obj } : c));
+    } catch {
+      onToast("Tardó demasiado: verificá si se guardó");
+    } finally {
+      setSaving(false);
+    }
+    setTimeout(load, 1200);
+  };
+
+  const handleAddOrder = async (obj: Row) => {
+    if (!orderConfig) return;
+    setSaving(true);
+    try {
+      const ok = await addRow(orderConfig.tab, obj);
+      onToast(ok ? "Pedido creado ✓" : "No se pudo guardar (reintentá)");
+      setOrderFor(null);
+    } catch {
+      onToast("Tardó demasiado: verificá si se guardó");
+    } finally {
+      setSaving(false);
+    }
+    setTimeout(loadPedidos, 1200);
+  };
+
   const toggleEstado = async (row: Row) => {
     const nuevo = row.estado === "Entregado" ? "Pendiente" : "Entregado";
     setRows((prev) =>
@@ -131,7 +192,13 @@ export function AdminRecords({
     try {
       await deleteRow(config.tab, row.id);
       // El backend repone el stock si el pago ya estaba aprobado (descontado).
-      onToast(row.descontado === "sí" ? "Pedido eliminado · stock repuesto ✓" : "Pedido eliminado ✓");
+      onToast(
+        row.descontado === "sí"
+          ? "Pedido eliminado · stock repuesto ✓"
+          : isClientes
+            ? "Cliente eliminado ✓"
+            : "Pedido eliminado ✓",
+      );
     } catch {
       onToast("No se pudo eliminar (reintentá)");
       load();
@@ -245,19 +312,19 @@ export function AdminRecords({
           {visible.map((r, i) => (
             <li
               key={r.id || i}
-              onClick={() => config.detail && setDetailRow(r)}
+              onClick={() => (config.detail || isClientes) && openRow(r)}
               style={{ animationDelay: `${Math.min(i, 8) * 30}ms` }}
               className={`flex animate-section-in items-center gap-3 rounded-xl border border-line bg-white p-3 motion-reduce:animate-none ${
-                config.detail ? "cursor-pointer transition-colors hover:border-accent" : ""
+                config.detail || isClientes ? "cursor-pointer transition-colors hover:border-accent" : ""
               }`}
             >
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
-                  {config.detail ? (
+                  {config.detail || isClientes ? (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setDetailRow(r);
+                        openRow(r);
                       }}
                       className="truncate text-left hover:text-primary hover:underline"
                     >
@@ -273,6 +340,19 @@ export function AdminRecords({
                   )}
                 </p>
                 <p className="truncate text-xs text-muted">{config.secondary(r)}</p>
+                {isClientes &&
+                  (() => {
+                    const n = ordersOf(r).length;
+                    return (
+                      <span
+                        className={`mt-1.5 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${
+                          n ? "bg-accent/15 text-primary" : "bg-page-soft text-muted"
+                        }`}
+                      >
+                        {n === 0 ? "Sin pedidos" : n === 1 ? "1 pedido" : `${n} pedidos`}
+                      </span>
+                    );
+                  })()}
                 {config.estado && (
                   <button
                     onClick={(e) => {
@@ -358,6 +438,43 @@ export function AdminRecords({
           saving={saving}
           onClose={() => setAdding(false)}
           onSave={handleAdd}
+        />
+      )}
+
+      {editRow && (
+        <AddSheet
+          config={config}
+          saving={saving}
+          initial={editRow}
+          title="Editar cliente"
+          onClose={() => setEditRow(null)}
+          onSave={handleEdit}
+        />
+      )}
+      {orderFor && orderConfig && (
+        <AddSheet
+          config={orderConfig}
+          saving={saving}
+          initial={{ cliente: orderFor.nombre ?? "", telefono: orderFor.telefono ?? "" }}
+          title={`Nuevo pedido · ${orderFor.nombre ?? ""}`}
+          onClose={() => setOrderFor(null)}
+          onSave={handleAddOrder}
+        />
+      )}
+      {clientRow && (
+        <ClientSheet
+          row={clientRow}
+          orders={ordersOf(clientRow)}
+          canOrder={!!orderConfig}
+          onClose={() => setClientRow(null)}
+          onNewOrder={() => setOrderFor(clientRow)}
+          onEdit={() => setEditRow(clientRow)}
+          onDelete={async () => {
+            const c = clientRow;
+            setClientRow(null);
+            await eliminar(c);
+          }}
+          onOpenOrder={(p) => setDetailRow(p)}
         />
       )}
 
@@ -549,13 +666,22 @@ function AddSheet({
   saving,
   onClose,
   onSave,
+  initial,
+  title,
 }: {
   config: RecordsConfig;
   saving: boolean;
   onClose: () => void;
   onSave: (r: Row) => void;
+  /** Valores iniciales (editar un registro o pre-cargar el cliente) */
+  initial?: Row;
+  title?: string;
 }) {
-  const [form, setForm] = useState<Row>({});
+  const [form, setForm] = useState<Row>(() => {
+    const base: Row = {};
+    for (const f of config.fields) if (initial?.[f.key] != null) base[f.key] = String(initial[f.key]);
+    return base;
+  });
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -571,7 +697,7 @@ function AddSheet({
       >
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-display text-lg font-bold text-primary">
-            {config.addLabel}
+            {title ?? config.addLabel}
           </h3>
           <button
             type="button"
@@ -633,6 +759,172 @@ function AddSheet({
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+/* -------------------------- Ficha de un cliente --------------------------- */
+
+function ClientSheet({
+  row,
+  orders,
+  canOrder,
+  onClose,
+  onNewOrder,
+  onEdit,
+  onDelete,
+  onOpenOrder,
+}: {
+  row: Row;
+  orders: Row[];
+  canOrder: boolean;
+  onClose: () => void;
+  onNewOrder: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onOpenOrder: (p: Row) => void;
+}) {
+  const tel = String(row.telefono ?? "").replace(/\D/g, "");
+  const wa = tel ? "https://wa.me/" + (tel.startsWith("54") ? tel : "549" + tel.replace(/^0/, "")) : "";
+  const esWeb = String(row.origen ?? "").trim().toLowerCase() === "web";
+  const datos: [string, string | undefined][] = [
+    ["Teléfono", row.telefono],
+    ["Email", row.email],
+    ["Ciudad", row.ciudad],
+    ["Dirección", row.direccion],
+    ["DNI / CUIT", row.dni],
+    ["Notas", row.notas],
+  ];
+  // Resumen del pedido: primer ítem (o el detalle) + cantidad de ítems
+  const resumen = (p: Row) => {
+    try {
+      const items = JSON.parse(p.items || "[]") as { n: string; q: number }[];
+      if (items.length) {
+        const first = `${items[0].q}x ${items[0].n}`;
+        return items.length > 1 ? `${first} +${items.length - 1}` : first;
+      }
+    } catch {
+      /* sin items en JSON */
+    }
+    return p.detalle || "Pedido";
+  };
+  const estadoDe = (p: Row) =>
+    p.descontado === "sí" || String(p.estado).toLowerCase() === "pagado"
+      ? { t: "Pagado", c: "bg-green-100 text-green-700" }
+      : p.estado === "Entregado"
+        ? { t: "Entregado", c: "bg-accent/15 text-primary" }
+        : { t: p.estado || "Pendiente", c: "bg-amber-100 text-amber-700" };
+
+  return (
+    <div className="fixed inset-0 z-[95] flex items-end justify-center sm:items-center">
+      <div className="absolute inset-0 animate-fade-in bg-black/50 motion-reduce:animate-none" onClick={onClose} />
+      <div className="relative max-h-[92vh] w-full max-w-md animate-section-in overflow-y-auto rounded-t-2xl bg-page p-5 motion-reduce:animate-none sm:rounded-2xl">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h3 className="truncate font-display text-xl font-bold text-primary">{row.nombre || "Cliente"}</h3>
+          <button
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-ink hover:bg-page-soft"
+          >
+            <CloseIcon className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="divide-y divide-line rounded-xl border border-line bg-white px-4 text-sm">
+          {datos
+            .filter(([, v]) => String(v ?? "").trim() !== "")
+            .map(([k, v]) => (
+              <div key={k} className="flex items-start justify-between gap-4 py-2.5">
+                <span className="shrink-0 text-muted">{k}</span>
+                <span className="text-right font-semibold text-ink">{v}</span>
+              </div>
+            ))}
+          {datos.every(([, v]) => String(v ?? "").trim() === "") && (
+            <p className="py-3 text-muted">Sin datos cargados.</p>
+          )}
+        </div>
+
+        <p className="mt-3 text-xs font-semibold text-muted">
+          {esWeb ? "🌐 Registrado desde la web" : "✍️ Cargado por vos"}
+          {row.fecha ? ` · ${row.fecha}` : ""}
+        </p>
+
+        <div className="mt-3 flex items-stretch gap-2">
+          {canOrder && (
+            <button onClick={onNewOrder} className="btn btn-primary btn-md flex-1">
+              <PlusIcon className="h-5 w-5" /> Nuevo pedido
+            </button>
+          )}
+          {wa && (
+            <a
+              href={wa}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Escribir por WhatsApp"
+              title="WhatsApp"
+              className="grid w-12 shrink-0 place-items-center rounded-xl border border-green-200 bg-green-50 text-green-600 hover:bg-green-100"
+            >
+              <WhatsappIcon className="h-5 w-5" />
+            </a>
+          )}
+          <button
+            onClick={onEdit}
+            aria-label="Editar datos"
+            title="Editar datos"
+            className="grid w-12 shrink-0 place-items-center rounded-xl border border-line bg-white text-ink hover:bg-page-soft"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+            </svg>
+          </button>
+          <button
+            onClick={onDelete}
+            aria-label="Eliminar cliente"
+            title="Eliminar cliente"
+            className="grid w-12 shrink-0 place-items-center rounded-xl border border-line bg-white text-sale hover:bg-sale/10"
+          >
+            <TrashIcon className="h-5 w-5" />
+          </button>
+        </div>
+
+        <h4 className="mb-2 mt-5 font-display text-base font-bold text-primary">
+          Historial{" "}
+          <span className="text-sm font-semibold text-muted">
+            ({orders.length === 0 ? "sin pedidos" : orders.length === 1 ? "1 pedido" : `${orders.length} pedidos`})
+          </span>
+        </h4>
+        {orders.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-line bg-white py-4 text-center text-sm text-muted">
+            Todavía no tiene pedidos.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {orders.map((p) => {
+              const e = estadoDe(p);
+              return (
+                <li key={p.id} className="flex items-center gap-3 rounded-xl border border-line bg-white p-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-ink">{resumen(p)}</p>
+                    <p className="text-xs text-muted">
+                      {formatPrice(Number(p.monto) || 0)}
+                      {p.fecha ? ` · ${p.fecha}` : ""}
+                      {" · "}
+                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${e.c}`}>{e.t}</span>
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => onOpenOrder(p)}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-full border border-primary/30 px-3 py-1 text-xs font-bold text-primary hover:bg-accent-soft"
+                  >
+                    <ArrowRightIcon className="h-3.5 w-3.5" /> Pedido
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
