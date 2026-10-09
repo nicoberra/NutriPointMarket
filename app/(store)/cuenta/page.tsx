@@ -207,7 +207,11 @@ export default function CuentaPage() {
           </form>
 
           <p className="mt-5 rounded-lg bg-page-soft px-3 py-2.5 text-center text-xs text-muted">
-            Tus datos se guardan de forma segura. Nunca compartimos tu información.
+            Tus datos se guardan de forma segura. Al crear tu cuenta aceptás los{" "}
+            <Link href="/terminos/" className="font-semibold text-primary underline">
+              Términos y condiciones
+            </Link>
+            .
           </p>
         </div>
       </div>

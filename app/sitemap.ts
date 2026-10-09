@@ -8,7 +8,7 @@ const BASE = "https://suplemarket.com.ar";
 /** sitemap.xml: páginas principales + la página propia de cada producto. */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
-  const routes: MetadataRoute.Sitemap = ["/", "/productos/", "/marcas/", "/ofertas/", "/contacto/"].map(
+  const routes: MetadataRoute.Sitemap = ["/", "/productos/", "/marcas/", "/ofertas/", "/contacto/", "/terminos/"].map(
     (path) => ({
       url: `${BASE}${path}`,
       lastModified: now,

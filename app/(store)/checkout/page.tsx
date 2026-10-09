@@ -384,6 +384,13 @@ export default function CheckoutPage() {
                   Seguir navegando
                 </Link>
               </div>
+              <p className="mt-3 text-center text-xs text-muted sm:text-left">
+                Al confirmar aceptás los{" "}
+                <Link href="/terminos/" className="font-semibold text-primary underline">
+                  Términos y condiciones
+                </Link>
+                .
+              </p>
             </div>
           </aside>
         </form>
