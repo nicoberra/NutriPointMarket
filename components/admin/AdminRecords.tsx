@@ -166,7 +166,7 @@ export function AdminRecords({
 
   // Cobrado: columna propia; los pagos aprobados (web/MP) también cuentan.
   const estaCobrado = (r: Row) =>
-    r.cobrado === "sí" || r.descontado === "sí" || String(r.estado ?? "").toLowerCase() === "pagado";
+    r.cobrado === "sí" || String(r.estado ?? "").toLowerCase() === "pagado";
   const toggleCobrado = async (row: Row) => {
     const nuevo = row.cobrado === "sí" ? "no" : "sí";
     setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, cobrado: nuevo } : r)));
@@ -222,13 +222,13 @@ export function AdminRecords({
   };
 
   const aprobarPago = async (row: Row) => {
-    onToast("Aprobando y descontando stock… ⏳");
+    onToast("Descontando stock… ⏳");
     setRows((prev) =>
       prev.map((r) => (r.id === row.id ? { ...r, descontado: "sí", estado: "pagado" } : r)),
     );
     try {
       const ok = await aprobarPedido(row.id);
-      onToast(ok ? "Pago aprobado · stock descontado ✓" : "No se pudo aprobar");
+      onToast(ok ? "Stock descontado ✓" : "No se pudo descontar");
       if (!ok) load();
     } catch {
       onToast("Tardó demasiado: verificá el pedido");
@@ -418,8 +418,8 @@ export function AdminRecords({
                     const faltaComprobante = esWeb && esTransfer && !r.comprobante && !estaCobrado(r);
                     if (r.descontado === "sí")
                       return (
-                        <span className="ml-1.5 mt-1.5 inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-bold text-green-700">
-                          <CheckIcon className="h-3.5 w-3.5" /> Pago aprobado
+                        <span className="ml-1.5 mt-1.5 inline-flex items-center gap-1 rounded-full bg-page-soft px-2.5 py-1 text-xs font-bold text-muted">
+                          <CheckIcon className="h-3.5 w-3.5" /> Stock descontado
                         </span>
                       );
                     if (faltaComprobante)
@@ -436,7 +436,7 @@ export function AdminRecords({
                         }}
                         className="ml-1.5 mt-1.5 inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-xs font-bold text-white hover:brightness-110"
                       >
-                        {esTransfer ? "Comprobante ✓ · Aprobar" : "Aprobar pago"}
+                        Descontar stock
                       </button>
                     );
                   })()}
@@ -563,7 +563,7 @@ function DetailSheet({ row, onClose }: { row: Row; onClose: () => void }) {
             <DetailLine k="Forma de pago" v={row.pago} />
             <DetailLine
               k="Estado"
-              v={row.descontado === "sí" ? "Pagado · stock descontado" : row.estado || "Pendiente"}
+              v={`${row.cobrado === "sí" || String(row.estado).toLowerCase() === "pagado" ? "Cobrado" : "Sin cobrar"} · ${row.estado === "Entregado" ? "entregado" : "sin entregar"} · ${row.descontado === "sí" ? "stock descontado" : "stock sin descontar"}`}
             />
             <DetailLine k="Envío" v={row.envio} />
           </DetailBox>
@@ -843,8 +843,8 @@ function ClientSheet({
     return p.detalle || "Pedido";
   };
   const estadoDe = (p: Row) =>
-    p.descontado === "sí" || String(p.estado).toLowerCase() === "pagado"
-      ? { t: "Pagado", c: "bg-green-100 text-green-700" }
+    p.cobrado === "sí" || String(p.estado).toLowerCase() === "pagado"
+      ? { t: "Cobrado", c: "bg-green-100 text-green-700" }
       : p.estado === "Entregado"
         ? { t: "Entregado", c: "bg-accent/15 text-primary" }
         : { t: p.estado || "Pendiente", c: "bg-amber-100 text-amber-700" };
