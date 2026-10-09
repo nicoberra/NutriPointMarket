@@ -174,9 +174,9 @@ export const FOOTER_NAV = [
 
 /** Enlaces legales (placeholders requeridos en Argentina) */
 export const FOOTER_LEGAL = [
-  { label: "Términos y condiciones", href: "#" },
-  { label: "Política de privacidad", href: "#" },
-  { label: "Defensa de las y los consumidores", href: "#" },
+  { label: "Términos y condiciones", href: "/terminos/" },
+  { label: "Política de privacidad", href: "/terminos/#privacidad" },
+  { label: "Defensa de las y los consumidores", href: "https://www.argentina.gob.ar/produccion/defensadelconsumidor/formulario" },
 ];
 
 /** Descuento pagando por transferencia (10%). Se muestra el precio final en cada producto. */
