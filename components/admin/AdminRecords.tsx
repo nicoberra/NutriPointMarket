@@ -164,6 +164,21 @@ export function AdminRecords({
     setTimeout(loadPedidos, 1200);
   };
 
+  // Cobrado: columna propia; los pagos aprobados (web/MP) también cuentan.
+  const estaCobrado = (r: Row) =>
+    r.cobrado === "sí" || r.descontado === "sí" || String(r.estado ?? "").toLowerCase() === "pagado";
+  const toggleCobrado = async (row: Row) => {
+    const nuevo = row.cobrado === "sí" ? "no" : "sí";
+    setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, cobrado: nuevo } : r)));
+    try {
+      const r = await updateRow(config.tab, row.id, { cobrado: nuevo });
+      if (r === false) throw new Error("no ok");
+    } catch {
+      onToast("No se pudo cambiar (reintentá)");
+      load();
+    }
+  };
+
   const toggleEstado = async (row: Row) => {
     const nuevo = row.estado === "Entregado" ? "Pendiente" : "Entregado";
     setRows((prev) =>
@@ -375,10 +390,30 @@ export function AdminRecords({
                     )}
                   </button>
                 )}
+                {config.estado && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleCobrado(r);
+                    }}
+                    title={estaCobrado(r) ? "Marcar como no cobrado" : "Marcar como cobrado"}
+                    className={`ml-1.5 mt-1.5 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${
+                      estaCobrado(r) ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+                    }`}
+                  >
+                    {estaCobrado(r) ? (
+                      <>
+                        <CheckIcon className="h-3.5 w-3.5" /> Cobrado
+                      </>
+                    ) : (
+                      "Sin cobrar"
+                    )}
+                  </button>
+                )}
                 {config.aprobar &&
                   (() => {
                     const esTransfer = (r.pago || "").toLowerCase().includes("transfer");
-                    const faltaComprobante = esTransfer && !r.comprobante;
+                    const faltaComprobante = esTransfer && !r.comprobante && !estaCobrado(r);
                     if (r.descontado === "sí")
                       return (
                         <span className="ml-1.5 mt-1.5 inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-bold text-green-700">
