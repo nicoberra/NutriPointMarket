@@ -21,12 +21,17 @@ export default function CuentaPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [acepta, setAcepta] = useState(false);
 
   const favProducts = products.filter((p) => favorites.includes(p.id));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (mode === "register" && !acepta) {
+      setError("Para crear la cuenta tenés que aceptar los Términos y condiciones.");
+      return;
+    }
     setLoading(true);
     const res =
       mode === "login"
@@ -189,14 +194,32 @@ export default function CuentaPage() {
               </div>
             </div>
 
+            {mode === "register" && (
+              <label className="flex items-start gap-3 rounded-lg border border-line bg-white px-3 py-2.5 text-sm text-ink">
+                <input
+                  type="checkbox"
+                  checked={acepta}
+                  onChange={(e) => setAcepta(e.target.checked)}
+                  className="mt-0.5 h-5 w-5 shrink-0 accent-[rgb(var(--color-accent))]"
+                />
+                <span>
+                  Leí y acepto los{" "}
+                  <Link href="/terminos/" target="_blank" className="font-semibold text-primary underline">
+                    Términos y condiciones
+                  </Link>
+                  , incluido el uso de mis datos para comunicaciones y promociones de Suple Market.
+                </span>
+              </label>
+            )}
+
             {error && (
               <p className="rounded-lg bg-sale/10 px-3 py-2 text-sm text-sale">{error}</p>
             )}
 
             <button
               type="submit"
-              disabled={loading}
-              className="btn btn-primary btn-lg w-full"
+              disabled={loading || (mode === "register" && !acepta)}
+              className="btn btn-primary btn-lg w-full disabled:opacity-60"
             >
               {loading
                 ? "Un momento…"
@@ -207,11 +230,7 @@ export default function CuentaPage() {
           </form>
 
           <p className="mt-5 rounded-lg bg-page-soft px-3 py-2.5 text-center text-xs text-muted">
-            Tus datos se guardan de forma segura. Al crear tu cuenta aceptás los{" "}
-            <Link href="/terminos/" className="font-semibold text-primary underline">
-              Términos y condiciones
-            </Link>
-            .
+            Tus datos se guardan de forma segura y solo los usa Suple Market.
           </p>
         </div>
       </div>
