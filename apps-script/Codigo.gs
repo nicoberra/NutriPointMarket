@@ -351,8 +351,31 @@ function deleteRow(tab, id) {
   // Si es un pedido con el pago aprobado (stock ya descontado), repone el
   // stock de cada producto antes de borrarlo.
   if (tab === "Pedidos") reponerStockPedido(n);
+  guardarEnPapelera(tab, n);
   sheetFor(tab).deleteRow(n);
   return { deleted: id };
+}
+
+// Copia la fila a la pestaña "Papelera" (se crea sola) antes de borrarla, con
+// fecha y pestaña de origen. Para recuperar: copiar los valores de vuelta.
+function guardarEnPapelera(tab, n) {
+  try {
+    var sh = sheetFor(tab);
+    var keys = keysOf(tab);
+    var row = sh.getRange(n, 1, 1, keys.length).getValues()[0];
+    var book = ss();
+    var pap = book.getSheetByName("Papelera");
+    if (!pap) {
+      pap = book.insertSheet("Papelera");
+      pap.appendRow(["Borrado el", "Pestaña", "Datos (en el orden de las columnas de esa pestaña)"]);
+      pap.getRange(1, 1, 1, 3).setFontWeight("bold");
+      pap.setFrozenRows(1);
+    }
+    pap.appendRow([now(), tab].concat(row));
+  } catch (e) {
+    // La papelera nunca debe impedir la operación, pero sí quedar registrada.
+    console.error("Papelera: " + e);
+  }
 }
 
 function reponerStockPedido(n) {
@@ -369,6 +392,9 @@ function reponerStockPedido(n) {
 }
 
 function findRowById(tab, id) {
+  // Un id vacío no puede coincidir con una fila sin id: sería borrar/editar
+  // una fila cualquiera.
+  if (id === undefined || id === null || String(id).trim() === "") return -1;
   var sh = sheetFor(tab);
   var keys = keysOf(tab);
   var idCol = keys.indexOf(TABLES[tab].idField);
@@ -1101,6 +1127,38 @@ function low(v) {
 
 /* ============================ SETUP / MANTENIMIENTO ====================== */
 
+// Copia de seguridad: duplica la planilla completa en una carpeta "Backups
+// Suple Market" de tu Drive y conserva las últimas 30 copias.
+function backupAhora() {
+  var file = DriveApp.getFileById(ss().getId());
+  var folders = DriveApp.getFoldersByName("Backups Suple Market");
+  var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder("Backups Suple Market");
+  var stamp = Utilities.formatDate(new Date(), "America/Argentina/Buenos_Aires", "yyyy-MM-dd HH:mm");
+  file.makeCopy("Backup Suple Market " + stamp, folder);
+  // Conserva las 30 más nuevas
+  var copias = [];
+  var it = folder.getFiles();
+  while (it.hasNext()) {
+    var c = it.next();
+    if (c.getName().indexOf("Backup Suple Market ") === 0) copias.push(c);
+  }
+  copias.sort(function (a, b) { return b.getDateCreated() - a.getDateCreated(); });
+  for (var i = 30; i < copias.length; i++) copias[i].setTrashed(true);
+  return copias.length;
+}
+
+// Ejecutar UNA vez: deja programado el backup automático todos los días a las 4 am.
+function instalarBackupDiario() {
+  var ya = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === "backupDiario"; });
+  if (!ya) ScriptApp.newTrigger("backupDiario").timeBased().everyDays(1).atHour(4).create();
+  backupAhora();
+  SpreadsheetApp.getActive().toast("Backup diario instalado y primera copia hecha.", "Suple Market", 5);
+}
+
+function backupDiario() {
+  backupAhora();
+}
+
 function setup() {
   var book = ss();
   Object.keys(TABLES).forEach(function (tab, idx) {
@@ -1117,7 +1175,12 @@ function setup() {
 
 // Reescribe SOLO la pestaña Productos con las columnas correctas y la deja
 // VACÍA (los productos los cargás vos). Útil si venías de un formato viejo.
-function resetProductos() {
+// PELIGRO: borra todos los productos. Para ejecutarla hay que crear antes la
+// propiedad del script PERMITIR_RESET = "si" (y borrarla después).
+function resetProductos_BORRA_TODO() {
+  if (PropertiesService.getScriptProperties().getProperty("PERMITIR_RESET") !== "si") {
+    throw new Error("Bloqueado: creá la propiedad PERMITIR_RESET = si para habilitarlo.");
+  }
   var sh = ss().getSheetByName("Productos");
   if (!sh) sh = ss().insertSheet("Productos");
   sh.clear();

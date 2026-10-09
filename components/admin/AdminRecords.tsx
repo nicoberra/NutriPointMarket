@@ -194,6 +194,11 @@ export function AdminRecords({
   };
 
   const eliminar = async (row: Row) => {
+    // Nunca borrar una fila sin id (podría borrarse otra). Se corrige desde la planilla.
+    if (!String(row.id ?? "").trim()) {
+      onToast("Este registro no tiene id: editalo o borralo desde la planilla");
+      return;
+    }
     if (
       !(await confirm({
         title: "¿Eliminar este registro?",
