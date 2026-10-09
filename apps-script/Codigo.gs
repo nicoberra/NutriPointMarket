@@ -329,7 +329,28 @@ function addRow(tab, obj) {
 function updateRow(tab, id, obj) {
   var n = findRowById(tab, id);
   if (n < 0) throw new Error("No se encontró: " + id);
+  if (tab === "Pedidos" && obj.hasOwnProperty("items")) ajustarStockPorEdicion(n, obj);
   return updateRowByNumber(tab, n, obj);
+}
+
+// Al editar los productos de un pedido: repone lo que tenía (si ya se había
+// descontado) y descuenta lo nuevo, así el stock queda por la diferencia.
+function ajustarStockPorEdicion(n, obj) {
+  var sh = sheetFor("Pedidos");
+  var keys = keysOf("Pedidos");
+  var row = sh.getRange(n, 1, 1, keys.length).getValues()[0];
+  var viejo = String(row[keys.indexOf("items")] || "[]");
+  var nuevo = String(obj.items || "[]");
+  if (viejo === nuevo) return;
+  var yaDesc = String(row[keys.indexOf("descontado")] || "").trim().toLowerCase() === "sí";
+  var itemsV = [], itemsN = [];
+  try { itemsV = JSON.parse(viejo); } catch (e1) {}
+  try { itemsN = JSON.parse(nuevo); } catch (e2) {}
+  if (yaDesc) {
+    for (var i = 0; i < itemsV.length; i++) ajustarProducto(itemsV[i].n, Number(itemsV[i].q) || 0, itemsV[i].v, itemsV[i].cv, +1);
+  }
+  for (var j = 0; j < itemsN.length; j++) ajustarProducto(itemsN[j].n, Number(itemsN[j].q) || 0, itemsN[j].v, itemsN[j].cv, -1);
+  obj.descontado = "sí";
 }
 
 function updateRowByNumber(tab, rowNumber, obj) {

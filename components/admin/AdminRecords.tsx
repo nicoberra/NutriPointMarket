@@ -83,6 +83,7 @@ export function AdminRecords({
   const [clientRow, setClientRow] = useState<Row | null>(null);
   const [editRow, setEditRow] = useState<Row | null>(null);
   const [orderFor, setOrderFor] = useState<Row | null>(null);
+  const [editOrder, setEditOrder] = useState<Row | null>(null);
   const loadPedidos = () => {
     if (!isClientes) return;
     listTable<Row>("Pedidos")
@@ -188,6 +189,24 @@ export function AdminRecords({
       onToast("No se pudo cambiar" + detalleError());
       load();
     }
+  };
+
+  const handleEditOrder = async (obj: Row) => {
+    if (!editOrder) return;
+    setSaving(true);
+    try {
+      const r = await updateRow("Pedidos", editOrder.id, obj);
+      onToast(r === false ? "No se pudo guardar" + detalleError() : "Pedido actualizado ✓");
+      if (r !== false) {
+        setEditOrder(null);
+        setDetailRow(null);
+      }
+    } catch {
+      onToast("Tardó demasiado: verificá si se guardó");
+    } finally {
+      setSaving(false);
+    }
+    recargar(loadPedidos);
   };
 
   const toggleEstado = async (row: Row) => {
@@ -529,14 +548,34 @@ export function AdminRecords({
       )}
 
       {dialog}
-      {detailRow && <DetailSheet row={detailRow} onClose={() => setDetailRow(null)} />}
+      {editOrder && (
+        <OrderSheet
+          initial={{
+            id: editOrder.id,
+            cliente: editOrder.cliente ?? "",
+            telefono: editOrder.telefono ?? "",
+            pago: editOrder.pago ?? "",
+            items: editOrder.items ?? "",
+            envio: editOrder.envio ?? "",
+            montoEnvio: editOrder.montoEnvio ?? "",
+            notas: editOrder.notas ?? "",
+            cobrado: editOrder.cobrado ?? "",
+          }}
+          saving={saving}
+          onClose={() => setEditOrder(null)}
+          onSave={handleEditOrder}
+        />
+      )}
+      {detailRow && !editOrder && (
+        <DetailSheet row={detailRow} onClose={() => setDetailRow(null)} onEdit={() => setEditOrder(detailRow)} />
+      )}
     </div>
   );
 }
 
 /* ------------------------- Detalle de un pedido --------------------------- */
 
-function DetailSheet({ row, onClose }: { row: Row; onClose: () => void }) {
+function DetailSheet({ row, onClose, onEdit }: { row: Row; onClose: () => void; onEdit?: () => void }) {
   const { products } = useProducts();
   const [foto, setFoto] = useState(false);
   let items: { n: string; v?: string; q: number; cv?: Record<string, string> }[] = [];
@@ -558,6 +597,14 @@ function DetailSheet({ row, onClose }: { row: Row; onClose: () => void }) {
       <div className="relative max-h-[92vh] w-full max-w-md animate-section-in overflow-y-auto rounded-t-2xl bg-page p-5 motion-reduce:animate-none sm:rounded-2xl">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="font-display text-lg font-bold text-primary">Detalle del pedido</h3>
+          {onEdit && (
+            <button
+              onClick={onEdit}
+              className="ml-auto mr-2 inline-flex items-center gap-1 rounded-full border border-primary/30 px-3 py-1 text-xs font-bold text-primary hover:bg-accent-soft"
+            >
+              ✎ Editar
+            </button>
+          )}
           <button
             onClick={onClose}
             aria-label="Cerrar"
