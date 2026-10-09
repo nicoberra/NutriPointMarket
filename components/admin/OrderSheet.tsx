@@ -23,7 +23,18 @@ export function OrderSheet({
   onClose,
   onSave,
 }: {
-  initial?: { cliente?: string; telefono?: string };
+  /** Datos iniciales: cliente para un pedido nuevo, o el pedido completo para editarlo (con id). */
+  initial?: {
+    id?: string;
+    cliente?: string;
+    telefono?: string;
+    pago?: string;
+    items?: string;
+    envio?: string;
+    montoEnvio?: string;
+    notas?: string;
+    cobrado?: string;
+  };
   saving: boolean;
   onClose: () => void;
   onSave: (r: Row) => void;
@@ -32,12 +43,29 @@ export function OrderSheet({
   const dollar = useDollar();
   const [cliente, setCliente] = useState(initial?.cliente ?? "");
   const [telefono, setTelefono] = useState(initial?.telefono ?? "");
-  const [pago, setPago] = useState<Pago>("Transferencia");
-  const [lines, setLines] = useState<Line[]>([]);
-  const [montoEnvio, setMontoEnvio] = useState<string>("");
-  const [envio, setEnvio] = useState("");
-  const [notas, setNotas] = useState("");
-  const [cobrado, setCobrado] = useState(true);
+  const editing = !!initial?.id;
+  const [pago, setPago] = useState<Pago>(() =>
+    initial?.pago === "Efectivo" || initial?.pago === "Mercado Pago" ? initial.pago : "Transferencia",
+  );
+  // Al editar: reconstruye los renglones desde los items guardados (por nombre)
+  const [lines, setLines] = useState<Line[]>(() => {
+    if (!initial?.items) return [];
+    try {
+      const items = JSON.parse(initial.items) as { n: string; v?: string; q: number }[];
+      return items
+        .map((it) => {
+          const p = products.find((x) => x.name === it.n);
+          return p ? { pid: p.id, variant: it.v || "", qty: Math.max(1, Number(it.q) || 1) } : null;
+        })
+        .filter((l): l is Line => l !== null);
+    } catch {
+      return [];
+    }
+  });
+  const [montoEnvio, setMontoEnvio] = useState<string>(initial?.montoEnvio && Number(initial.montoEnvio) > 0 ? String(initial.montoEnvio) : "");
+  const [envio, setEnvio] = useState(initial?.envio ?? "");
+  const [notas, setNotas] = useState(initial?.notas ?? "");
+  const [cobrado, setCobrado] = useState(initial?.cobrado ? initial.cobrado === "sí" : true);
 
   const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const sorted = useMemo(
@@ -125,7 +153,7 @@ export function OrderSheet({
       >
         <div className="mb-4 flex items-center justify-between gap-3">
           <h3 className="truncate font-display text-lg font-bold text-primary">
-            Nuevo pedido{initial?.cliente ? ` · ${initial.cliente}` : ""}
+            {editing ? "Editar pedido" : "Nuevo pedido"}{initial?.cliente ? ` · ${initial.cliente}` : ""}
           </h3>
           <button
             type="button"
@@ -340,7 +368,7 @@ export function OrderSheet({
             disabled={saving || incompleto || !cliente.trim()}
             className="btn btn-primary btn-md flex-1 disabled:opacity-60"
           >
-            {saving ? "Guardando…" : "Guardar pedido"}
+            {saving ? "Guardando…" : editing ? "Guardar cambios" : "Guardar pedido"}
           </button>
         </div>
       </form>
