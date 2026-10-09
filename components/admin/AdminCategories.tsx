@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useConfirm } from "./useConfirm";
+import { CopyLinkButton } from "./CopyLinkButton";
 import { useCategories } from "@/context/CategoriesContext";
 import {
   addCategory,
@@ -235,6 +236,10 @@ export function AdminCategories({
                   >
                     {c.name}
                   </button>
+                  <CopyLinkButton
+                    url={`https://suplemarket.com.ar/productos/?categoria=${c.slug}`}
+                    title="Copiar link de la categoría"
+                  />
                   <button
                     onClick={() => remove(c.name)}
                     aria-label="Borrar"
