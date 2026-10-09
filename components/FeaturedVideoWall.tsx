@@ -38,6 +38,9 @@ export function FeaturedVideoWall({
   poster?: string;
 }) {
   const items = products.filter((p) => p.image);
+  // Copias necesarias para que la tira cubra la pantalla y siga sin cortes
+  // (cada ítem mide ~96 px con su separación; se cubren al menos 1000 px + una vuelta).
+  const copies = Math.max(3, Math.ceil(1000 / Math.max(1, items.length * 96)) + 1);
   const wrapRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const movedRef = useRef(false); // distingue "tocar" de "arrastrar"
@@ -54,9 +57,15 @@ export function FeaturedVideoWall({
     let raf = 0;
     let resumeTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const half = () => track.scrollHeight / 2;
+    // Altura exacta de una vuelta: desde el primer ítem hasta el primero de la copia siguiente.
+    const n = items.length;
+    const setH = () => {
+      const c = track.children;
+      if (c.length > n) return (c[n] as HTMLElement).offsetTop - (c[0] as HTMLElement).offsetTop;
+      return track.scrollHeight / copies;
+    };
     const loop = (v: number) => {
-      const h = half();
+      const h = setH();
       if (!h) return v;
       v = v % h;
       return v < 0 ? v + h : v;
@@ -151,10 +160,10 @@ export function FeaturedVideoWall({
       wrap.removeEventListener("mouseenter", onEnter);
       wrap.removeEventListener("mouseleave", onLeave);
     };
-  }, [items.length]);
+  }, [items.length, copies]);
 
   if (items.length === 0) return null;
-  const doubled = [...items, ...items];
+  const repeated = Array.from({ length: copies }, () => items).flat();
 
   return (
     <section id={id} className="scroll-mt-24 py-10 sm:py-14">
@@ -194,7 +203,7 @@ export function FeaturedVideoWall({
           }}
         >
           <div ref={trackRef} className="flex flex-col gap-3 will-change-transform">
-            {doubled.map((p, i) => (
+            {repeated.map((p, i) => (
               <Link
                 key={`${p.id}-${i}`}
                 href={`/producto/${p.slug}/`}
