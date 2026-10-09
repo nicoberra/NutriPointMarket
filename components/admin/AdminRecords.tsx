@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useConfirm } from "./useConfirm";
 import { OrderSheet } from "./OrderSheet";
-import { listTable, addRow, updateRow, deleteRow, aprobarPedido, localAsset } from "@/lib/api";
+import { listTable, addRow, updateRow, deleteRow, aprobarPedido, localAsset, lastApiError } from "@/lib/api";
 import { useProducts } from "@/context/ProductsContext";
 import { whatsappLink } from "@/lib/config";
 import { formatPrice } from "@/lib/format";
@@ -115,6 +115,16 @@ export function AdminRecords({
   };
 
   useEffect(load, [config.tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Tras guardar, recarga varias veces: la fila puede tardar unos segundos en aparecer.
+  const recargar = (extra?: () => void) => {
+    [1200, 4000, 9000].forEach((ms) =>
+      setTimeout(() => {
+        load();
+        extra?.();
+      }, ms),
+    );
+  };
+  const detalleError = () => (lastApiError ? `: ${lastApiError}` : " (reintentá)");
 
   // Todas las acciones con try/catch: si la planilla tarda o falla, avisa y
   // recarga (para volver a la verdad) en vez de quedar trabado o mentir.
@@ -122,15 +132,14 @@ export function AdminRecords({
     setSaving(true);
     try {
       const ok = await addRow(config.tab, obj);
-      setAdding(false);
-      onToast(ok ? "Guardado ✓" : "No se pudo guardar (reintentá)");
+      if (ok) setAdding(false);
+      onToast(ok ? "Guardado ✓" : "No se pudo guardar" + detalleError());
     } catch {
       onToast("Tardó demasiado: verificá si se guardó");
     } finally {
       setSaving(false);
     }
-    // recargar tras un momento (la escritura es asíncrona)
-    setTimeout(load, 1200);
+    recargar(loadPedidos);
   };
 
   const handleEdit = async (obj: Row) => {
@@ -138,15 +147,17 @@ export function AdminRecords({
     setSaving(true);
     try {
       const r = await updateRow(config.tab, editRow.id, obj);
-      onToast(r === false ? "No se pudo guardar (reintentá)" : "Datos actualizados ✓");
-      setEditRow(null);
-      setClientRow((c) => (c && c.id === editRow.id ? { ...c, ...obj } : c));
+      onToast(r === false ? "No se pudo guardar" + detalleError() : "Datos actualizados ✓");
+      if (r !== false) {
+        setEditRow(null);
+        setClientRow((c) => (c && c.id === editRow.id ? { ...c, ...obj } : c));
+      }
     } catch {
       onToast("Tardó demasiado: verificá si se guardó");
     } finally {
       setSaving(false);
     }
-    setTimeout(load, 1200);
+    recargar();
   };
 
   const handleAddOrder = async (obj: Row) => {
@@ -154,14 +165,14 @@ export function AdminRecords({
     setSaving(true);
     try {
       const ok = await addRow(orderConfig.tab, obj);
-      onToast(ok ? "Pedido creado ✓" : "No se pudo guardar (reintentá)");
-      setOrderFor(null);
+      onToast(ok ? "Pedido creado ✓ (stock descontado)" : "No se pudo guardar" + detalleError());
+      if (ok) setOrderFor(null);
     } catch {
       onToast("Tardó demasiado: verificá si se guardó");
     } finally {
       setSaving(false);
     }
-    setTimeout(loadPedidos, 1200);
+    recargar(loadPedidos);
   };
 
   // Cobrado: columna propia; los pagos aprobados (web/MP) también cuentan.
@@ -174,7 +185,7 @@ export function AdminRecords({
       const r = await updateRow(config.tab, row.id, { cobrado: nuevo });
       if (r === false) throw new Error("no ok");
     } catch {
-      onToast("No se pudo cambiar (reintentá)");
+      onToast("No se pudo cambiar" + detalleError());
       load();
     }
   };
@@ -188,7 +199,7 @@ export function AdminRecords({
       const r = await updateRow(config.tab, row.id, { estado: nuevo });
       if (r === false) throw new Error("no ok");
     } catch {
-      onToast("No se pudo cambiar el estado (reintentá)");
+      onToast("No se pudo cambiar el estado" + detalleError());
       load();
     }
   };
@@ -221,7 +232,7 @@ export function AdminRecords({
             : "Pedido eliminado ✓",
       );
     } catch {
-      onToast("No se pudo eliminar (reintentá)");
+      onToast("No se pudo eliminar" + detalleError());
       load();
     }
   };
