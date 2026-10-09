@@ -40,7 +40,12 @@ export function OrderSheet({
 
   const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const sorted = useMemo(
-    () => [...products].sort((a, b) => a.name.localeCompare(b.name, "es")),
+    () =>
+      [...products].sort((a, b) => {
+        const sa = a.inStock === false ? 1 : 0;
+        const sb = b.inStock === false ? 1 : 0;
+        return sa - sb || a.name.localeCompare(b.name, "es");
+      }),
     [products],
   );
 
@@ -66,18 +71,15 @@ export function OrderSheet({
   const envioNum = Number(montoEnvio) || 0;
   const total = subtotal + envioNum;
 
-  const addLine = () => {
-    const first = sorted.find((p) => !lines.some((l) => l.pid === p.id)) ?? sorted[0];
-    if (!first) return;
-    setLines((ls) => [...ls, { pid: first.id, variant: first.flavors[0] ?? "", qty: 1 }]);
-  };
+  const addLine = () => setLines((ls) => [...ls, { pid: "", variant: "", qty: 1 }]);
+  const incompleto = lines.length === 0 || lines.some((l) => !byId.get(l.pid));
   const setLine = (i: number, patch: Partial<Line>) =>
     setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   const removeLine = (i: number) => setLines((ls) => ls.filter((_, j) => j !== i));
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cliente.trim() || lines.length === 0) return;
+    if (!cliente.trim() || incompleto) return;
     const items = lines
       .map((l) => {
         const p = byId.get(l.pid);
@@ -202,6 +204,7 @@ export function OrderSheet({
                           }}
                           className="input h-11 min-w-0 flex-1 text-sm"
                         >
+                          <option value="">Seleccionar producto…</option>
                           {sorted.map((op) => (
                             <option key={op.id} value={op.id}>
                               {op.name}
@@ -319,7 +322,7 @@ export function OrderSheet({
           </button>
           <button
             type="submit"
-            disabled={saving || lines.length === 0 || !cliente.trim()}
+            disabled={saving || incompleto || !cliente.trim()}
             className="btn btn-primary btn-md flex-1 disabled:opacity-60"
           >
             {saving ? "Guardando…" : "Guardar pedido"}
