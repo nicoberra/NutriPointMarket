@@ -413,7 +413,9 @@ export function AdminRecords({
                 {config.aprobar &&
                   (() => {
                     const esTransfer = (r.pago || "").toLowerCase().includes("transfer");
-                    const faltaComprobante = esTransfer && !r.comprobante && !estaCobrado(r);
+                    // Solo pedidos de la web (id "ped…") con transferencia; los cargados a mano no lo necesitan
+                    const esWeb = String(r.id ?? "").startsWith("ped");
+                    const faltaComprobante = esWeb && esTransfer && !r.comprobante && !estaCobrado(r);
                     if (r.descontado === "sí")
                       return (
                         <span className="ml-1.5 mt-1.5 inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-bold text-green-700">
