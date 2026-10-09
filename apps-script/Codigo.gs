@@ -307,6 +307,18 @@ function addRow(tab, obj) {
   }
   if (TABLES[tab].idField === "id" && !obj.id) obj.id = "id" + Date.now();
   if (keys.indexOf("fecha") !== -1 && !obj.fecha) obj.fecha = now();
+  // Pedidos: el stock se descuenta al crear el pedido (web o CRM). Si el
+  // pedido se elimina, deleteRow lo repone. "Aprobar" ya no descuenta de nuevo.
+  if (tab === "Pedidos") {
+    var itemsP = [];
+    try { itemsP = JSON.parse(obj.items || "[]"); } catch (eP) {}
+    if (itemsP.length && String(obj.descontado || "").trim().toLowerCase() !== "sí") {
+      for (var ip = 0; ip < itemsP.length; ip++) {
+        descontarProducto(itemsP[ip].n, Number(itemsP[ip].q) || 0, itemsP[ip].v, itemsP[ip].cv);
+      }
+      obj.descontado = "sí";
+    }
+  }
   var line = keys.map(function (k) {
     return sanitize(k, obj[k]);
   });
