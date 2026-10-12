@@ -30,3 +30,7 @@ next-env.d.ts
 
 # Versiones WebP generadas en el build (scripts/optimize-images.mjs)
 /public/_opt/
+
+# generados por tools/mapa-envios (regenerar con python mapa.py && python armar.py)
+/tools/mapa-envios/mapa-base.svg
+/tools/mapa-envios/mapa.html

@@ -693,15 +693,27 @@ function mpCrearPreferencia(p) {
   var exec = "";
   try { exec = ScriptApp.getService().getUrl(); } catch (e0) {}
 
+  // El envío va como ítem aparte (una sola vez), el resto son los productos.
+  var envioMonto = Number(p.envio) || 0;
+  if (envioMonto < 0 || envioMonto >= monto) envioMonto = 0;
+  var itemsMP = [
+    {
+      title: String(p.titulo || "Pedido Suple Market"),
+      quantity: 1,
+      unit_price: monto - envioMonto,
+      currency_id: "ARS",
+    },
+  ];
+  if (envioMonto > 0) {
+    itemsMP.push({
+      title: String(p.envioTitulo || "Envío a domicilio"),
+      quantity: 1,
+      unit_price: envioMonto,
+      currency_id: "ARS",
+    });
+  }
   var pref = {
-    items: [
-      {
-        title: String(p.titulo || "Pedido Suple Market"),
-        quantity: 1,
-        unit_price: monto,
-        currency_id: "ARS",
-      },
-    ],
+    items: itemsMP,
     external_reference: String(p.pedido || ""),
     back_urls: {
       success: SITE_URL + "/pago/exito/",
