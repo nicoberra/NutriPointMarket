@@ -673,6 +673,9 @@ export async function mpCreatePreference(args: {
   monto: number;
   titulo: string;
   email: string;
+  /** Costo de envío (va como ítem aparte en Mercado Pago) */
+  envio?: number;
+  envioTitulo?: string;
 }): Promise<string | null> {
   // Reintenta ante fallas de red (crear una preferencia extra es inofensivo).
   for (let i = 0; i < 3; i++) {
@@ -682,6 +685,8 @@ export async function mpCreatePreference(args: {
         monto: args.monto,
         titulo: args.titulo,
         email: args.email,
+        envio: args.envio ?? 0,
+        envioTitulo: args.envioTitulo ?? "",
       }, 18000)) as ApiResult & { init_point?: string };
       if (r.ok && r.init_point) return r.init_point;
       if (r.ok === false) return null; // el backend respondió con un error real

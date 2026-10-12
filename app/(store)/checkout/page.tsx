@@ -9,6 +9,8 @@ import { whatsappLink, TRANSFER, transferPrice } from "@/lib/config";
 import { createOrder, mpCreatePreference, uploadComprobante } from "@/lib/api";
 import { PageBanner } from "@/components/PageBanner";
 import { CheckIcon, WhatsappIcon } from "@/components/Icons";
+import { ShippingZones } from "@/components/ShippingZones";
+import { PROVINCIAS, ZONAS_ENVIO, calcularEnvio } from "@/lib/envios";
 
 type Metodo = "Transferencia" | "Mercado Pago";
 
@@ -30,9 +32,12 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const [compUp, setCompUp] = useState<"idle" | "up" | "done">("idle");
 
-  // Envío fijo por ahora (sin "envío gratis" por monto).
-  const SHIPPING = 10000;
-  const shipping = subtotal === 0 ? 0 : SHIPPING;
+  // Entrega: envío a domicilio (costo según zona) o retiro en persona ($0).
+  const [entrega, setEntrega] = useState<"envio" | "retiro">("envio");
+  const [provincia, setProvincia] = useState("");
+  const [partido, setPartido] = useState("");
+  const envioInfo = calcularEnvio({ retiro: entrega === "retiro", provincia, partido });
+  const shipping = subtotal === 0 ? 0 : envioInfo.costo;
   const total = subtotal + shipping;
 
   // Descuento por pagar con transferencia (no aplica a Mercado Pago): cada
@@ -56,6 +61,10 @@ export default function CheckoutPage() {
     setError(null);
 
     const fd = new FormData(e.currentTarget);
+    if (entrega === "envio" && envioInfo.tipo === "pendiente") {
+      setError(provincia === "Buenos Aires" ? "Elegí tu partido para calcular el envío." : "Elegí tu provincia para calcular el envío.");
+      return;
+    }
     const metodo = (String(fd.get("pago") || "Transferencia") as Metodo);
     const cliente = String(fd.get("nombre") || "").trim();
     // Recordamos el nombre en este dispositivo para saludarlo la próxima vez.
@@ -66,10 +75,15 @@ export default function CheckoutPage() {
     }
     const email = String(fd.get("email") || "").trim();
     const telefono = String(fd.get("telefono") || "").trim();
-    const direccion = [fd.get("direccion"), fd.get("ciudad"), fd.get("provincia"), fd.get("cp")]
-      .map((v) => String(v || "").trim())
-      .filter(Boolean)
-      .join(", ");
+    const direccion =
+      entrega === "retiro"
+        ? "Retiro en persona"
+        : [fd.get("direccion"), fd.get("ciudad"), partido, provincia, fd.get("cp")]
+            .map((v) => String(v || "").trim())
+            .filter(Boolean)
+            .join(", ");
+    // Texto del envío para el pedido: "Envío GBA 1 · Morón", "Retiro en persona", "Envío Vía Cargo · a coordinar"
+    const envioTexto = [direccion, envioInfo.resumen].filter(Boolean).join(" · ");
     // Combos: las variantes elegidas van en el detalle (legible) y en items
     // (cv) para que al aprobar el pago se descuente la variante correcta.
     const choicesTxt = (i: (typeof items)[number]) =>
@@ -109,7 +123,7 @@ export default function CheckoutPage() {
         detalle,
         monto: montoFinal,
         montoEnvio: shipping,
-        envio: direccion,
+        envio: envioTexto,
         metodo,
         items: itemsJson,
       });
@@ -120,6 +134,9 @@ export default function CheckoutPage() {
           monto: montoFinal,
           titulo: `Pedido Suple Market (${count} art.)`,
           email,
+          // El envío va como ítem aparte en Mercado Pago
+          envio: shipping,
+          envioTitulo: envioInfo.tipo === "zona" ? `Envío a domicilio · ${envioInfo.zona.corto}` : "Envío a domicilio",
         });
         if (!link) {
           setError("No se pudo iniciar el pago con Mercado Pago. Probá de nuevo o elegí otro medio.");
@@ -287,22 +304,123 @@ export default function CheckoutPage() {
 
             <fieldset className="rounded-xl border border-line bg-white p-5">
               <legend className="px-2 font-display text-base font-bold text-primary">Envío</legend>
-              <p className="mb-2 text-xs text-muted">
-                Costo de envío: <b className="text-ink">{formatPrice(SHIPPING)}</b>.
-              </p>
-              <p className="mb-3 rounded-lg bg-page-soft px-3 py-2 text-xs text-muted">
-                🛵 En la zona de entrega, el envío va por <b>motomensajería / logística
-                propia</b>. Fuera de la zona, va por <b>Vía Cargo</b>. En ambos casos
-                coordinamos la entrega con vos por WhatsApp.
-              </p>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                  <Field name="direccion" label="Dirección" required />
-                </div>
-                <Field name="ciudad" label="Ciudad" required />
-                <Field name="provincia" label="Provincia" required />
-                <Field name="cp" label="Código postal" required />
+
+              {/* Envío o retiro */}
+              <div className="grid grid-cols-2 gap-2" role="group" aria-label="Forma de entrega">
+                {([
+                  { v: "envio", t: "Envío a domicilio", h: "Capital, GBA o Vía Cargo" },
+                  { v: "retiro", t: "Retiro en persona", h: "Sin costo · coordinamos por WhatsApp" },
+                ] as const).map((o) => (
+                  <button
+                    key={o.v}
+                    type="button"
+                    aria-pressed={entrega === o.v}
+                    onClick={() => setEntrega(o.v)}
+                    className={`rounded-xl border-2 p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                      entrega === o.v ? "border-primary bg-accent-soft" : "border-line bg-white hover:border-primary/40"
+                    }`}
+                  >
+                    <span className="block text-sm font-bold text-ink">{o.t}</span>
+                    <span className="block text-xs text-muted">{o.h}</span>
+                  </button>
+                ))}
               </div>
+
+              {entrega === "envio" && (
+                <>
+                  <p className="mb-2 mt-5 text-sm font-semibold text-ink">Zonas de envío</p>
+                  <ShippingZones selectedId={envioInfo.tipo === "zona" ? envioInfo.zona.id : null} />
+
+                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <Field name="direccion" label="Dirección" required />
+                    </div>
+                    <label className="block">
+                      <span className="mb-1.5 block text-sm font-semibold text-ink">
+                        Provincia <span className="text-sale">*</span>
+                      </span>
+                      <select
+                        name="provincia"
+                        required
+                        value={provincia}
+                        onChange={(e) => {
+                          setProvincia(e.target.value);
+                          setPartido("");
+                        }}
+                        className="input h-11 text-base"
+                      >
+                        <option value="">Elegí tu provincia…</option>
+                        {PROVINCIAS.map((p) => (
+                          <option key={p} value={p}>
+                            {p}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {provincia === "Buenos Aires" ? (
+                      <label className="block">
+                        <span className="mb-1.5 block text-sm font-semibold text-ink">
+                          Elegí tu partido <span className="text-sale">*</span>
+                        </span>
+                        <select
+                          name="partido"
+                          required
+                          value={partido}
+                          onChange={(e) => setPartido(e.target.value)}
+                          className="input h-11 text-base"
+                        >
+                          <option value="">Elegí tu partido…</option>
+                          {ZONAS_ENVIO.filter((z) => z.id !== "capital").map((z) => (
+                            <optgroup key={z.id} label={`${z.nombre} · ${formatPrice(z.precio)}`}>
+                              {z.partidos.map((p) => (
+                                <option key={p} value={p}>
+                                  {p}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ))}
+                          <optgroup label="Interior de la provincia · Vía Cargo">
+                            <option value="Otro partido">Otro partido</option>
+                          </optgroup>
+                        </select>
+                      </label>
+                    ) : (
+                      <Field name="ciudad" label="Ciudad" required />
+                    )}
+                    <Field name="cp" label="Código postal" required />
+                  </div>
+
+                  <p
+                    className={`mt-4 rounded-lg px-3 py-2.5 text-sm font-semibold ${
+                      envioInfo.tipo === "zona"
+                        ? "bg-accent-soft text-ink"
+                        : envioInfo.tipo === "interior"
+                          ? "bg-page-soft text-ink"
+                          : "bg-page-soft text-muted"
+                    }`}
+                    aria-live="polite"
+                  >
+                    {envioInfo.tipo === "zona" && (
+                      <span
+                        className="mr-2 inline-block h-3 w-3 rounded-full align-middle"
+                        style={{ background: envioInfo.zona.color }}
+                        aria-hidden
+                      />
+                    )}
+                    {envioInfo.etiqueta}
+                  </p>
+                  <p className="mt-2 text-xs text-muted">
+                    🛵 En Capital y GBA el envío va por motomensajería / logística propia. En el interior, por
+                    Vía Cargo (el costo se coordina por WhatsApp y no se suma acá).
+                  </p>
+                </>
+              )}
+
+              {entrega === "retiro" && (
+                <p className="mt-4 rounded-lg bg-accent-soft px-3 py-2.5 text-sm text-ink">
+                  Retirás en persona sin costo de envío. Al confirmar, coordinamos día y lugar por WhatsApp.
+                </p>
+              )}
             </fieldset>
           </div>
 
@@ -329,9 +447,20 @@ export default function CheckoutPage() {
                   <dd className="font-medium text-ink">{formatPrice(subtotal)}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-muted">Envío</dt>
-                  <dd className="font-medium text-ink">
-                    {shipping === 0 ? "Gratis" : formatPrice(shipping)}
+                  <dt className="text-muted">
+                    Envío
+                    {envioInfo.tipo === "zona" && (
+                      <span className="block text-xs">{envioInfo.resumen}</span>
+                    )}
+                  </dt>
+                  <dd className="text-right font-medium text-ink">
+                    {envioInfo.tipo === "retiro"
+                      ? "Retiro · $ 0"
+                      : envioInfo.tipo === "interior"
+                        ? "A coordinar"
+                        : envioInfo.tipo === "pendiente"
+                          ? "A calcular"
+                          : formatPrice(shipping)}
                   </dd>
                 </div>
                 {descuento > 0 && (
