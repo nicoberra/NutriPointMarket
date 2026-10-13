@@ -6,8 +6,9 @@
  * - Si dos partes del CRM piden la misma pestaña a la vez, se hace UNA sola
  *   llamada (cada llamada a Apps Script tarda 1,5 a 3 s).
  * - Avisa a quien esté mostrando la pestaña cuando llegan datos nuevos.
- * Solo vive en este navegador mientras la pestaña está abierta (sessionStorage):
- * se borra al cerrar sesión o el navegador.
+ * - Si los datos se bajaron hace menos de 40 s, no los vuelve a pedir.
+ * Se guarda en este navegador (localStorage) para abrir el CRM al instante
+ * aunque se haya cerrado; se borra al cerrar sesión.
  */
 import { listTable } from "@/lib/api";
 
@@ -16,12 +17,14 @@ const mem = new Map<string, Row[]>();
 const inflight = new Map<string, Promise<Row[]>>();
 const subs = new Map<string, Set<(rows: Row[]) => void>>();
 const KEY = "sm-crm-tabla:";
+const FRESCO_MS = 40000;
+const bajadoEn = new Map<string, number>(); // última descarga de cada pestaña en esta sesión
 
 /** Datos ya cargados de una pestaña (o null si nunca se cargó en esta sesión). */
 export function peekTable<T = Row>(tab: string): T[] | null {
   if (mem.has(tab)) return mem.get(tab) as unknown as T[];
   try {
-    const raw = sessionStorage.getItem(KEY + tab);
+    const raw = localStorage.getItem(KEY + tab);
     if (raw) {
       const data = JSON.parse(raw) as Row[];
       mem.set(tab, data);
@@ -36,7 +39,7 @@ export function peekTable<T = Row>(tab: string): T[] | null {
 function store(tab: string, data: Row[]) {
   mem.set(tab, data);
   try {
-    sessionStorage.setItem(KEY + tab, JSON.stringify(data));
+    localStorage.setItem(KEY + tab, JSON.stringify(data));
   } catch {
     /* ignore (sin espacio o modo privado) */
   }
@@ -49,12 +52,21 @@ export function fetchTable<T = Row>(tab: string): Promise<T[]> {
   if (cur) return cur as unknown as Promise<T[]>;
   const p = listTable<Row>(tab)
     .then((data) => {
+      bajadoEn.set(tab, Date.now());
       store(tab, data);
       return data;
     })
     .finally(() => inflight.delete(tab));
   inflight.set(tab, p);
   return p as unknown as Promise<T[]>;
+}
+
+/** Como fetchTable, pero si ya se bajó hace menos de 40 s usa lo que hay. */
+export function ensureTable<T = Row>(tab: string): Promise<T[]> {
+  const t = bajadoEn.get(tab);
+  const cur = peekTable<T>(tab);
+  if (cur && t && Date.now() - t < FRESCO_MS) return Promise.resolve(cur);
+  return fetchTable<T>(tab);
 }
 
 /** Escucha los datos nuevos de una pestaña. Devuelve la función para dejar de escuchar. */
@@ -72,16 +84,17 @@ export function patchTable(tab: string, fn: (rows: Row[]) => Row[]) {
 
 /** Precarga en segundo plano (al entrar al CRM). */
 export function prefetchTables(...tabs: string[]) {
-  for (const t of tabs) fetchTable(t).catch(() => {});
+  for (const t of tabs) ensureTable(t).catch(() => {});
 }
 
 /** Se borra todo (al cerrar sesión). */
 export function clearTables() {
   mem.clear();
+  bajadoEn.clear();
   try {
-    for (let i = sessionStorage.length - 1; i >= 0; i--) {
-      const k = sessionStorage.key(i);
-      if (k && k.startsWith(KEY)) sessionStorage.removeItem(k);
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(KEY)) localStorage.removeItem(k);
     }
   } catch {
     /* ignore */
