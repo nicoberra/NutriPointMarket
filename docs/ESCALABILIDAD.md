@@ -2,13 +2,15 @@
 
 Fecha: 2026-10-13. Estado: **etapas 1, 2 y 3 aplicadas en el código** (OK de
 Nicolás el 13/10). Backend versión `v3`. Tag previo: `antes-escalabilidad-20261013`.
-Pruebas: `node apps-script/test/test-gs.js` (planilla simulada, 46 casos).
+Pruebas: `node apps-script/test/test-gs.js` (planilla simulada, 53 casos, incluye
+compras simultáneas sobre stock bajo, doble clic y webhook repetido). Prueba real:
+`tools/prueba-carga.js` contra una copia aislada (ver sección 5).
 
 | Etapa | Estado |
 |---|---|
 | 1 · Integridad | Hecha: bloqueo en escrituras, pedidos idempotentes, control de stock |
 | 2 · Lecturas rápidas | Hecha en el servidor: caché de 2 min, se borra con cada escritura |
-| 3 · Visibilidad | Hecha: pestaña Errores y mail diario si hay avisos. Falta el panel en el CRM |
+| 3 · Visibilidad | Hecha: pestaña Errores, mail inmediato ante fallas graves (máx. 1 por hora) y resumen diario. Falta el panel en el CRM |
 | 4 · Crecimiento | Pendiente (no hace falta todavía) |
 | 5 · Migración | Solo si se cumplen las condiciones |
 
@@ -115,6 +117,28 @@ cumple alguna de estas condiciones de forma sostenida:
 La migración mantiene la misma API (`action=...`), así la web casi no cambia.
 
 ## 5. Pruebas de carga (entorno aislado)
+
+### Pasos para armar la copia (los hace Nicolás, 5 minutos)
+
+1. En Drive, abrir la planilla → Archivo → **Hacer una copia** → nombre
+   "Suple Market PRUEBA". Si el Apps Script está dentro de la planilla, se
+   copia con ella; si no, abrir el proyecto del script → Descripción general →
+   **Hacer una copia**.
+2. En el script de la copia: Configuración del proyecto → Propiedades del
+   script → agregar **SHEET_ID** = el id de la copia (lo que está entre
+   `/d/` y `/edit` en la URL de la planilla copiada). No cargar tokens de
+   Mercado Pago ni de GitHub en la copia.
+3. Ejecutar ▶ `verificarPlanilla`: tiene que decir "copia". Si dice
+   "PRODUCCIÓN", no seguir.
+4. Implementar → **Nueva implementación** → Aplicación web (Ejecutar como: yo ·
+   Acceso: cualquier persona) → copiar la URL /exec de la copia.
+5. En la planilla copiada, poner Cantidad = 3 a un producto (por ejemplo una creatina).
+6. Correr (o pedírselo a Claude):
+   `node tools/prueba-carga.js <URL de la copia> "<nombre del producto>" 10`
+   El script se niega a correr contra la URL de producción.
+
+### Qué se mide
+
 
 Nunca contra la planilla real.
 
