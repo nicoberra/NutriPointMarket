@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useMemo,
   useState,
   type ReactNode,
@@ -51,15 +52,33 @@ export function ProductsProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>(SEED);
   const [loading, setLoading] = useState(true);
 
+  // Una sola lectura a la vez: si piden refrescar mientras hay una en curso,
+  // se hace UNA más al terminar (así no se apilan llamadas lentas y el
+  // resultado final siempre incluye lo último que se guardó).
+  const inflight = useRef<Promise<void> | null>(null);
+  const again = useRef(false);
   const refresh = useCallback(async () => {
-    const live = applyComboStock(await fetchProducts());
-    if (!live.length) return; // lectura vacía: no borra la base ni el caché
-    setProducts(live);
-    try {
-      localStorage.setItem(CACHE_KEY, JSON.stringify(live));
-    } catch {
-      /* ignore */
+    if (inflight.current) {
+      again.current = true;
+      return inflight.current;
     }
+    const run = async () => {
+      do {
+        again.current = false;
+        const live = applyComboStock(await fetchProducts());
+        if (!live.length) continue; // lectura vacía: no borra la base ni el caché
+        setProducts(live);
+        try {
+          localStorage.setItem(CACHE_KEY, JSON.stringify(live));
+        } catch {
+          /* ignore */
+        }
+      } while (again.current);
+    };
+    inflight.current = run().finally(() => {
+      inflight.current = null;
+    });
+    return inflight.current;
   }, []);
 
   useEffect(() => {

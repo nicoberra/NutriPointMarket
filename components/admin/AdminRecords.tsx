@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useConfirm } from "./useConfirm";
 import { OrderSheet } from "./OrderSheet";
-import { listTable, addRow, updateRow, deleteRow, aprobarPedido, localAsset, lastApiError } from "@/lib/api";
+import { addRow, updateRow, deleteRow, aprobarPedido, localAsset, lastApiError } from "@/lib/api";
+import { peekTable, fetchTable, subscribeTable } from "@/lib/tableCache";
 import { useProducts } from "@/context/ProductsContext";
 import { whatsappLink } from "@/lib/config";
 import { formatPrice } from "@/lib/format";
@@ -86,11 +87,16 @@ export function AdminRecords({
   const [editOrder, setEditOrder] = useState<Row | null>(null);
   const loadPedidos = () => {
     if (!isClientes) return;
-    listTable<Row>("Pedidos")
-      .then((d) => setPedidos([...d].reverse()))
-      .catch(() => {});
+    const cached = peekTable<Row>("Pedidos");
+    if (cached) setPedidos([...cached].reverse());
+    fetchTable<Row>("Pedidos").catch(() => {});
   };
   useEffect(loadPedidos, [config.tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Cuando llegan datos nuevos de Pedidos (de esta u otra sección), se muestran.
+  useEffect(() => {
+    if (!isClientes) return;
+    return subscribeTable("Pedidos", (d) => setPedidos([...(d as Row[])].reverse()));
+  }, [isClientes]);
   // Cruce cliente ↔ pedidos: por teléfono (últimos 10 dígitos) o por nombre exacto
   const normTel = (v?: string) => String(v ?? "").replace(/\D/g, "").replace(/^549?/, "").replace(/^0/, "").slice(-10);
   const ordersOf = (c: Row): Row[] => {
@@ -104,26 +110,36 @@ export function AdminRecords({
   };
   const openRow = (r: Row) => (config.detail ? setDetailRow(r) : setClientRow(r));
 
+  // Muestra al instante lo último cargado y actualiza en segundo plano
+  // (más reciente primero). Solo muestra "Cargando…" la primera vez.
   const load = () => {
-    setLoading(true);
-    listTable<Row>(config.tab)
-      .then((data) => {
-        // más reciente primero (por fecha o por orden inverso de la planilla)
-        setRows([...data].reverse());
+    const cached = peekTable<Row>(config.tab);
+    if (cached) {
+      setRows([...cached].reverse());
+      setLoading(false);
+    } else setLoading(true);
+    fetchTable<Row>(config.tab)
+      .catch(() => {
+        if (!cached) onToast("No se pudo cargar");
       })
-      .catch(() => onToast("No se pudo cargar"))
       .finally(() => setLoading(false));
   };
 
   useEffect(load, [config.tab]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Tras guardar, recarga varias veces: la fila puede tardar unos segundos en aparecer.
+  useEffect(() => subscribeTable(config.tab, (d) => setRows([...(d as Row[])].reverse())), [config.tab]);
+  // Tras guardar: el servidor responde cuando ya escribió, así que alcanza con
+  // una recarga. Si tardó demasiado (no sabemos si se guardó), una más a los 6 s.
+  const tardo = useRef(false);
   const recargar = (extra?: () => void) => {
-    [1200, 4000, 9000].forEach((ms) =>
+    load();
+    extra?.();
+    if (tardo.current) {
+      tardo.current = false;
       setTimeout(() => {
         load();
         extra?.();
-      }, ms),
-    );
+      }, 6000);
+    }
   };
   const detalleError = () => (lastApiError ? `: ${lastApiError}` : " (reintentá)");
 
@@ -140,6 +156,7 @@ export function AdminRecords({
       onToast(ok ? "Guardado ✓" : "No se pudo guardar" + detalleError());
     } catch {
       onToast("Tardó demasiado: verificá si se guardó");
+      tardo.current = true;
     } finally {
       setSaving(false);
     }
@@ -158,6 +175,7 @@ export function AdminRecords({
       }
     } catch {
       onToast("Tardó demasiado: verificá si se guardó");
+      tardo.current = true;
     } finally {
       setSaving(false);
     }
@@ -173,6 +191,7 @@ export function AdminRecords({
       if (ok) setOrderFor(null);
     } catch {
       onToast("Tardó demasiado: verificá si se guardó");
+      tardo.current = true;
     } finally {
       setSaving(false);
     }
@@ -206,6 +225,7 @@ export function AdminRecords({
       }
     } catch {
       onToast("Tardó demasiado: verificá si se guardó");
+      tardo.current = true;
     } finally {
       setSaving(false);
     }
@@ -248,6 +268,7 @@ export function AdminRecords({
       onToast(ok ? (p.descontado === "sí" ? "Pedido eliminado · stock repuesto ✓" : "Pedido eliminado ✓") : "No se pudo eliminar" + detalleError());
     } catch {
       onToast("Tardó demasiado: verificá si se eliminó");
+      tardo.current = true;
     }
     recargar(loadPedidos);
   };

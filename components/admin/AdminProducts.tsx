@@ -96,7 +96,7 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
     } catch {
       onToast("Tardó demasiado: verificá si se guardó");
     }
-    setTimeout(() => refresh().catch(() => {}), 1000);
+    refresh().catch(() => {});
   };
 
   // Sube la foto de un producto (o de una variante) a GitHub y refresca.
@@ -110,7 +110,7 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
     try {
       await uploadProductImage(p.name, file, variante);
       onToast("Foto subida ✓ (aparece en unos segundos)");
-      refreshLater(3000, 8000, 15000);
+      refreshLater(2500, 9000);
     } catch {
       onToast("No se pudo subir la foto");
     }
@@ -125,7 +125,7 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
       // Si tardó más de la cuenta, puede que igual se haya borrado: refrescamos.
       onToast("Tardó demasiado: verificá si se borró");
     }
-    refreshLater(1500, 6000);
+    refreshLater(0);
   };
 
   // Guardado optimista: cierra al toque y guarda en segundo plano (se siente
@@ -140,7 +140,7 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
     } catch {
       onToast("Tardó demasiado: verificá si se guardó");
     }
-    refreshLater(800, 5000);
+    refreshLater(0);
   };
 
   const handleDelete = async (p: Product) => {
@@ -158,7 +158,7 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
     } catch {
       onToast("Tardó demasiado: verificá si se eliminó");
     }
-    refreshLater(800, 5000);
+    refreshLater(0);
   };
 
   // Grupos por categoría (solo cuando el filtro es "Todas").
