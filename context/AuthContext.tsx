@@ -30,6 +30,8 @@ interface AuthContextValue {
     name: string,
     email: string,
     password: string,
+    /** Campo trampa del formulario (vacío si lo envía una persona). */
+    hp?: string,
   ) => Promise<{ ok: boolean; error?: string }>;
   login: (
     email: string,
@@ -70,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return {
       user,
       ready,
-      register: async (name, email, password) => {
+      register: async (name, email, password, hp = "") => {
         const clean = email.trim().toLowerCase();
         if (!name.trim() || !clean || password.length < 4) {
           return {
@@ -78,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             error: "Completá nombre, email y una contraseña de 4+ caracteres.",
           };
         }
-        const r = await registerUser(name.trim(), clean, password);
+        const r = await registerUser(name.trim(), clean, password, "", hp);
         if (r.ok) {
           persistSession({ name: r.user?.nombre || name.trim(), email: r.user?.email || clean });
           return { ok: true };

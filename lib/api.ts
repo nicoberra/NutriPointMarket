@@ -342,6 +342,8 @@ export async function registerUser(
   email: string,
   password: string,
   telefono = "",
+  /** Campo trampa (vacío si lo envía una persona). */
+  hp = "",
 ): Promise<AuthResult> {
   try {
     const pass = await sha256Hex(password);
@@ -351,6 +353,7 @@ export async function registerUser(
       password: pass,
       telefono,
       origen: "web",
+      hp_sm: hp,
     });
     const r = (await api("registrar", { data })) as ApiResult & { user?: AuthUser };
     if (r.ok === true) return { ok: true, user: r.user };
@@ -602,8 +605,8 @@ export async function deleteCategoryImage(categoria: string): Promise<boolean> {
 }
 
 /** Guarda un email suscripto en la planilla (pestaña Suscriptores). */
-export async function subscribeEmail(email: string): Promise<boolean> {
-  return addRow("Suscriptores", { email: email.trim().toLowerCase() });
+export async function subscribeEmail(email: string, hp = ""): Promise<boolean> {
+  return addRow("Suscriptores", { email: email.trim().toLowerCase(), hp_sm: hp });
 }
 
 /** Sube el comprobante de transferencia de un pedido (se guarda en GitHub). */
@@ -630,6 +633,8 @@ export interface OrderInput {
   envio: string; // dirección
   metodo: string; // "Transferencia" | "Mercado Pago"
   items?: string; // JSON de los productos: [{n,v,q}]
+  /** Campo trampa (vacío si lo envía una persona). */
+  hp?: string;
 }
 
 /** Aprueba el pago de un pedido en el CRM: descuenta el stock y lo marca pagado. */
@@ -659,6 +664,7 @@ export async function createOrder(o: OrderInput): Promise<boolean> {
       montoEnvio: o.montoEnvio,
       pago: o.metodo,
       items: o.items ?? "",
+      hp_sm: o.hp ?? "",
       descontado: "no",
     }),
   }, 18000);

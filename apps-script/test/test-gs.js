@@ -62,7 +62,7 @@ const ctx = {
   LockService: { getScriptLock: () => ({ tryLock: () => { lockCalls++; return true; }, releaseLock: () => {} }) },
   Utilities: {
     formatDate: (d) => d.toISOString().slice(0, 16).replace("T", " "),
-    computeDigest: () => [1, 2, 3], DigestAlgorithm: {}, Charset: {}, base64Encode: (x) => Buffer.from(String(x)).toString("base64"),
+    computeDigest: (_alg, v) => Array.from(require("crypto").createHash("sha256").update(String(v)).digest()).map((b) => (b > 127 ? b - 256 : b)), DigestAlgorithm: {}, Charset: {}, base64Encode: (x) => Buffer.from(String(x)).toString("base64"),
     getUuid: () => "uuid-" + Math.random(),
   },
   ContentService: { createTextOutput: (t) => ({ text: t, setMimeType() { return this; } }), MimeType: { JAVASCRIPT: "js", JSON: "json" } },
@@ -108,10 +108,15 @@ book.sheets.Clientes = makeSheet("Clientes", [header("Clientes"),
   rowFrom("Clientes", { id: "c1", nombre: "Juan Perez", email: "juan@test.com", clave: "v2$x" }),
   rowFrom("Clientes", { id: "c2", nombre: "", email: "no-es-email", clave: "v2$y" }),
 ]);
+book.sheets.Suscriptores = makeSheet("Suscriptores", [header("Suscriptores")]);
 book.sheets.Categorias = makeSheet("Categorias", [header("Categorias"), rowFrom("Categorias", { nombre: "Proteínas", orden: 1 })]);
 
 /* --------------------------------- Helpers -------------------------------- */
+// Las pruebas de lógica mandan muchas altas seguidas del mismo cliente ficticio:
+// limpian los contadores del límite contra abuso. Las pruebas del límite lo apagan.
+let limpiarLimites = true;
 const call = (params, body) => {
+  if (limpiarLimites) for (const k of Object.keys(cacheStore)) if (/^(rl_|loginfail_)/.test(k)) delete cacheStore[k];
   const e = { parameter: Object.assign({ callback: "cb" }, params) };
   if (body) e.postData = { contents: JSON.stringify(body) };
   const t = ctx.handle(e).text;
@@ -131,7 +136,7 @@ const items = (arr) => JSON.stringify(arr);
 
 /* --------------------------------- Pruebas -------------------------------- */
 console.log("Versión y lecturas");
-check("version v5", call({ action: "version" }).version === "v5");
+check("version v6", call({ action: "version" }).version === "v6");
 const l1 = call({ action: "productos_list" });
 check("productos_list público sin costos", l1.ok && l1.data.length === 5 && !("costo" in l1.data[0]));
 const hitsAntes = cacheHits;
@@ -270,6 +275,32 @@ check("  ...todo queda en Papelera", book.sheets.Papelera && book.sheets.Papeler
 pedidos().find((x) => x[0] === "ped1791900000010")[kP.indexOf("estado")] = "revisar pago";
 const res = ctx.resumenDiario();
 check("resumen diario manda mail con errores y pagos a revisar", mails.length >= 1 && /avisos del sistema/.test(mails[mails.length - 1].subj) && /Errores/.test(mails[mails.length - 1].body) && /revisar/.test(mails[mails.length - 1].body), res);
+
+console.log("Límite contra abuso");
+limpiarLimites = true; call({ action: "version" }); // contadores en cero
+limpiarLimites = false;
+filaCre[kPr.indexOf("cantidad")] = 50; filaCre[kPr.indexOf("stock")] = "sí";
+const nRL = pedidos().length;
+const altaWeb = (i, extra = {}) => addPedido(Object.assign({ id: "ped17919005" + String(i).padStart(5, "0"), cliente: "Comprador RL", telefono: "11 5555-0000", monto: 33000, pago: "Efectivo", envio: "", items: items([{ n: "CREATINA MONOHIDRATO  300 gr", q: 1 }]) }, extra));
+const rRL = [1, 2, 3, 4, 5, 6].map((i) => altaWeb(i));
+check("mismo teléfono: 5 pedidos pasan, el 6.º recibe el aviso amable", rRL.slice(0, 5).every((r) => r.ok) && /muchos intentos/.test(rRL[5].error || ""), rRL.map((r) => r.ok || r.error));
+check("  ...el rechazo no crea fila ni se anota en Errores", pedidos().length === nRL + 5 && !book.sheets.Errores.rows.some((r) => /muchos intentos/.test(String(r[2]))));
+check("otro cliente sigue pudiendo comprar", altaWeb(7, { telefono: "11 6666-1111", cliente: "Otro" }).ok === true);
+check("campo trampa completado → rechazo sin crear fila", /No pudimos procesar/.test(altaWeb(8, { telefono: "11 7777-2222", hp_sm: "http://spam" }).error || "") && !pedidos().some((x) => x[0] === "ped1791900500008"));
+const susc = [1, 2, 3, 4].map(() => call({ action: "add", tab: "Suscriptores", data: JSON.stringify({ email: "spam@test.com" }) }));
+if (!(susc.slice(0, 3).every((r) => r.ok))) console.log("   susc:", JSON.stringify(susc));
+check("suscriptor: 3 intentos por email y después aviso", susc.slice(0, 3).every((r) => r.ok) && /muchos intentos/.test(susc[3].error || ""));
+book.sheets.Clientes.rows.push(rowFrom("Clientes", { id: "c9", nombre: "Lu", email: "lu@test.com", clave: ctx.nuevaClave("buena") }));
+const malos = [1, 2, 3, 4, 5].map(() => call({ action: "login", email: "lu@test.com", password: "mala" }));
+const tras5 = call({ action: "login", email: "lu@test.com", password: "buena" });
+check("login: tras 5 claves incorrectas, bloqueo aunque la clave sea buena", malos.every((r) => r.ok === false) && tras5.ok === false && /15 minutos/.test(tras5.error), tras5);
+delete cacheStore["loginfail_lu@test.com"];
+check("  ...pasado el bloqueo, la clave buena entra", call({ action: "login", email: "lu@test.com", password: "buena" }).ok === true);
+const nCrmRL = pedidos().length;
+for (let i = 0; i < 8; i++) ctx.handle({ parameter: { action: "version" } }); // el CRM con token no pasa por el límite (se prueba con addRow directo)
+for (let i = 0; i < 8; i++) ctx.addRow("Pedidos", { id: "idRL" + i, cliente: "Comprador RL", telefono: "11 5555-0000", monto: "1", pago: "Efectivo", items: "[]" });
+check("CRM: sin límite (8 altas del mismo cliente)", pedidos().length === nCrmRL + 8);
+limpiarLimites = true;
 
 console.log("Copias automáticas");
 const mq = ctx.quitarBackupsAutomaticos();

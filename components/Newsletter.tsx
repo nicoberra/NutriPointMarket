@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ASSET_PREFIX } from "@/lib/config";
 import { subscribeEmail } from "@/lib/api";
 import { MailIcon, CheckIcon } from "./Icons";
+import { Trampa, leerTrampa } from "@/components/Trampa";
 
 /** Bloque de newsletter antes del footer. */
 export function Newsletter() {
@@ -40,14 +41,16 @@ export function Newsletter() {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
+                const hp = leerTrampa(e.currentTarget);
                 const mail = email.trim();
                 if (!mail) return;
                 setDone(true);
                 // Guarda el email en la planilla (pestaña Suscriptores).
-                subscribeEmail(mail).catch(() => {});
+                subscribeEmail(mail, hp).catch(() => {});
               }}
-              className="mx-auto mt-6 flex max-w-md flex-col gap-2 sm:flex-row"
+              className="relative mx-auto mt-6 flex max-w-md flex-col gap-2 sm:flex-row"
             >
+              <Trampa />
               <input
                 type="email"
                 required

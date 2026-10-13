@@ -1,25 +1,27 @@
-# Publica automáticamente la tienda en GitHub Pages en cada push a main.
+# Verifica cada cambio y publica la tienda en GitHub Pages.
+# - En cada push (cualquier rama) y en cada PR: pruebas del backend (planilla
+#   simulada), lint, build y chequeo de tipos. Si algo falla, no se publica.
+# - Solo un push a main que pasa todo se publica.
+# Sin secretos ni acceso a producción: el repo es público.
 # Requiere (una sola vez): Settings → Pages → Source = "GitHub Actions".
-name: Deploy a GitHub Pages
+name: Verificar y publicar
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
+  pull_request:
   workflow_dispatch: # permite ejecutarlo manualmente desde la pestaña Actions
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-# Evita despliegues en paralelo pisándose.
-concurrency:
-  group: pages
-  cancel-in-progress: false
 
 jobs:
-  build:
+  verificar:
     runs-on: ubuntu-latest
+    # En una rama nueva, un push cancela la verificación anterior de esa rama.
+    concurrency:
+      group: verificar-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,27 +32,46 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Configurar Pages
-        uses: actions/configure-pages@v5
-
       - name: Instalar dependencias
         run: npm ci
+
+      - name: Pruebas del backend (Apps Script con planilla simulada)
+        run: node apps-script/test/test-gs.js
+
+      - name: Lint
+        run: npm run lint
 
       - name: Build (exportación estática)
         run: npm run build
 
-      - name: Subir artefacto
+      - name: Chequeo de tipos
+        run: npx tsc --noEmit
+
+      - name: Subir artefacto para publicar
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./out
 
   deploy:
-    needs: build
+    # Solo main, y solo si "verificar" pasó.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: verificar
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    # Evita despliegues en paralelo pisándose.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Configurar Pages
+        uses: actions/configure-pages@v5
+
       - name: Desplegar a GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

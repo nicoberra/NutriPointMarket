@@ -8,6 +8,7 @@ import { useProducts } from "@/context/ProductsContext";
 import { PageBanner } from "@/components/PageBanner";
 import { ProductCard } from "@/components/ProductCard";
 import { UserIcon, HeartIcon } from "@/components/Icons";
+import { Trampa, leerTrampa } from "@/components/Trampa";
 
 export default function CuentaPage() {
   const { user, ready, login, register, logout } = useAuth();
@@ -25,8 +26,9 @@ export default function CuentaPage() {
 
   const favProducts = products.filter((p) => favorites.includes(p.id));
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const hp = leerTrampa(e.currentTarget);
     setError(null);
     if (mode === "register" && !acepta) {
       setError("Para crear la cuenta tenés que aceptar los Términos y condiciones.");
@@ -36,7 +38,7 @@ export default function CuentaPage() {
     const res =
       mode === "login"
         ? await login(email, password)
-        : await register(name, email, password);
+        : await register(name, email, password, hp);
     setLoading(false);
     if (!res.ok) setError(res.error ?? "Ocurrió un error.");
   };
@@ -132,7 +134,8 @@ export default function CuentaPage() {
             </button>
           </div>
 
-          <form onSubmit={submit} className="space-y-4">
+          <form onSubmit={submit} className="relative space-y-4">
+            <Trampa />
             {mode === "register" && (
               <div>
                 <label className="mb-1.5 block text-sm font-semibold text-ink">
