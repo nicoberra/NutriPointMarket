@@ -51,12 +51,13 @@ export function categoryFromName(nombre: string): Category {
  * respaldo instantáneo también lo refleje, actualizá esta lista.
  */
 export const categories: Category[] = [
-  { slug: "proteinas", name: "Proteínas", tagline: "", shape: "tub", image: "/productos/protei-nas-1791159337812.jpg" },
-  { slug: "creatina", name: "Creatina", tagline: "", shape: "jar", image: "/productos/creatina-1791159328845.jpg" },
-  { slug: "pancakes-proteicos", name: "Pancakes PROTEICOS", tagline: "", shape: "bar", image: "/productos/pancakes-proteicos-1791161879816.jpg" },
-  { slug: "kinesio-tape", name: "Kinesio TAPE", tagline: "", shape: "bar", image: "/productos/kinesio-tape-1791159318671.jpg" },
-  { slug: "shakers", name: "Shakers", tagline: "", shape: "bottle", image: "/productos/shakers-1791150078717.jpg" },
-  { slug: "combos", name: "Combos", tagline: "", shape: "combo", image: "/productos/combos-1791149845090.jpg" },
+  { slug: "proteinas", name: "Proteínas", tagline: "", shape: shapeForSlug("proteinas"), image: "/productos/protei-nas-1791159337812.jpg" },
+  { slug: "creatina", name: "Creatina", tagline: "", shape: shapeForSlug("creatina"), image: "/productos/creatina-1791159328845.jpg" },
+  { slug: "pancakes-proteicos", name: "Pancakes PROTEICOS", tagline: "", shape: shapeForSlug("pancakes-proteicos"), image: "/productos/pancakes-proteicos-1791161879816.jpg" },
+  { slug: "kinesio-tape", name: "Kinesio TAPE", tagline: "", shape: shapeForSlug("kinesio-tape"), image: "/productos/kinesio-tape-1791159318671.jpg" },
+  { slug: "shakers", name: "Shakers", tagline: "", shape: shapeForSlug("shakers"), image: "/productos/shakers-1791150078717.jpg" },
+  { slug: "barritas", name: "Barritas", tagline: "", shape: shapeForSlug("barritas"), image: "/productos/barritas-1791394659660.jpg" },
+  { slug: "combos", name: "Combos", tagline: "", shape: shapeForSlug("combos"), image: "/productos/combos-1791149845090.jpg" },
 ];
 
 /**
