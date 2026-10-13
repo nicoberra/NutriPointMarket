@@ -642,6 +642,7 @@ export async function aprobarPedido(id: string): Promise<boolean> {
  * Guarda un pedido en la planilla (pestaña Pedidos). Timeout largo (18s) porque
  * en 4G/WiFi lento el guardado tarda. NO se reintenta para no duplicar pedidos.
  */
+/** Devuelve true si se creó; si el backend rechazó el pedido, lanza Error con el motivo. */
 export async function createOrder(o: OrderInput): Promise<boolean> {
   const estado = o.metodo === "Mercado Pago" ? "pendiente de pago" : "nuevo";
   const r = await api("add", {
@@ -661,7 +662,8 @@ export async function createOrder(o: OrderInput): Promise<boolean> {
       descontado: "no",
     }),
   }, 18000);
-  return r.ok !== false;
+  if (r.ok === false) throw new Error(r.error || "No se pudo confirmar el pedido");
+  return true;
 }
 
 /**

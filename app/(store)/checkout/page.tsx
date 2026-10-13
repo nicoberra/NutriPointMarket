@@ -150,8 +150,10 @@ export default function CheckoutPage() {
       // Efectivo / Transferencia
       clear();
       setDone({ metodo, id, total: montoFinal });
-    } catch {
-      setError("No se pudo confirmar el pedido. Revisá tu conexión e intentá de nuevo.");
+    } catch (e) {
+      // El backend puede rechazar el pedido (p. ej. precios desactualizados) con un motivo claro.
+      const msg = e instanceof Error && e.message && !/timeout|fetch/i.test(e.message) ? e.message : "";
+      setError(msg || "No se pudo confirmar el pedido. Revisá tu conexión e intentá de nuevo.");
       setLoading(false);
     }
   };

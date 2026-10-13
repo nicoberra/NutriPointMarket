@@ -28,6 +28,15 @@ var GITHUB_BRANCH = "main";
 // Dominio del sitio (para las páginas de retorno de Mercado Pago).
 var SITE_URL = "https://suplemarket.com.ar";
 
+// Modelo de precios (tiene que coincidir con lib/config.ts): la planilla guarda
+// el precio CON transferencia; la web publica ese precio + 10% redondeado a la
+// centena. Mercado Pago cobra el precio publicado; transferencia/efectivo el base.
+var DESCUENTO_TRANSFERENCIA = 0.1;
+// Costos de envío por zona (tienen que coincidir con lib/envios.ts).
+var ENVIOS = { "Capital": 5500, "GBA 1": 7000, "GBA 2": 9000, "GBA 3": 15000 };
+// Tamaño máximo del comprobante (base64, ~2.5 MB de imagen).
+var COMPROBANTE_MAX_B64 = 3500000;
+
 /* ----------------------------- ESQUEMA DE TABLAS -------------------------- */
 
 var TABLES = {
@@ -190,7 +199,9 @@ function handle(e) {
         out = { ok: true, data: listTable(p.tab) };
         break;
       case "add":
-        out = { ok: true, data: addRow(p.tab, parseData(p)) };
+        // Sin token (tienda pública) solo pasan los campos permitidos y el
+        // monto se recalcula acá con los precios de la planilla.
+        out = { ok: true, data: addRow(p.tab, esAdmin ? parseData(p) : validarAltaPublica(p.tab, parseData(p))) };
         break;
       case "update":
         out = { ok: true, data: updateRow(p.tab, p.id, parseData(p)) };
@@ -301,10 +312,11 @@ function addRow(tab, obj) {
   if (!TABLES[tab]) throw new Error("Pestaña inválida: " + tab);
   var sh = sheetFor(tab);
   var keys = keysOf(tab);
-  if (tab === "Clientes") {
+  if (tab === "Clientes" && !obj.sinFusion) {
     var existing = findClienteRow(obj);
     if (existing > 0) return updateRowByNumber(tab, existing, obj);
   }
+  delete obj.sinFusion;
   if (TABLES[tab].idField === "id" && !obj.id) obj.id = "id" + Date.now();
   if (keys.indexOf("fecha") !== -1 && !obj.fecha) obj.fecha = now();
   // Pedidos: el stock se descuenta al crear el pedido (web o CRM). Si el
@@ -449,7 +461,100 @@ function sanitize(key, value) {
   if (value === undefined || value === null) return "";
   if (key === "telefono") return cleanPhone(value);
   if (key === "stock" || key === "destacado") return siNo(value); // guardar "sí"/"no"
+  // Un texto que empieza con = + - @ o un tabulador lo interpretaría Sheets
+  // como fórmula. El apóstrofo inicial lo fuerza a texto (no se ve en la celda
+  // ni vuelve al leer).
+  if (typeof value === "string" && /^[=+\-@\t\r]/.test(value)) return "'" + value;
   return value;
+}
+
+/* --------------------------- Altas públicas ------------------------------ */
+
+// Campos que puede mandar la tienda pública (sin token) al crear una fila.
+var CAMPOS_PUBLICOS = {
+  Pedidos: ["id", "cliente", "telefono", "detalle", "monto", "notas", "envio", "montoEnvio", "pago", "items"],
+  Suscriptores: ["email"],
+};
+
+// Deja solo los campos permitidos, fija los que no puede decidir el cliente y
+// recalcula el total del pedido con los precios de la planilla. Si el total
+// que mandó la web no coincide (precios viejos o manipulados), rechaza.
+function validarAltaPublica(tab, obj) {
+  var permitidos = CAMPOS_PUBLICOS[tab];
+  if (!permitidos) throw new Error("Alta no permitida: " + tab);
+  var limpio = {};
+  for (var i = 0; i < permitidos.length; i++) {
+    var k = permitidos[i];
+    if (obj[k] !== undefined && obj[k] !== null) {
+      limpio[k] = typeof obj[k] === "string" ? obj[k].slice(0, 2000) : obj[k];
+    }
+  }
+  if (tab === "Suscriptores") {
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(limpio.email || ""))) throw new Error("Email inválido");
+    return limpio;
+  }
+  // Pedidos
+  if (!/^ped\d{10,16}$/.test(String(limpio.id || ""))) throw new Error("Id de pedido inválido");
+  if (findRowById("Pedidos", limpio.id) > 0) throw new Error("El pedido ya existe");
+  var pago = String(limpio.pago || "").trim();
+  if (["Mercado Pago", "Transferencia", "Efectivo"].indexOf(pago) === -1) throw new Error("Medio de pago inválido");
+  var items = [];
+  try { items = JSON.parse(limpio.items || "[]"); } catch (e) {}
+  if (!items.length) throw new Error("El pedido no tiene productos");
+  if (items.length > 50) throw new Error("Demasiados productos");
+
+  var calc = calcularTotalPedido(items, pago);
+  var envio = envioSegunTexto(limpio.envio);
+  var total = calc.subtotal + envio;
+  if (Math.abs(Number(limpio.monto) - total) > 1) {
+    throw new Error("Los precios se actualizaron. Recargá la página y volvé a confirmar el pedido.");
+  }
+  limpio.monto = total;
+  limpio.montoEnvio = envio;
+  limpio.estado = pago === "Mercado Pago" ? "pendiente de pago" : "nuevo";
+  limpio.descontado = "no";
+  limpio.cobrado = "";
+  limpio.comprobante = "";
+  limpio.costo = "";
+  return limpio;
+}
+
+// Precio publicado en la web a partir del precio base de la planilla.
+function precioWeb(base) {
+  if (!base || base <= 0) return 0;
+  return Math.round(base / (1 - DESCUENTO_TRANSFERENCIA) / 100) * 100;
+}
+
+// Suma los productos de un pedido con los precios ACTUALES de la planilla.
+// Mercado Pago: precio publicado. Transferencia / efectivo: precio base.
+function calcularTotalPedido(items, pago) {
+  var sh = sheetFor("Productos");
+  var values = sh.getDataRange().getValues();
+  var precios = {};
+  for (var r = 1; r < values.length; r++) {
+    var nombre = low(values[r][0]);
+    if (nombre) precios[nombre] = Number(values[r][3]) || 0;
+  }
+  var subtotal = 0;
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i] || {};
+    var q = Math.floor(Number(it.q) || 0);
+    if (q <= 0 || q > 99) throw new Error("Cantidad inválida");
+    var base = precios[low(it.n)];
+    if (base === undefined) throw new Error("Producto no disponible: " + String(it.n || "").slice(0, 60));
+    if (!base) throw new Error("Producto sin precio: " + String(it.n || "").slice(0, 60));
+    subtotal += (pago === "Mercado Pago" ? precioWeb(base) : base) * q;
+  }
+  return { subtotal: subtotal };
+}
+
+// Costo de envío según el texto que guarda el checkout ("... · Envío GBA 1 · Morón").
+function envioSegunTexto(txt) {
+  var t = String(txt || "");
+  for (var zona in ENVIOS) {
+    if (t.indexOf("Envío " + zona) !== -1) return ENVIOS[zona];
+  }
+  return 0; // retiro, interior (Vía Cargo a coordinar) o sin dato
 }
 
 function cleanPhone(v) {
@@ -655,6 +760,23 @@ function slugImagen(s) {
 // en la columna Comprobante del pedido.
 function subirComprobante(p) {
   if (!p.pedido || !p.data) return { ok: false, error: "Faltan datos" };
+  var data = String(p.data);
+  // Solo JPEG (la web lo convierte siempre a JPEG) y con un tamaño acotado.
+  if (data.indexOf("/9j/") !== 0 || !/^[A-Za-z0-9+/=]+$/.test(data.slice(0, 200))) {
+    return { ok: false, error: "El comprobante tiene que ser una imagen JPEG" };
+  }
+  if (data.length > COMPROBANTE_MAX_B64) return { ok: false, error: "La imagen es demasiado grande" };
+  // Solo pedidos reales por transferencia que todavía no estén cobrados.
+  var nPed = findRowById("Pedidos", p.pedido);
+  if (nPed < 0) return { ok: false, error: "Pedido no encontrado" };
+  var keysPed = keysOf("Pedidos");
+  var rowPed = sheetFor("Pedidos").getRange(nPed, 1, 1, keysPed.length).getValues()[0];
+  if (String(rowPed[keysPed.indexOf("pago")] || "").trim() !== "Transferencia") {
+    return { ok: false, error: "Este pedido no es por transferencia" };
+  }
+  if (low(rowPed[keysPed.indexOf("estado")]) === "pagado" || low(rowPed[keysPed.indexOf("cobrado")]) === "sí") {
+    return { ok: false, error: "El pedido ya está cobrado" };
+  }
   var token = PropertiesService.getScriptProperties().getProperty("GITHUB_TOKEN");
   if (!token) return { ok: false, error: "Falta GITHUB_TOKEN en Propiedades del script" };
   var path = "public/comprobantes/" + slugImagen(p.pedido) + "-" + Date.now() + ".jpg";
@@ -675,8 +797,7 @@ function subirComprobante(p) {
     return { ok: false, error: "GitHub " + code + ": " + res.getContentText().slice(0, 180) };
   }
   var url = "https://raw.githubusercontent.com/" + GITHUB_REPO + "/" + GITHUB_BRANCH + "/" + path;
-  var n = findRowById("Pedidos", p.pedido);
-  if (n > 0) updateRowByNumber("Pedidos", n, { comprobante: url });
+  updateRowByNumber("Pedidos", nPed, { comprobante: url });
   return { ok: true, url: url };
 }
 
@@ -688,13 +809,23 @@ function subirComprobante(p) {
 function mpCrearPreferencia(p) {
   var token = PropertiesService.getScriptProperties().getProperty("MP_ACCESS_TOKEN");
   if (!token) return { ok: false, error: "Falta MP_ACCESS_TOKEN en Propiedades del script" };
-  var monto = Number(p.monto) || 0;
+  // El monto NO se toma de la web: se lee del pedido ya guardado en la planilla
+  // (cuyo total se validó al crearlo).
+  var nPed = findRowById("Pedidos", p.pedido);
+  if (nPed < 0) return { ok: false, error: "Pedido no encontrado" };
+  var keysPed = keysOf("Pedidos");
+  var rowPed = sheetFor("Pedidos").getRange(nPed, 1, 1, keysPed.length).getValues()[0];
+  if (String(rowPed[keysPed.indexOf("pago")] || "").trim() !== "Mercado Pago") {
+    return { ok: false, error: "Este pedido no es por Mercado Pago" };
+  }
+  if (low(rowPed[keysPed.indexOf("estado")]) === "pagado") return { ok: false, error: "El pedido ya está pagado" };
+  var monto = Number(rowPed[keysPed.indexOf("monto")]) || 0;
   if (monto <= 0) return { ok: false, error: "Monto inválido" };
   var exec = "";
   try { exec = ScriptApp.getService().getUrl(); } catch (e0) {}
 
   // El envío va como ítem aparte (una sola vez), el resto son los productos.
-  var envioMonto = Number(p.envio) || 0;
+  var envioMonto = Number(rowPed[keysPed.indexOf("montoEnvio")]) || 0;
   if (envioMonto < 0 || envioMonto >= monto) envioMonto = 0;
   var itemsMP = [
     {
@@ -771,7 +902,24 @@ function mpWebhook(p, e) {
     var ref = pay.external_reference;
     if (pay.status === "approved" && ref) {
       var n = findRowById("Pedidos", ref);
-      if (n > 0) updateRowByNumber("Pedidos", n, { estado: "pagado" });
+      if (n > 0) {
+        var keysW = keysOf("Pedidos");
+        var rowW = sheetFor("Pedidos").getRange(n, 1, 1, keysW.length).getValues()[0];
+        var montoPedido = Number(rowW[keysW.indexOf("monto")]) || 0;
+        var pagado = Number(pay.transaction_amount) || 0;
+        var notasW = String(rowW[keysW.indexOf("notas")] || "");
+        var marca = "MP #" + payId;
+        if (notasW.indexOf(marca) === -1) notasW = (notasW ? notasW + " · " : "") + marca + " $" + pagado;
+        if (Math.abs(pagado - montoPedido) <= 1) {
+          updateRowByNumber("Pedidos", n, { estado: "pagado", notas: notasW });
+        } else {
+          // Pagó otro monto: no se marca pagado, queda para revisar en el CRM.
+          updateRowByNumber("Pedidos", n, {
+            estado: "revisar pago",
+            notas: notasW + " (pedido $" + montoPedido + ")",
+          });
+        }
+      }
     }
     return { ok: true };
   } catch (err) {
@@ -906,9 +1054,14 @@ function seedCategorias() {
 
 function registrar(obj) {
   if (!obj.email || !obj.password) return { ok: false, error: "Faltan email o contraseña" };
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(obj.email))) return { ok: false, error: "Email inválido" };
+  if (String(obj.password).length < 6) return { ok: false, error: "La contraseña tiene que tener al menos 6 caracteres" };
   if (findClienteRow({ email: obj.email }) > 0)
     return { ok: false, error: "Ya existe una cuenta con ese email" };
+  // Siempre fila nueva: si se fusionara por nombre o DNI con un cliente que ya
+  // existe, cualquiera podría pisarle la clave registrándose con su nombre.
   addRow("Clientes", {
+    sinFusion: true,
     nombre: obj.nombre || "",
     email: obj.email,
     telefono: obj.telefono || "",
@@ -1101,40 +1254,6 @@ function productoRename(from, to) {
     }
   }
   return { renamed: true, from: from, to: to, combosActualizados: combosActualizados };
-}
-
-/* ---------------------- Restaurar costos (una sola vez) ------------------ */
-// Ejecutar desde el editor (Ejecutar ▶ restaurarCostos) si los costos de la
-// planilla quedaron en 0: vuelve a escribir los costos de respaldo (ARS).
-// Es inofensivo repetirlo. No requiere redeploy.
-function restaurarCostos() {
-  var COSTOS = {
-    "Tape": 1000,
-    "WHEY PROTEIN TRUE MADE 1kg": 67545,
-    "WHEY PROTEIN DOYPACK 1kg": 69584.19,
-    "CREATINA MICRONIZADA SABOR NEUTRO 150gr": 15122,
-    "CREATINA MICRONIZADA SABOR NEUTRO 300gr": 19400,
-    "CREATINA MONOHIDRATO  300 gr": 20077,
-    "CREATINA MONOHIDRATO / DOYPACK. 300 gr DOYPACK": 18132,
-    "Pancakes Proteicos Dulces": 9832,
-    "Pancakes Proteicos salados": 9832,
-    "Proteína + Creatina": 89661,
-    "Shaker ENA True Made con compartimentos": 4165,
-    "Proteina + Creatina + Shaker": 125000
-  };
-  var ok = [], falta = [];
-  for (var nombre in COSTOS) {
-    var n = findRowById("Productos", nombre);
-    if (n > 0) {
-      updateRowByNumber("Productos", n, { costo: COSTOS[nombre], costoMoneda: "ARS" });
-      ok.push(nombre + " = " + COSTOS[nombre]);
-    } else {
-      falta.push(nombre);
-    }
-  }
-  Logger.log("Costos restaurados (" + ok.length + "):\n" + ok.join("\n"));
-  if (falta.length) Logger.log("No encontrados (renombrados?): " + falta.join(", "));
-  return { restaurados: ok.length, noEncontrados: falta };
 }
 
 /* -------------------------------- Utils ---------------------------------- */
