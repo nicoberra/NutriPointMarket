@@ -18,7 +18,7 @@
  * ============================================================================ */
 
 var SHEET_ID = "12paAzW6OcSgYv4u6L7QVI4tpvrEx1yqnujW0OjcieMc";
-var API_VERSION = "v5"; // v3: validación de pedidos, bloqueo, caché y registro de errores
+var API_VERSION = "v6"; // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
 
 // Repo de GitHub donde se guardan las fotos de productos (en public/productos/).
 // El token NO va acá: se guarda en Propiedades del script como GITHUB_TOKEN.
@@ -184,6 +184,8 @@ function handle(e) {
     if (!esAdmin && !esAccionPublica(action, p)) {
       return respond({ ok: false, error: "auth" }, p.callback);
     }
+    // Límite contra abuso: solo la tienda pública (el CRM con token no tiene límite).
+    if (!esAdmin) controlarAbuso(action, p);
     // Las escrituras van de a una (bloqueo): así dos pedidos simultáneos no
     // pisan el stock. Al terminar se borra el caché del catálogo.
     if (ACCIONES_ESCRITURA[action]) {
@@ -196,6 +198,80 @@ function handle(e) {
     out = { ok: false, error: String(err && err.message ? err.message : err) };
   }
   return respond(out, p.callback);
+}
+
+/* -------------------------- Límite contra abuso --------------------------- */
+
+// [cantidad, segundos]. "porId": por cliente (teléfono / email / pedido);
+// "global": entre todos, por acción y por minuto. Holgados para compras normales.
+var LIMITES = {
+  pedido:      { porId: [5, 600],  global: [60, 60] },
+  suscriptor:  { porId: [3, 600],  global: [30, 60] },
+  registrar:   { porId: [3, 600],  global: [20, 60] },
+  login:       { porId: [15, 600], global: [120, 60] },
+  mp:          { porId: [8, 600],  global: [60, 60] },
+  comprobante: { porId: [6, 600],  global: [30, 60] },
+  crm:         { global: [30, 60] },
+};
+var MSG_LIMITE = "Hiciste muchos intentos seguidos. Esperá unos minutos y volvé a probar.";
+var MSG_TRAMPA = "No pudimos procesar el envío. Recargá la página y probá de nuevo.";
+// Campo oculto de los formularios: una persona no lo ve ni lo completa; un bot sí.
+var CAMPO_TRAMPA = "hp_sm";
+
+function controlarAbuso(action, p) {
+  var d = null;
+  var datos = function () { return d || (d = parseData(p)); };
+  var trampa = function () {
+    if (String(datos()[CAMPO_TRAMPA] || p[CAMPO_TRAMPA] || "").trim() !== "") throw new Error(MSG_TRAMPA);
+  };
+  switch (action) {
+    case "add":
+      if (p.tab === "Pedidos") {
+        trampa();
+        var tel = String(datos().telefono || "").replace(/\D/g, "");
+        limitar("pedido", tel.length >= 6 ? tel : datos().cliente);
+      } else if (p.tab === "Suscriptores") {
+        trampa();
+        limitar("suscriptor", datos().email);
+      }
+      break;
+    case "registrar":
+      trampa();
+      limitar("registrar", datos().email);
+      break;
+    case "login":
+      limitar("login", p.email);
+      break;
+    case "mp_crear_pref":
+      limitar("mp", p.pedido);
+      break;
+    case "subir_comprobante":
+      limitar("comprobante", p.pedido);
+      break;
+    case "crm_login":
+      limitar("crm", "");
+      break;
+  }
+}
+
+function limitar(tipo, id) {
+  var cfg = LIMITES[tipo];
+  if (!cfg) return;
+  var cache = CacheService.getScriptCache();
+  var claves = [];
+  if (cfg.global) {
+    claves.push(["rl_g_" + tipo + "_" + Math.floor(Date.now() / 1000 / cfg.global[1]), cfg.global[0], cfg.global[1] * 2]);
+  }
+  var clave = String(id || "").toLowerCase().replace(/\s+/g, "").slice(0, 120);
+  if (cfg.porId && clave) claves.push(["rl_" + tipo + "_" + clave, cfg.porId[0], cfg.porId[1]]);
+  for (var i = 0; i < claves.length; i++) {
+    var n = Number(cache.get(claves[i][0]) || 0);
+    if (n >= claves[i][1]) throw new Error(MSG_LIMITE);
+  }
+  for (var j = 0; j < claves.length; j++) {
+    var m = Number(cache.get(claves[j][0]) || 0);
+    cache.put(claves[j][0], String(m + 1), claves[j][2]);
+  }
 }
 
 // Acciones que escriben en la planilla (se ejecutan con bloqueo).
@@ -724,6 +800,8 @@ function borrarCacheCatalogo() {
 var ERRORES_ESPERADOS = /inválid|Sin stock|Solo quedan|precios se actualizaron|no disponible|ya existe|no encontrado|Faltan|Falta el|Demasiad|Cantidad|no es por|ya está|demasiado grande|JPEG|sin precio|no tiene productos|Ya existe una cuenta|Contraseña|al menos 6/i;
 
 function registrarError(action, err, p, grave) {
+  var txt0 = String(err && err.message ? err.message : err);
+  if (txt0 === MSG_LIMITE || txt0 === MSG_TRAMPA) return;
   try {
     var texto = String(err && err.message ? err.message : err);
     if (grave === undefined) grave = !ERRORES_ESPERADOS.test(texto);
@@ -1355,6 +1433,10 @@ function registrar(obj) {
 
 function login(email, password) {
   if (!email || !password) return { ok: false, error: "Faltan datos" };
+  var cacheL = CacheService.getScriptCache();
+  var claveL = "loginfail_" + String(email).toLowerCase().replace(/\s+/g, "").slice(0, 120);
+  var fallos = Number(cacheL.get(claveL) || 0);
+  if (fallos >= 5) return { ok: false, error: "Demasiados intentos con esa cuenta. Esperá 15 minutos o recuperá tu contraseña." };
   var sh = sheetFor("Clientes");
   var keys = keysOf("Clientes");
   var data = sh.getDataRange().getValues();
@@ -1369,8 +1451,10 @@ function login(email, password) {
         if (String(data[r][iClave]).indexOf("v2$") !== 0) {
           sh.getRange(r + 1, iClave + 1).setValue(nuevaClave(password));
         }
+        cacheL.remove(claveL);
         return { ok: true, user: { nombre: data[r][iNom], email: data[r][iEmail] } };
       }
+      cacheL.put(claveL, String(fallos + 1), 15 * 60);
       return { ok: false, error: "Contraseña incorrecta" };
     }
   }

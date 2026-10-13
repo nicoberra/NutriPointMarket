@@ -10,6 +10,7 @@ import { createOrder, mpCreatePreference, uploadComprobante } from "@/lib/api";
 import { PageBanner } from "@/components/PageBanner";
 import { CheckIcon, WhatsappIcon } from "@/components/Icons";
 import { PROVINCIAS, ZONAS_ENVIO, calcularEnvio, detectarZona, type ZonaDetectada } from "@/lib/envios";
+import { Trampa, CAMPO_TRAMPA } from "@/components/Trampa";
 
 type Metodo = "Transferencia" | "Mercado Pago";
 
@@ -176,6 +177,7 @@ export default function CheckoutPage() {
         envio: envioTexto,
         metodo,
         items: itemsJson,
+        hp: String(fd.get(CAMPO_TRAMPA) || ""),
       });
 
       if (metodo === "Mercado Pago") {
@@ -311,7 +313,8 @@ export default function CheckoutPage() {
     <>
       <PageBanner title="Finalizar compra" crumbs={[{ label: "Checkout" }]} />
       <div className="container-page py-10">
-        <form onSubmit={confirm} className="grid gap-8 lg:grid-cols-[1fr_360px]">
+        <form onSubmit={confirm} className="relative grid gap-8 lg:grid-cols-[1fr_360px]">
+          <Trampa />
           {/* Datos */}
           <div className="space-y-6">
             <fieldset className="rounded-xl border border-line bg-white p-5">

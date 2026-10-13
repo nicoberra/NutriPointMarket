@@ -331,7 +331,7 @@ export function OrderSheet({
           <label className="flex items-center justify-between rounded-xl border border-line bg-white px-3 py-2.5">
             <span>
               <span className="block text-sm font-semibold text-ink">Ya está cobrado</span>
-              <span className="block text-xs text-muted">Si no, queda como "Sin cobrar" en la lista</span>
+              <span className="block text-xs text-muted">Si no, queda como &quot;Sin cobrar&quot; en la lista</span>
             </span>
             <input
               type="checkbox"
