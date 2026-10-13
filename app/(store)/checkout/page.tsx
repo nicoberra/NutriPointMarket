@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { formatPrice } from "@/lib/format";
@@ -31,6 +31,10 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [compUp, setCompUp] = useState<"idle" | "up" | "done">("idle");
+  // Número de pedido del intento de compra actual: si el cliente reintenta la
+  // MISMA compra (p. ej. tras un corte de conexión) se reutiliza y el servidor
+  // no la duplica. Si cambia algo del pedido, se genera uno nuevo.
+  const intento = useRef<{ firma: string; id: string } | null>(null);
 
   // Entrega: envío a domicilio (costo según zona) o retiro en persona ($0).
   const [entrega, setEntrega] = useState<"envio" | "retiro">("envio");
@@ -106,12 +110,16 @@ export default function CheckoutPage() {
         ...(i.comboChoices ? { cv: i.comboChoices } : {}),
       })),
     );
-    const id = "ped" + Date.now();
-
-    // Total según el método: efectivo/transferencia con 15% off (por producto);
+    // Total según el método: efectivo/transferencia con 10% off (por producto);
     // Mercado Pago sin descuento.
     const desc = metodo === "Mercado Pago" ? 0 : descuentoProductos;
     const montoFinal = total - desc;
+
+    const firma = JSON.stringify([itemsJson, cliente, telefono, email, metodo, envioTexto, montoFinal]);
+    if (!intento.current || intento.current.firma !== firma) {
+      intento.current = { firma, id: "ped" + Date.now() };
+    }
+    const id = intento.current.id;
 
     setLoading(true);
     try {
@@ -148,6 +156,7 @@ export default function CheckoutPage() {
       }
 
       // Efectivo / Transferencia
+      intento.current = null; // compra cerrada: la próxima usa otro número
       clear();
       setDone({ metodo, id, total: montoFinal });
     } catch (e) {

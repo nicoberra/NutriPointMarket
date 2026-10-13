@@ -18,7 +18,7 @@
  * ============================================================================ */
 
 var SHEET_ID = "12paAzW6OcSgYv4u6L7QVI4tpvrEx1yqnujW0OjcieMc";
-var API_VERSION = "v2";
+var API_VERSION = "v3"; // v3: validación de pedidos, bloqueo, caché y registro de errores
 
 // Repo de GitHub donde se guardan las fotos de productos (en public/productos/).
 // El token NO va acá: se guarda en Propiedades del script como GITHUB_TOKEN.
@@ -184,24 +184,73 @@ function handle(e) {
     if (!esAdmin && !esAccionPublica(action, p)) {
       return respond({ ok: false, error: "auth" }, p.callback);
     }
+    // Las escrituras van de a una (bloqueo): así dos pedidos simultáneos no
+    // pisan el stock. Al terminar se borra el caché del catálogo.
+    if (ACCIONES_ESCRITURA[action]) {
+      out = conBloqueo(function () { return ejecutar(action, p, e, esAdmin); });
+    } else {
+      out = ejecutar(action, p, e, esAdmin);
+    }
+  } catch (err) {
+    registrarError(action, err, p);
+    out = { ok: false, error: String(err && err.message ? err.message : err) };
+  }
+  return respond(out, p.callback);
+}
+
+// Acciones que escriben en la planilla (se ejecutan con bloqueo).
+var ACCIONES_ESCRITURA = {
+  productos_save: 1, add: 1, update: 1, delete: 1, categoria_rename: 1, producto_rename: 1,
+  subir_imagen: 1, borrar_imagen: 1, subir_comprobante: 1, mp_webhook: 1, aprobar_pedido: 1, registrar: 1,
+};
+
+function conBloqueo(fn) {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) {
+    throw new Error("Hay mucha demanda en este momento. Probá de nuevo en unos segundos.");
+  }
+  try {
+    return fn();
+  } finally {
+    try { borrarCacheCatalogo(); } catch (eC) {}
+    lock.releaseLock();
+  }
+}
+
+function ejecutar(action, p, e, esAdmin) {
+  var out;
     switch (action) {
       case "version":
         out = { ok: true, version: API_VERSION };
         break;
       case "productos_list":
-        // Con token (CRM) incluye costos; público, sin costos.
-        out = { ok: true, data: listProductos(esAdmin) };
+        // Con token (CRM) incluye costos y siempre lee la planilla; la tienda
+        // pública usa el caché (se borra con cada cambio).
+        out = { ok: true, data: esAdmin ? listProductos(true) : leerCacheado("cat_productos", function () { return listProductos(false); }) };
         break;
       case "productos_save":
         out = { ok: true, data: saveProducto(parseData(p)) };
         break;
       case "list":
-        out = { ok: true, data: listTable(p.tab) };
+        out = {
+          ok: true,
+          data: !esAdmin && p.tab === "Categorias"
+            ? leerCacheado("cat_categorias", function () { return listTable("Categorias"); })
+            : listTable(p.tab),
+        };
         break;
       case "add":
         // Sin token (tienda pública) solo pasan los campos permitidos y el
         // monto se recalcula acá con los precios de la planilla.
-        out = { ok: true, data: addRow(p.tab, esAdmin ? parseData(p) : validarAltaPublica(p.tab, parseData(p))) };
+        if (esAdmin) {
+          out = { ok: true, data: addRow(p.tab, parseData(p)) };
+        } else {
+          var alta = validarAltaPublica(p.tab, parseData(p));
+          // Reintento del mismo pedido (misma compra): no se duplica.
+          out = alta.__repetido
+            ? { ok: true, data: { id: alta.id }, repetido: true }
+            : { ok: true, data: addRow(p.tab, alta) };
+        }
         break;
       case "update":
         out = { ok: true, data: updateRow(p.tab, p.id, parseData(p)) };
@@ -248,10 +297,7 @@ function handle(e) {
       default:
         out = { ok: false, error: "Acción desconocida: " + action };
     }
-  } catch (err) {
-    out = { ok: false, error: String(err) };
-  }
-  return respond(out, p.callback);
+  return out;
 }
 
 function respond(obj, callback) {
@@ -495,7 +541,18 @@ function validarAltaPublica(tab, obj) {
   }
   // Pedidos
   if (!/^ped\d{10,16}$/.test(String(limpio.id || ""))) throw new Error("Id de pedido inválido");
-  if (findRowById("Pedidos", limpio.id) > 0) throw new Error("El pedido ya existe");
+  var nExiste = findRowById("Pedidos", limpio.id);
+  if (nExiste > 0) {
+    // Mismo id: si es la misma compra (reintento por mala conexión) se
+    // responde OK sin crear otro pedido ni descontar stock de nuevo.
+    var kEx = keysOf("Pedidos");
+    var rowEx = sheetFor("Pedidos").getRange(nExiste, 1, 1, kEx.length).getValues()[0];
+    if (String(rowEx[kEx.indexOf("items")]) === String(limpio.items || "") &&
+        low(rowEx[kEx.indexOf("cliente")]) === low(limpio.cliente)) {
+      return { __repetido: true, id: limpio.id };
+    }
+    throw new Error("El pedido ya existe");
+  }
   var pago = String(limpio.pago || "").trim();
   if (["Mercado Pago", "Transferencia", "Efectivo"].indexOf(pago) === -1) throw new Error("Medio de pago inválido");
   var items = [];
@@ -503,6 +560,7 @@ function validarAltaPublica(tab, obj) {
   if (!items.length) throw new Error("El pedido no tiene productos");
   if (items.length > 50) throw new Error("Demasiados productos");
 
+  verificarStock(items);
   var calc = calcularTotalPedido(items, pago);
   var envio = envioSegunTexto(limpio.envio);
   var total = calc.subtotal + envio;
@@ -517,6 +575,174 @@ function validarAltaPublica(tab, obj) {
   limpio.comprobante = "";
   limpio.costo = "";
   return limpio;
+}
+
+// Revisa que haya stock para todo el pedido (se llama con el bloqueo tomado,
+// justo antes de descontar). Reglas:
+//  - Stock "no" en la planilla → sin stock.
+//  - Variante con cantidad ("Vainilla:3") → no se puede pedir más que eso.
+//  - Cantidad total cargada (> 0) → no se puede pedir más que eso.
+//  - Si la cantidad no está cargada (0 o vacía) y el stock es "sí", se acepta.
+//  - Combos: se revisa cada producto que lo compone.
+function verificarStock(items) {
+  var values = sheetFor("Productos").getDataRange().getValues();
+  var keys = keysOf("Productos");
+  var iN = keys.indexOf("nombre"), iS = keys.indexOf("stock"), iC = keys.indexOf("cantidad"),
+    iV = keys.indexOf("variantes"), iCo = keys.indexOf("combo");
+  var prods = {};
+  for (var r = 1; r < values.length; r++) {
+    var nm = low(values[r][iN]);
+    if (nm) prods[nm] = values[r];
+  }
+  var porProducto = {}, porVariante = {};
+  function sumar(nombre, variante, q) {
+    var row = prods[low(nombre)];
+    if (!row) return; // el total del pedido ya avisa "Producto no disponible"
+    var comboRaw = String(row[iCo] || "").trim();
+    if (comboRaw) {
+      var comps = [];
+      try { comps = JSON.parse(comboRaw); } catch (e) {}
+      for (var c = 0; c < comps.length; c++) {
+        sumar(comps[c].n, (variante && variante[comps[c].n]) || comps[c].v, q * (Number(comps[c].q) || 1));
+      }
+      return;
+    }
+    var k = low(nombre);
+    porProducto[k] = (porProducto[k] || 0) + q;
+    if (variante && typeof variante === "string") {
+      var kv = k + "|" + low(variante);
+      porVariante[kv] = (porVariante[kv] || 0) + q;
+    }
+  }
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i] || {};
+    var q = Math.floor(Number(it.q) || 0);
+    var row0 = prods[low(it.n)];
+    var esCombo = row0 && String(row0[iCo] || "").trim();
+    sumar(it.n, esCombo ? (it.cv || null) : (it.v || ""), q);
+  }
+  for (var k2 in porProducto) {
+    var row2 = prods[k2];
+    var nombreReal = String(row2[iN]);
+    var stockTxt = String(row2[iS] === undefined ? "" : row2[iS]).trim();
+    if (stockTxt !== "" && !parseSiNo(stockTxt)) throw new Error("Sin stock: " + nombreReal);
+    var cant = Number(row2[iC]) || 0;
+    if (cant > 0 && porProducto[k2] > cant) {
+      throw new Error("Solo quedan " + cant + " unidades de " + nombreReal);
+    }
+  }
+  for (var kv2 in porVariante) {
+    var partes = kv2.split("|");
+    var row3 = prods[partes[0]];
+    var vars = String(row3[iV] || "").split(",");
+    for (var j = 0; j < vars.length; j++) {
+      var idx = vars[j].lastIndexOf(":");
+      if (idx <= 0) continue;
+      if (low(vars[j].slice(0, idx)) !== partes[1]) continue;
+      var disp = Number(vars[j].slice(idx + 1).trim()) || 0;
+      if (porVariante[kv2] > disp) {
+        var vNom = vars[j].slice(0, idx).trim();
+        throw new Error(disp > 0
+          ? "Solo quedan " + disp + " de " + String(row3[iN]) + " (" + vNom + ")"
+          : "Sin stock: " + String(row3[iN]) + " (" + vNom + ")");
+      }
+    }
+  }
+}
+
+/* ------------------------------- Caché ----------------------------------- */
+
+// Guarda en caché (2 minutos) la respuesta de una lectura pública. Se parte en
+// trozos porque cada clave admite ~100 KB. Cualquier escritura la borra.
+var CACHE_TTL_S = 120;
+var CACHE_CLAVES = ["cat_productos", "cat_categorias"];
+
+function leerCacheado(clave, fn) {
+  var cache = CacheService.getScriptCache();
+  try {
+    var n = Number(cache.get(clave + "_n") || 0);
+    if (n > 0) {
+      var keys = [];
+      for (var i = 0; i < n; i++) keys.push(clave + "_" + i);
+      var partes = cache.getAll(keys);
+      var txt = "";
+      for (var j = 0; j < n; j++) {
+        if (partes[clave + "_" + j] == null) { txt = null; break; }
+        txt += partes[clave + "_" + j];
+      }
+      if (txt) return JSON.parse(txt);
+    }
+  } catch (eR) {}
+  var data = fn();
+  try {
+    var json = JSON.stringify(data);
+    var TAM = 90000, obj = {}, cant = Math.ceil(json.length / TAM);
+    if (cant <= 50) {
+      for (var k = 0; k < cant; k++) obj[clave + "_" + k] = json.slice(k * TAM, (k + 1) * TAM);
+      obj[clave + "_n"] = String(cant);
+      cache.putAll(obj, CACHE_TTL_S);
+    }
+  } catch (eW) {}
+  return data;
+}
+
+function borrarCacheCatalogo() {
+  var cache = CacheService.getScriptCache();
+  var keys = [];
+  for (var i = 0; i < CACHE_CLAVES.length; i++) keys.push(CACHE_CLAVES[i] + "_n");
+  cache.removeAll(keys); // sin el contador, los trozos se ignoran
+}
+
+/* --------------------------- Registro de errores -------------------------- */
+
+// Anota el error en la pestaña "Errores" (se crea sola). Sin datos sensibles:
+// solo acción, mensaje, pestaña e id. Nunca debe romper la respuesta.
+function registrarError(action, err, p) {
+  try {
+    var book = ss();
+    var sh = book.getSheetByName("Errores");
+    if (!sh) {
+      sh = book.insertSheet("Errores");
+      sh.appendRow(["Fecha", "Acción", "Mensaje", "Pestaña", "Id"]);
+      sh.getRange(1, 1, 1, 5).setFontWeight("bold");
+      sh.setFrozenRows(1);
+    }
+    var msg = String(err && err.message ? err.message : err).slice(0, 300);
+    sh.appendRow([now(), String(action || "").slice(0, 40), sanitize("m", msg), sanitize("t", String((p && p.tab) || "").slice(0, 40)), sanitize("i", String((p && (p.id || p.pedido)) || "").slice(0, 60))]);
+  } catch (e2) {
+    console.error("registrarError: " + e2);
+  }
+}
+
+// Mail diario (lo dispara backupDiario) SOLO si hubo errores, pagos para
+// revisar o la planilla se acerca al límite de celdas.
+function resumenDiario() {
+  var book = ss();
+  var avisos = [];
+  var shE = book.getSheetByName("Errores");
+  if (shE && shE.getLastRow() > 1) {
+    var desde = Utilities.formatDate(new Date(Date.now() - 24 * 3600 * 1000), "GMT-3", "yyyy-MM-dd HH:mm");
+    var filas = shE.getRange(2, 1, shE.getLastRow() - 1, 3).getValues().filter(function (f) {
+      var fecha = f[0] instanceof Date ? Utilities.formatDate(f[0], "GMT-3", "yyyy-MM-dd HH:mm") : String(f[0]);
+      return fecha >= desde;
+    });
+    if (filas.length) {
+      avisos.push("Errores en las últimas 24 h: " + filas.length);
+      filas.slice(-10).forEach(function (f) { avisos.push("  · " + f[1] + ": " + f[2]); });
+    }
+  }
+  var pedidos = listTable("Pedidos").filter(function (r) { return low(r.estado) === "revisar pago"; });
+  if (pedidos.length) {
+    avisos.push("Pedidos con pago para revisar (monto distinto en Mercado Pago): " + pedidos.length);
+    pedidos.slice(0, 10).forEach(function (r) { avisos.push("  · " + r.id + " · " + r.cliente); });
+  }
+  var celdas = 0;
+  book.getSheets().forEach(function (shx) { celdas += shx.getMaxRows() * shx.getMaxColumns(); });
+  if (celdas > 5000000) avisos.push("La planilla tiene " + celdas + " celdas (límite de Google: 10.000.000). Conviene archivar pedidos viejos.");
+  if (!avisos.length) return "sin avisos";
+  MailApp.sendEmail(Session.getEffectiveUser().getEmail(), "Suple Market · avisos del sistema", avisos.join("\n") +
+    "\n\nDetalle en la planilla, pestañas Errores y Pedidos.");
+  return avisos.length + " avisos enviados";
 }
 
 // Precio publicado en la web a partir del precio base de la planilla.
@@ -1309,6 +1535,7 @@ function instalarBackupDiario() {
 
 function backupDiario() {
   backupAhora();
+  try { resumenDiario(); } catch (e) { registrarError("resumenDiario", e, {}); }
 }
 
 // Ejecutar UNA vez desde el editor (▶ tareasPendientes). Hace los pendientes:
@@ -1317,6 +1544,9 @@ function backupDiario() {
 //  2) actualiza los encabezados de Pedidos;
 //  3) instala el backup diario (4 am) y hace la primera copia en Drive.
 // Es seguro repetirla: si no hay nada que hacer, no cambia nada.
+// Pedidos creados por pruebas automáticas (13/10/2026) contra la versión vieja.
+var IDS_PRUEBA = ["ped1791863284000", "hack"];
+
 function tareasPendientes() {
   var sh = sheetFor("Pedidos");
   var keys = keysOf("Pedidos");
@@ -1324,7 +1554,9 @@ function tareasPendientes() {
   var data = sh.getDataRange().getValues();
   var borrados = 0;
   for (var r = data.length - 1; r >= 1; r--) {
-    if (String(data[r][iCli] || "").toUpperCase().indexOf("PRUEBA CLAUDE") !== -1) {
+    var idFila = String(data[r][keys.indexOf("id")] || "");
+    if (String(data[r][iCli] || "").toUpperCase().indexOf("PRUEBA CLAUDE") !== -1 ||
+        IDS_PRUEBA.indexOf(idFila) !== -1) {
       reponerStockPedido(r + 1);
       guardarEnPapelera("Pedidos", r + 1);
       sh.deleteRow(r + 1);
@@ -1332,10 +1564,22 @@ function tareasPendientes() {
     }
   }
   writeHeader(sh, "Pedidos");
+  // Cliente de prueba registrado con email inválido
+  var shC = sheetFor("Clientes");
+  var kC = keysOf("Clientes");
+  var dC = shC.getDataRange().getValues();
+  for (var rc = dC.length - 1; rc >= 1; rc--) {
+    if (low(dC[rc][kC.indexOf("email")]) === "no-es-email") {
+      guardarEnPapelera("Clientes", rc + 1);
+      shC.deleteRow(rc + 1);
+      borrados++;
+    }
+  }
+  borrarCacheCatalogo();
   var ya = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === "backupDiario"; });
   if (!ya) ScriptApp.newTrigger("backupDiario").timeBased().everyDays(1).atHour(4).create();
   var copias = backupAhora();
-  var msg = "Pedidos de prueba borrados: " + borrados + " · Backup diario " + (ya ? "ya estaba instalado" : "instalado") +
+  var msg = "Filas de prueba borradas: " + borrados + " · Backup diario " + (ya ? "ya estaba instalado" : "instalado") +
     " · Copias en Drive: " + copias;
   Logger.log(msg);
   try { SpreadsheetApp.getActive().toast(msg, "Suple Market", 8); } catch (e) {}
