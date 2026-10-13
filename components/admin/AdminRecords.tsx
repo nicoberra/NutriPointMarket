@@ -457,6 +457,12 @@ export function AdminRecords({
                           <CheckIcon className="h-3.5 w-3.5" /> Stock descontado
                         </span>
                       );
+                    if (String(r.estado ?? "").toLowerCase() === "revisar pago")
+                      return (
+                        <span className="ml-1.5 mt-1.5 inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-1 text-xs font-bold text-red-700">
+                          Revisar pago MP (ver notas)
+                        </span>
+                      );
                     if (faltaComprobante)
                       return (
                         <span className="ml-1.5 mt-1.5 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700">
