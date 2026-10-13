@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { crmLogin, crmLogout, getCrmToken, setCrmToken, CRM_AUTH_EVENT } from "@/lib/api";
+import { crmLogout, getCrmToken, setCrmToken, CRM_AUTH_EVENT } from "@/lib/api";
+import { GlassyPinLogin } from "./GlassyPinLogin";
 import { AdminProducts } from "./AdminProducts";
 import { useProducts } from "@/context/ProductsContext";
 import { AdminRecords, type RecordsConfig } from "./AdminRecords";
@@ -168,7 +168,7 @@ export function AdminApp() {
   };
 
   if (!ready) return null;
-  if (!authed) return <Login onOk={login} />;
+  if (!authed) return <GlassyPinLogin onOk={login} />;
 
   const titles: Record<Section, string> = {
     dashboard: "Panel",
@@ -344,116 +344,3 @@ export function AdminApp() {
   );
 }
 
-/* -------------------------------- Login ---------------------------------- */
-
-function Login({ onOk }: { onOk: () => void }) {
-  const [pin, setPin] = useState("");
-  const [showPin, setShowPin] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [shake, setShake] = useState(false);
-  useEffect(() => {
-    if (error) setShake(true);
-  }, [error]);
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-    const res = await crmLogin(pin);
-    setLoading(false);
-    if (res.ok) onOk();
-    else if (res.reason === "conn")
-      setError("No se pudo conectar. Revisá tu internet y probá de nuevo (tu PIN puede estar bien).");
-    else if (res.reason === "blocked")
-      setError("Demasiados intentos. Por seguridad el acceso queda bloqueado 15 minutos.");
-    else
-      setError(
-        res.restantes != null && Number.isFinite(res.restantes)
-          ? `PIN incorrecto. Te quedan ${res.restantes} intentos.`
-          : "PIN incorrecto. Probá de nuevo.",
-      );
-  };
-
-  return (
-    <div className="flex min-h-screen items-center justify-center p-6">
-      <div className="w-full max-w-sm animate-section-in motion-reduce:animate-none">
-      <div
-        onAnimationEnd={() => setShake(false)}
-        className={`w-full rounded-2xl border border-line bg-white p-7 shadow-card ${shake ? "animate-shake" : ""}`}
-      >
-        <div className="mb-6 text-center">
-          <span className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-accent font-display text-2xl font-black text-primary">
-            N
-          </span>
-          <h1 className="font-display text-xl font-extrabold text-primary">
-            Suple Market <span className="text-primary">CRM</span>
-          </h1>
-          <p className="mt-1 text-sm text-muted">Panel privado. Ingresá tu PIN.</p>
-        </div>
-        <form onSubmit={submit} className="space-y-3">
-          <div className="relative">
-            <input
-              type={showPin ? "text" : "password"}
-              inputMode="numeric"
-              autoFocus
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-              placeholder="••••••"
-              className="input h-12 pr-11 text-center text-lg tracking-[0.5em]"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPin((v) => !v)}
-              aria-label={showPin ? "Ocultar PIN" : "Ver PIN"}
-              title={showPin ? "Ocultar PIN" : "Ver PIN"}
-              className="absolute inset-y-0 right-0 grid w-11 place-items-center text-muted hover:text-primary"
-            >
-              {showPin ? (
-                <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 3l18 18" />
-                  <path d="M10.6 10.6a2 2 0 002.8 2.8" />
-                  <path d="M9.4 5.2A9.5 9.5 0 0112 5c5 0 9 4.5 9 7a12 12 0 01-2.2 3.1M6.2 6.2A12.4 12.4 0 003 12c0 2.5 4 7 9 7a9.4 9.4 0 004-.9" />
-                </svg>
-              ) : (
-                <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-              )}
-            </button>
-          </div>
-          {error && (
-            <p className="rounded-lg bg-sale/10 px-3 py-2 text-center text-sm text-sale">
-              {error}
-            </p>
-          )}
-          <button
-            type="submit"
-            disabled={loading || pin.length < 4}
-            className="btn btn-primary btn-lg w-full"
-          >
-            {loading ? (
-              <>
-                <span
-                  aria-hidden
-                  className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
-                />
-                Verificando…
-              </>
-            ) : (
-              "Ingresar"
-            )}
-          </button>
-        </form>
-        <Link
-          href="/"
-          className="mt-5 block text-center text-xs font-semibold text-muted hover:text-primary"
-        >
-          ← Volver a la tienda
-        </Link>
-      </div>
-      </div>
-    </div>
-  );
-}
