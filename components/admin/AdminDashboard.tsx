@@ -6,6 +6,7 @@ import { peekTable, ensureTable, subscribeTable } from "@/lib/tableCache";
 import { formatPrice } from "@/lib/format";
 import { UserIcon, ClipboardIcon, ChevronRightIcon } from "@/components/Icons";
 import { useCountUp } from "./useCountUp";
+import { ErrorState } from "@/components/Estados";
 
 type Section = "productos" | "clientes" | "pedidos" | "facturacion";
 
@@ -23,6 +24,8 @@ const low = (v: unknown) => String(v ?? "").trim().toLowerCase();
 
 export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
   const { products } = useProducts();
+  const [errorCarga, setErrorCarga] = useState(false);
+  const [intento, setIntento] = useState(0);
   const [m, setM] = useState({
     clientes: 0,
     pedidos: 0,
@@ -98,12 +101,18 @@ export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
     run();
     const u1 = subscribeTable("Clientes", run);
     const u2 = subscribeTable("Pedidos", run);
-    Promise.all([ensureTable("Clientes"), ensureTable("Pedidos")]).catch(() => {}).finally(run);
+    setErrorCarga(false);
+    Promise.all([ensureTable("Clientes"), ensureTable("Pedidos")])
+      .catch(() => {
+        // Sin datos guardados no mostramos ceros engañosos: error + Reintentar.
+        if (!peekTable("Pedidos") || !peekTable("Clientes")) setErrorCarga(true);
+      })
+      .finally(run);
     return () => {
       u1();
       u2();
     };
-  }, []);
+  }, [intento]);
 
   const sinStock = products.filter((p) => p.inStock === false).slice(0, 8);
   const sinFoto = products.filter((p) => !p.image);
@@ -112,6 +121,12 @@ export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
 
   return (
     <div className="space-y-5">
+      {errorCarga && (
+        <ErrorState
+          text="No pudimos traer clientes y pedidos. Revisá tu conexión y probá de nuevo."
+          onRetry={() => setIntento((n) => n + 1)}
+        />
+      )}
       {/* Avisos primero (solo los que tienen algo): sin foto / sin stock */}
       {(sinFoto.length > 0 || sinStock.length > 0) && (
         <section className="space-y-4">

@@ -8,6 +8,7 @@ import { peekTable, fetchTable, ensureTable, subscribeTable, patchTable } from "
 import { useProducts } from "@/context/ProductsContext";
 import { whatsappLink } from "@/lib/config";
 import { formatPrice } from "@/lib/format";
+import { EmptyState, ErrorState } from "@/components/Estados";
 import {
   CloseIcon,
   PlusIcon,
@@ -16,6 +17,8 @@ import {
   CheckIcon,
   SearchIcon,
   TrashIcon,
+  UserIcon,
+  ClipboardIcon,
 } from "@/components/Icons";
 
 export interface FieldDef {
@@ -71,6 +74,7 @@ export function AdminRecords({
 }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorCarga, setErrorCarga] = useState(false);
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [seg, setSeg] = useState<"mine" | "web">("mine");
@@ -118,9 +122,11 @@ export function AdminRecords({
       setRows([...cached].reverse());
       setLoading(false);
     } else setLoading(true);
+    setErrorCarga(false);
     (forzar ? fetchTable<Row>(config.tab) : ensureTable<Row>(config.tab))
       .catch(() => {
-        if (!cached) onToast("No se pudo cargar");
+        if (!cached) setErrorCarga(true);
+        else onToast("No se pudo actualizar (se muestran los últimos datos)");
       })
       .finally(() => setLoading(false));
   };
@@ -407,14 +413,30 @@ export function AdminRecords({
             <li key={i} className="h-[76px] animate-pulse rounded-xl border border-line bg-white motion-reduce:animate-none" />
           ))}
         </ul>
+      ) : errorCarga && rows.length === 0 ? (
+        <ErrorState onRetry={() => load(true)} />
       ) : visible.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-line bg-white py-12 text-center text-sm text-muted">
-          {query
-            ? "No hay resultados para la búsqueda."
-            : config.segments && seg === "web"
-              ? "Todavía nadie se registró desde la web."
-              : "Todavía no hay registros."}
-        </div>
+        query ? (
+          <EmptyState
+            icon={<SearchIcon className="h-7 w-7" />}
+            title="No hay resultados para la búsqueda"
+            text="Probá con otro nombre, teléfono o email."
+            action={{ label: "Limpiar búsqueda", onClick: () => setQ("") }}
+          />
+        ) : config.segments && seg === "web" ? (
+          <EmptyState
+            icon={<UserIcon className="h-7 w-7" />}
+            title="Todavía nadie se registró desde la web"
+            text="Cuando un cliente cree su cuenta en la tienda, aparece acá."
+          />
+        ) : (
+          <EmptyState
+            icon={isClientes ? <UserIcon className="h-7 w-7" /> : <ClipboardIcon className="h-7 w-7" />}
+            title={isClientes ? "Todavía no hay clientes" : "Todavía no hay registros"}
+            text={isClientes ? "Cargá tu primer cliente para empezar a registrarle pedidos." : undefined}
+            action={{ label: isClientes ? "Nuevo usuario" : "Agregar", onClick: () => setAdding(true) }}
+          />
+        )
       ) : (
         <ul className="space-y-2 sm:grid sm:grid-cols-2 sm:gap-2 sm:space-y-0 xl:grid-cols-3">
           {visible.map((r, i) => (
@@ -1058,9 +1080,12 @@ function ClientSheet({
           </span>
         </h4>
         {orders.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-line bg-white py-4 text-center text-sm text-muted">
-            Todavía no tiene pedidos.
-          </p>
+          <EmptyState
+            compact
+            icon={<ClipboardIcon className="h-5 w-5" />}
+            title="Todavía no tiene pedidos"
+            action={canOrder ? { label: "Nuevo pedido", onClick: onNewOrder } : undefined}
+          />
         ) : (
           <ul className="space-y-2">
             {orders.map((p) => {

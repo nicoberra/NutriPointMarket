@@ -9,6 +9,8 @@ import { PageBanner } from "@/components/PageBanner";
 import { ProductCard } from "@/components/ProductCard";
 import { UserIcon, HeartIcon } from "@/components/Icons";
 import { Trampa, leerTrampa } from "@/components/Trampa";
+import { FormSkeleton } from "@/components/Estados";
+import { EmptyState } from "@/components/Estados";
 
 export default function CuentaPage() {
   const { user, ready, login, register, logout } = useAuth();
@@ -47,7 +49,7 @@ export default function CuentaPage() {
     return (
       <>
         <PageBanner title="Mi cuenta" crumbs={[{ label: "Mi cuenta" }]} />
-        <div className="container-page py-16 text-center text-sm text-muted">Cargando…</div>
+        <FormSkeleton />
       </>
     );
   }
@@ -81,15 +83,12 @@ export default function CuentaPage() {
               <span className="text-sm font-normal text-muted">({favProducts.length})</span>
             </h2>
             {favProducts.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-line bg-white py-16 text-center">
-                <p className="font-semibold text-ink">Todavía no tenés favoritos</p>
-                <p className="mt-1 text-sm text-muted">
-                  Tocá el corazón en cualquier producto para guardarlo acá.
-                </p>
-                <Link href="/productos" className="btn btn-primary btn-md mt-4">
-                  Explorar productos
-                </Link>
-              </div>
+              <EmptyState
+                icon={<HeartIcon className="h-7 w-7" />}
+                title="Todavía no tenés favoritos"
+                text="Tocá el corazón en cualquier producto para guardarlo acá."
+                action={{ label: "Explorar productos", href: "/productos" }}
+              />
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
                 {favProducts.map((p) => (

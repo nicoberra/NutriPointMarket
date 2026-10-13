@@ -11,7 +11,8 @@ import type { CategorySlug } from "@/lib/types";
 import { formatPrice } from "@/lib/format";
 import { ProductCard } from "./ProductCard";
 import { ProductSkeleton } from "./ProductSkeleton";
-import { FilterIcon, CloseIcon, SearchIcon } from "./Icons";
+import { FilterIcon, CloseIcon, SearchIcon, PercentIcon } from "./Icons";
+import { EmptyState } from "@/components/Estados";
 
 type SortKey = "destacados" | "mas-vendidos" | "novedades" | "precio-asc" | "precio-desc";
 
@@ -327,13 +328,21 @@ export function Catalog({
               ))}
             </div>
           ) : filtered.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-line bg-white py-20 text-center">
-              <p className="font-semibold text-ink">No encontramos productos</p>
-              <p className="mt-1 text-sm text-muted">Probá ajustando los filtros o la búsqueda.</p>
-              <button onClick={clearFilters} className="btn btn-primary btn-md mt-4">
-                Limpiar filtros
-              </button>
-            </div>
+            onlyOffers && !search.trim() && !selectedCats.length && !selectedBrands.length ? (
+              <EmptyState
+                icon={<PercentIcon className="h-7 w-7" />}
+                title="Por ahora no hay ofertas"
+                text="Cuando haya descuentos los vas a ver acá. Mientras tanto, pagando por transferencia tenés 10% off."
+                action={{ label: "Ver todos los productos", href: "/productos" }}
+              />
+            ) : (
+              <EmptyState
+                icon={<SearchIcon className="h-7 w-7" />}
+                title="No encontramos productos"
+                text="Probá ajustando los filtros o la búsqueda."
+                action={{ label: "Limpiar filtros", onClick: clearFilters }}
+              />
+            )
           ) : (
             <>
             <h2 className="sr-only">Productos</h2>

@@ -3,6 +3,7 @@
 import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ProductoView } from "@/components/ProductoView";
+import { DetailSkeleton } from "@/components/Estados";
 
 /**
  * Compatibilidad con los links viejos /producto?slug=xxx: muestra el producto
@@ -30,11 +31,7 @@ function Legacy() {
 export default function ProductoPage() {
   return (
     <Suspense
-      fallback={
-        <div className="container-page py-20 text-center text-sm text-muted">
-          Cargando…
-        </div>
-      }
+      fallback={<DetailSkeleton />}
     >
       <Legacy />
     </Suspense>

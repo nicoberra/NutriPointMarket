@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Catalog } from "@/components/Catalog";
 import { PageBanner } from "@/components/PageBanner";
 import { SeoFooter } from "@/components/SeoFooter";
+import { CatalogSkeleton } from "@/components/Estados";
 
 export const metadata: Metadata = {
   title: "Comprar suplementos online",
@@ -31,9 +32,5 @@ export default function ProductosPage() {
 }
 
 function CatalogFallback() {
-  return (
-    <div className="container-page py-16 text-center text-sm text-muted">
-      Cargando productos…
-    </div>
-  );
+  return <CatalogSkeleton />;
 }

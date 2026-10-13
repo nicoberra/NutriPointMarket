@@ -19,8 +19,9 @@ import {
 import { formatPrice } from "@/lib/format";
 import { listPrice } from "@/lib/config";
 import { categoryMap } from "@/data/categories";
-import { SearchIcon, CloseIcon, CheckIcon, PlusIcon, TrashIcon, ChevronDownIcon } from "@/components/Icons";
+import { SearchIcon, CloseIcon, CheckIcon, PlusIcon, TrashIcon, ChevronDownIcon, PackageIcon } from "@/components/Icons";
 import { AdminCategories } from "./AdminCategories";
+import { EmptyState } from "@/components/Estados";
 
 /**
  * CRM · Productos. Cada producto es una tarjeta que se edita EN EL LUGAR:
@@ -209,13 +210,18 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
       </div>
 
       {products.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-line bg-white py-12 text-center text-sm text-muted">
-          Todavía no hay productos. Tocá “Agregar producto”.
-        </div>
+        <EmptyState
+          icon={<PackageIcon className="h-7 w-7" />}
+          title="Todavía no hay productos"
+          text="Cargá el primero y aparece en la tienda."
+          action={{ label: "Agregar producto", onClick: () => setAdding(true) }}
+        />
       ) : filtered.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-line bg-white py-12 text-center text-sm text-muted">
-          No hay productos para esa búsqueda.
-        </div>
+        <EmptyState
+          icon={<SearchIcon className="h-7 w-7" />}
+          title="No hay productos para esa búsqueda"
+          action={{ label: "Ver todos", onClick: () => { setQ(""); setCat(""); } }}
+        />
       ) : (
         groups.map((g) => (
           <section key={g.cat?.slug ?? "otros"}>

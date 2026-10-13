@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Catalog } from "@/components/Catalog";
 import { PageBanner } from "@/components/PageBanner";
 import { SeoFooter } from "@/components/SeoFooter";
+import { CatalogSkeleton } from "@/components/Estados";
 
 export const metadata: Metadata = {
   title: "Ofertas en suplementos",
@@ -20,11 +21,7 @@ export default function OfertasPage() {
         crumbs={[{ label: "Ofertas" }]}
       />
       <Suspense
-        fallback={
-          <div className="container-page py-16 text-center text-sm text-muted">
-            Cargando ofertas…
-          </div>
-        }
+        fallback={<CatalogSkeleton />}
       >
         <Catalog onlyOffers />
       </Suspense>
