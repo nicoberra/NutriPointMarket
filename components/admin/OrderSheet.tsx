@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Product } from "@/lib/types";
 import { useProducts } from "@/context/ProductsContext";
 import { formatPrice } from "@/lib/format";
@@ -106,9 +106,19 @@ export function OrderSheet({
     setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   const removeLine = (i: number) => setLines((ls) => ls.filter((_, j) => j !== i));
 
+  // Número del pedido nuevo, fijo mientras el formulario esté abierto: si la
+  // misma alta llega dos veces, el servidor la reconoce y no la duplica.
+  const [nuevoId] = useState(() => "id" + Date.now() + String(Math.floor(Math.random() * 1000)).padStart(3, "0"));
+  // Evita un segundo envío mientras el primero está en curso (doble toque).
+  const enviando = useRef(false);
+  useEffect(() => {
+    if (!saving) enviando.current = false;
+  }, [saving]);
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cliente.trim() || incompleto) return;
+    if (!cliente.trim() || incompleto || saving || enviando.current) return;
+    enviando.current = true;
     const items = lines
       .map((l) => {
         const p = byId.get(l.pid);
@@ -123,6 +133,7 @@ export function OrderSheet({
       .filter(Boolean)
       .join(" | ");
     onSave({
+      ...(editing ? {} : { id: nuevoId }),
       cliente: cliente.trim(),
       telefono: telefono.trim(),
       detalle,

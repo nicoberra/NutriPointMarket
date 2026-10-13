@@ -130,8 +130,11 @@ export function AdminRecords({
   // Todas las acciones con try/catch: si la planilla tarda o falla, avisa y
   // recarga (para volver a la verdad) en vez de quedar trabado o mentir.
   const handleAdd = async (obj: Row) => {
+    if (saving) return;
     setSaving(true);
     try {
+      // id fijo para esta alta: si la solicitud llega dos veces, no se duplica
+      if (!obj.id && config.tab !== "Clientes") obj = { ...obj, id: "id" + Date.now() + String(Math.floor(Math.random() * 1000)).padStart(3, "0") };
       const ok = await addRow(config.tab, obj);
       if (ok) setAdding(false);
       onToast(ok ? "Guardado ✓" : "No se pudo guardar" + detalleError());
@@ -162,7 +165,7 @@ export function AdminRecords({
   };
 
   const handleAddOrder = async (obj: Row) => {
-    if (!orderConfig) return;
+    if (!orderConfig || saving) return;
     setSaving(true);
     try {
       const ok = await addRow(orderConfig.tab, obj);
@@ -221,6 +224,32 @@ export function AdminRecords({
       onToast("No se pudo cambiar el estado" + detalleError());
       load();
     }
+  };
+
+  // Eliminar un pedido desde la ficha del cliente (va a la Papelera y, si
+  // había descontado stock, lo repone).
+  const eliminarPedido = async (p: Row) => {
+    if (!String(p.id ?? "").trim()) {
+      onToast("Este pedido no tiene id: borralo desde la planilla");
+      return;
+    }
+    if (
+      !(await confirm({
+        title: "¿Eliminar este pedido?",
+        message:
+          (p.detalle ? String(p.detalle) + " · " : "") +
+          (p.descontado === "sí" ? "El stock de sus productos se repone." : "No se puede deshacer."),
+      }))
+    )
+      return;
+    setPedidos((prev) => prev.filter((x) => x.id !== p.id));
+    try {
+      const ok = await deleteRow("Pedidos", p.id);
+      onToast(ok ? (p.descontado === "sí" ? "Pedido eliminado · stock repuesto ✓" : "Pedido eliminado ✓") : "No se pudo eliminar" + detalleError());
+    } catch {
+      onToast("Tardó demasiado: verificá si se eliminó");
+    }
+    recargar(loadPedidos);
   };
 
   const eliminar = async (row: Row) => {
@@ -550,6 +579,7 @@ export function AdminRecords({
             await eliminar(c);
           }}
           onOpenOrder={(p) => setDetailRow(p)}
+          onDeleteOrder={eliminarPedido}
         />
       )}
 
@@ -877,6 +907,7 @@ function ClientSheet({
   onEdit,
   onDelete,
   onOpenOrder,
+  onDeleteOrder,
 }: {
   row: Row;
   orders: Row[];
@@ -886,6 +917,7 @@ function ClientSheet({
   onEdit: () => void;
   onDelete: () => void;
   onOpenOrder: (p: Row) => void;
+  onDeleteOrder: (p: Row) => void;
 }) {
   const tel = String(row.telefono ?? "").replace(/\D/g, "");
   const wa = tel ? "https://wa.me/" + (tel.startsWith("54") ? tel : "549" + tel.replace(/^0/, "")) : "";
@@ -1021,6 +1053,13 @@ function ClientSheet({
                     className="inline-flex shrink-0 items-center gap-1 rounded-full border border-primary/30 px-3 py-1 text-xs font-bold text-primary hover:bg-accent-soft"
                   >
                     <ArrowRightIcon className="h-3.5 w-3.5" /> Pedido
+                  </button>
+                  <button
+                    onClick={() => onDeleteOrder(p)}
+                    aria-label="Eliminar pedido"
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-red-200 text-red-600 hover:bg-red-50"
+                  >
+                    <TrashIcon className="h-4 w-4" />
                   </button>
                 </li>
               );
