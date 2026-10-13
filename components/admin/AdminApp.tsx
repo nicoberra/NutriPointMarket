@@ -9,6 +9,7 @@ import { AdminRecords, type RecordsConfig } from "./AdminRecords";
 import { AdminDashboard } from "./AdminDashboard";
 import { AdminBilling } from "./AdminBilling";
 import { PullToRefresh } from "./PullToRefresh";
+import { prefetchTables, clearTables } from "@/lib/tableCache";
 import {
   GridIcon,
   PackageIcon,
@@ -111,6 +112,12 @@ export function AdminApp() {
     return () => window.removeEventListener(CRM_AUTH_EVENT, onAuth);
   }, []);
 
+  // Con sesión iniciada: precarga Pedidos y Clientes en segundo plano, así
+  // el Panel, Clientes, Pedidos y Facturación abren con datos al instante.
+  useEffect(() => {
+    if (authed) prefetchTables("Pedidos", "Clientes");
+  }, [authed]);
+
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 2600);
@@ -156,6 +163,7 @@ export function AdminApp() {
       /* ignore */
     }
     crmLogout().catch(() => {}); // revoca el token en el backend
+    clearTables(); // borra los datos guardados en este navegador
     setAuthed(false);
   };
 

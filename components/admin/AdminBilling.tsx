@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { listTable } from "@/lib/api";
+import { peekTable, fetchTable, subscribeTable } from "@/lib/tableCache";
 import { formatPrice } from "@/lib/format";
 import { ChartIcon } from "@/components/Icons";
 
@@ -40,19 +40,26 @@ export function AdminBilling() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    listTable<Record<string, unknown>>("Pedidos")
-      .then((rows) => {
-        const s: Sale[] = [];
-        for (const r of rows) {
-          const amount = parseAmount(r.monto);
-          const cost = parseAmount(r.costo);
-          const date = parseDate(r.fecha);
-          if (amount > 0 && date) s.push({ amount, cost, date });
-        }
-        setSales(s);
-      })
+    const calc = (rows: Record<string, unknown>[]) => {
+      const s: Sale[] = [];
+      for (const r of rows) {
+        const amount = parseAmount(r.monto);
+        const cost = parseAmount(r.costo);
+        const date = parseDate(r.fecha);
+        if (amount > 0 && date) s.push({ amount, cost, date });
+      }
+      setSales(s);
+    };
+    const cached = peekTable<Record<string, unknown>>("Pedidos");
+    if (cached) {
+      calc(cached);
+      setLoading(false);
+    }
+    const unsub = subscribeTable("Pedidos", calc);
+    fetchTable<Record<string, unknown>>("Pedidos")
       .catch(() => {})
       .finally(() => setLoading(false));
+    return unsub;
   }, []);
 
   const stats = useMemo(() => {

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useProducts } from "@/context/ProductsContext";
-import { listTable } from "@/lib/api";
+import { peekTable, fetchTable, subscribeTable } from "@/lib/tableCache";
 import { formatPrice } from "@/lib/format";
 import { UserIcon, ClipboardIcon, ChevronRightIcon } from "@/components/Icons";
 import { useCountUp } from "./useCountUp";
@@ -36,11 +36,8 @@ export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
   });
 
   useEffect(() => {
-    Promise.all([
-      listTable<Record<string, unknown>>("Clientes"),
-      listTable<Record<string, unknown>>("Pedidos"),
-    ])
-      .then(([clientes, pedidos]) => {
+    // Al instante con lo ya cargado; se recalcula cuando llegan datos nuevos.
+    const calc = (clientes: Record<string, unknown>[], pedidos: Record<string, unknown>[]) => {
         const now = new Date();
         const mk = now.getFullYear() * 12 + now.getMonth();
         const wkStart = new Date(now);
@@ -92,8 +89,20 @@ export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
           semRev,
           semProf,
         });
-      })
-      .catch(() => {});
+    };
+    const run = () => {
+      const c = peekTable<Record<string, unknown>>("Clientes");
+      const p = peekTable<Record<string, unknown>>("Pedidos");
+      if (c && p) calc(c, p);
+    };
+    run();
+    const u1 = subscribeTable("Clientes", run);
+    const u2 = subscribeTable("Pedidos", run);
+    Promise.all([fetchTable("Clientes"), fetchTable("Pedidos")]).catch(() => {}).finally(run);
+    return () => {
+      u1();
+      u2();
+    };
   }, []);
 
   const sinStock = products.filter((p) => p.inStock === false).slice(0, 8);
