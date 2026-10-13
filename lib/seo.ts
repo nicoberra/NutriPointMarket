@@ -95,7 +95,7 @@ export const CATEGORY_SEO: Record<string, CategorySeo> = {
   },
   barritas: {
     keyword: "barritas saludables",
-    variants: ["barra de chocolate con avellanas"],
+    variants: ["barra proteica"],
     h1: "Barritas saludables",
     title: "Barritas saludables: comprar online",
     description:
@@ -103,7 +103,7 @@ export const CATEGORY_SEO: Record<string, CategorySeo> = {
     intro:
       "Barritas saludables para llevar en la mochila: una colación práctica para antes o después de entrenar.",
     h2: "Comprar barritas saludables online",
-    body: `Encontrá barras como la de chocolate con avellanas, con 10% de descuento pagando por transferencia. ${ENVIO}`,
+    body: `Encontrá barras proteicas como la de Íntegra, con 10% de descuento pagando por transferencia. ${ENVIO}`,
   },
   "kinesio-tape": {
     keyword: "kinesio tape",
