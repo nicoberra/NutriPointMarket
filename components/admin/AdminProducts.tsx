@@ -366,7 +366,7 @@ function ProductRow({
     onSave(product, costo === "" ? { costoMoneda: m } : { costo: costoNum, costoMoneda: m });
 
   const savePrices = () => {
-    onSave(product, { precio: precioFinal, precioML: descPesos > 0 ? precioNormal : undefined });
+    onSave(product, { precio: precioFinal, precioML: descPesos > 0 ? precioNormal : 0 });
   };
 
   return (
@@ -895,7 +895,7 @@ function ProductSheet({
       marca: isCombo ? comboBrand : marca.trim(),
       categoria,
       precio: precioFinal,
-      precioML: descPesos > 0 ? precioNormal : undefined,
+      precioML: descPesos > 0 ? precioNormal : 0,
       variantes: isCombo ? "" : variantesStr,
       stock: isCombo ? true : hasVariantStock ? variantTotal > 0 : cantNum > 0,
       destacado,
