@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { StoreShell } from "@/components/StoreShell";
 import { ProductoView } from "@/components/ProductoView";
+import { CategoriaView } from "@/components/CategoriaView";
 
 /**
  * 404 del sitio. Si la URL es /producto/<slug>/ de un producto que todavía no
@@ -12,15 +13,25 @@ import { ProductoView } from "@/components/ProductoView";
  */
 export default function NotFound() {
   const [slug, setSlug] = useState<string | null>(null);
+  const [catSlug, setCatSlug] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const m = window.location.pathname.match(/^\/producto\/([^/]+)\/?$/);
     setSlug(m ? decodeURIComponent(m[1]) : null);
+    const c = window.location.pathname.match(/^\/categoria\/([^/]+)\/?$/);
+    setCatSlug(c ? decodeURIComponent(c[1]) : null);
     setReady(true);
   }, []);
 
   if (!ready) return null;
+  if (catSlug) {
+    return (
+      <StoreShell>
+        <CategoriaView slug={catSlug} />
+      </StoreShell>
+    );
+  }
   if (slug) {
     return (
       <StoreShell>

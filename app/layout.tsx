@@ -54,6 +54,56 @@ export const metadata: Metadata = {
   },
 };
 
+// Entidades para Google: la tienda (Store) y el sitio (WebSite), con los temas
+// del rubro enlazados a Wikipedia. Sin reseñas ni puntajes inventados.
+const BASE = "https://suplemarket.com.ar";
+const STORE_JSONLD = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Store",
+      "@id": `${BASE}/#store`,
+      name: SITE.name,
+      alternateName: ["SupleMarket", "Suple Market Argentina"],
+      description: SITE.description,
+      url: `${BASE}/`,
+      logo: `${BASE}/logo.png`,
+      image: `${BASE}/logo.png`,
+      telephone: "+5491151640472",
+      areaServed: { "@type": "Country", name: "Argentina" },
+      currenciesAccepted: "ARS",
+      paymentAccepted: "Efectivo, Transferencia bancaria, Mercado Pago",
+      sameAs: [SITE.instagram],
+      knowsAbout: [
+        "Suplementos deportivos",
+        "Proteína whey",
+        "Creatina monohidrato",
+        "Nutrición deportiva",
+        "Suplemento dietético",
+      ],
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${BASE}/#website`,
+      url: `${BASE}/`,
+      name: SITE.name,
+      alternateName: ["SupleMarket", "suplemarket.com.ar"],
+      inLanguage: "es-AR",
+      publisher: { "@id": `${BASE}/#store` },
+      about: [
+        { "@type": "Thing", name: "Suplemento dietético", sameAs: "https://es.wikipedia.org/wiki/Suplemento_diet%C3%A9tico" },
+        { "@type": "Thing", name: "Nutrición deportiva", sameAs: "https://es.wikipedia.org/wiki/Nutrici%C3%B3n_deportiva" },
+        { "@type": "Thing", name: "Creatina", sameAs: "https://es.wikipedia.org/wiki/Creatina" },
+      ],
+      potentialAction: {
+        "@type": "SearchAction",
+        target: { "@type": "EntryPoint", urlTemplate: `${BASE}/productos/?buscar={search_term_string}` },
+        "query-input": "required name=search_term_string",
+      },
+    },
+  ],
+};
+
 export const viewport: Viewport = {
   themeColor: "#2129E3",
   width: "device-width",
@@ -71,17 +121,7 @@ export default function RootLayout({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "Store",
-              name: SITE.name,
-              description: SITE.description,
-              url: "https://suplemarket.com.ar",
-              image: "https://suplemarket.com.ar/logo.png",
-              telephone: "+5491151640472",
-              areaServed: "AR",
-              sameAs: [SITE.instagram],
-            }),
+            __html: JSON.stringify(STORE_JSONLD).replace(/</g, "\\u003c"),
           }}
         />
         <PWARegister />

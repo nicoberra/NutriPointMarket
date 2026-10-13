@@ -26,13 +26,19 @@ export function HeroIntro() {
       tl.from(q("[data-hero-badge]"), { autoAlpha: 0, y: 12, duration: 0.4 });
 
       if (title) {
-        const split = SplitText.create(title, { type: "words", wordsClass: "hero-word" });
+        // La línea chica (palabra clave) entra con el badge y no se divide.
+        tl.from(q("[data-hero-kicker]"), { autoAlpha: 0, y: 8, duration: 0.4 }, "<");
+        // Solo se divide la frase principal; la línea chica queda entera.
+        const split = SplitText.create(title.querySelector("[data-hero-split]") ?? title, {
+          type: "words",
+          wordsClass: "hero-word",
+        });
         tl.from(
           split.words,
           { autoAlpha: 0, yPercent: 60, stagger: 0.07, duration: 0.7 },
           "-=0.15",
         );
-        const highlight = title.querySelector("span");
+        const highlight = title.querySelector("[data-hero-hl]");
         if (highlight) {
           tl.fromTo(
             highlight,

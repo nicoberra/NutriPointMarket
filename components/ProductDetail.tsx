@@ -439,6 +439,7 @@ function ProductTabs({ product }: { product: Product }) {
 
   return (
     <div className="mt-12">
+      <h2 className="mb-3 font-display text-lg font-bold text-primary">Sobre {product.name}</h2>
       {/* Desktop: tabs */}
       <div className="hidden lg:block">
         <div className="flex flex-wrap gap-1 border-b border-line">

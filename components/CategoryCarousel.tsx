@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCategories } from "@/context/CategoriesContext";
 import { ProductVisual } from "./ProductVisual";
 import { SmartImg } from "@/components/SmartImg";
+import { categoryHref } from "@/lib/seo";
 
 /**
  * Carrusel de categorías con auto-scroll infinito (derecha → izquierda).
@@ -229,7 +230,7 @@ export function CategoryCarousel() {
             {items.map((c, i) => (
               <Link
                 key={`${c.slug}-${i}`}
-                href={`/productos?categoria=${c.slug}`}
+                href={categoryHref(c.slug)}
                 draggable={false}
                 className="group/slide flex w-40 shrink-0 flex-col items-center gap-3 px-2 text-center transition-transform duration-300 ease-enter hover:-translate-y-1 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
               >

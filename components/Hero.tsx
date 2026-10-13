@@ -22,11 +22,19 @@ export function Hero() {
             data-hero-title
             className="font-display text-4xl font-black leading-[1.05] tracking-tight text-primary sm:text-5xl lg:text-6xl"
           >
-            Potenciá tu <span className="inline-block text-secondary">rendimiento</span>
+            <span
+              data-hero-kicker
+              className="mb-2 block font-sans text-sm font-bold uppercase tracking-[0.14em] text-muted sm:text-base"
+            >
+              Suplementos deportivos en Argentina
+            </span>{" "}
+            <span data-hero-split className="block">
+              Potenciá tu <span data-hero-hl className="inline-block text-secondary">rendimiento</span>
+            </span>
           </h1>
           <p data-hero-text className="mt-4 max-w-md text-base text-muted sm:text-lg">
-            Proteínas, creatinas, pancakes proteicos y suplementos seleccionados para
-            acompañar tus objetivos. Productos 100% originales.
+            Suplementos deportivos seleccionados para acompañar tus objetivos: proteínas,
+            creatinas y pancakes proteicos. Productos 100% originales.
           </p>
           <div data-hero-cta className="mt-7 flex flex-wrap gap-3">
             <Link href="/productos" className="btn btn-primary btn-lg">

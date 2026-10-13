@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useProducts } from "@/context/ProductsContext";
 import { PageBanner } from "@/components/PageBanner";
 import { ArrowRightIcon } from "@/components/Icons";
+import { SeoFooter } from "@/components/SeoFooter";
 
 export default function MarcasPage() {
   const { brands, products, loading } = useProducts();
@@ -11,8 +12,8 @@ export default function MarcasPage() {
   return (
     <>
       <PageBanner
-        title="Nuestras marcas"
-        subtitle="Trabajamos solo con marcas líderes y productos 100% originales."
+        title="Marcas de suplementos"
+        subtitle="Marcas de suplementos líderes, con productos 100% originales."
         crumbs={[{ label: "Marcas" }]}
       />
 
@@ -53,6 +54,10 @@ export default function MarcasPage() {
           </div>
         )}
       </section>
+      <SeoFooter
+        title="Marcas de suplementos deportivos 100% originales"
+        text="Trabajamos con distribuidores oficiales de cada marca. Pagando por transferencia tenés 10% de descuento, y hacemos envíos a CABA, GBA y al interior del país por Vía Cargo."
+      />
     </>
   );
 }

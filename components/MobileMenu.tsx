@@ -8,10 +8,11 @@ import { useCategories } from "@/context/CategoriesContext";
 import { Logo } from "./Logo";
 import { SearchBar } from "./SearchBar";
 import { ChevronDownIcon, CloseIcon, InstagramIcon, UserIcon } from "./Icons";
+import { categoryHref } from "@/lib/seo";
 
 const SIMPLE = [
   { label: "Marcas", href: "/marcas" },
-  { label: "Combos", href: "/productos?categoria=combos" },
+  { label: "Combos", href: "/categoria/combos/" },
   { label: "Ofertas", href: "/ofertas", highlight: true },
   { label: "Contacto", href: "/contacto" },
   { label: "Nutricionista", href: "/#nutricionista" },
@@ -102,7 +103,7 @@ export function MobileMenu({
                   {categories.map((c) => (
                     <li key={c.slug}>
                       <Link
-                        href={`/productos?categoria=${c.slug}`}
+                        href={categoryHref(c.slug)}
                         onClick={onClose}
                         className="block rounded-md px-3 py-2 text-sm text-muted hover:bg-page-soft hover:text-primary"
                       >

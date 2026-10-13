@@ -6,11 +6,15 @@ export function PageBanner({
   title,
   subtitle,
   crumbs = [],
+  titleAs = "h1",
 }: {
   title: string;
   subtitle?: string;
   crumbs?: { label: string; href?: string }[];
+  /** "p" cuando la página ya tiene su propio H1 (ficha de producto) */
+  titleAs?: "h1" | "p";
 }) {
+  const Title = titleAs;
   return (
     <div className="border-b border-line bg-page-soft">
       <div className="container-page py-8 sm:py-10">
@@ -31,9 +35,9 @@ export function PageBanner({
             </span>
           ))}
         </nav>
-        <h1 className="font-display text-2xl font-extrabold tracking-tight text-primary sm:text-3xl">
+        <Title className="font-display text-2xl font-extrabold tracking-tight text-primary sm:text-3xl">
           {title}
-        </h1>
+        </Title>
         {subtitle && <p className="mt-1.5 max-w-2xl text-sm text-muted">{subtitle}</p>}
       </div>
     </div>
