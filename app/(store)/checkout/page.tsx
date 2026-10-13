@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { formatPrice } from "@/lib/format";
@@ -9,8 +9,7 @@ import { whatsappLink, TRANSFER, transferPrice } from "@/lib/config";
 import { createOrder, mpCreatePreference, uploadComprobante } from "@/lib/api";
 import { PageBanner } from "@/components/PageBanner";
 import { CheckIcon, WhatsappIcon } from "@/components/Icons";
-import { ShippingZones } from "@/components/ShippingZones";
-import { PROVINCIAS, ZONAS_ENVIO, calcularEnvio } from "@/lib/envios";
+import { PROVINCIAS, ZONAS_ENVIO, calcularEnvio, detectarZona, type ZonaDetectada } from "@/lib/envios";
 
 type Metodo = "Transferencia" | "Mercado Pago";
 
@@ -36,11 +35,51 @@ export default function CheckoutPage() {
   // no la duplica. Si cambia algo del pedido, se genera uno nuevo.
   const intento = useRef<{ firma: string; id: string } | null>(null);
 
-  // Entrega: envío a domicilio (costo según zona) o retiro en persona ($0).
-  const [entrega, setEntrega] = useState<"envio" | "retiro">("envio");
+  // Envío a domicilio: la zona se detecta sola a partir de la localidad o
+  // barrio (API Georef). Si no se reconoce, el cliente elige provincia/partido.
   const [provincia, setProvincia] = useState("");
   const [partido, setPartido] = useState("");
-  const envioInfo = calcularEnvio({ retiro: entrega === "retiro", provincia, partido });
+  const [localidad, setLocalidad] = useState("");
+  const [detectada, setDetectada] = useState<ZonaDetectada | null>(null);
+  const [buscando, setBuscando] = useState(false);
+  const [manual, setManual] = useState(false);
+  const envioInfo = calcularEnvio({ provincia, partido });
+
+  useEffect(() => {
+    if (manual) return;
+    const texto = localidad.trim();
+    if (texto.length < 3) {
+      setDetectada(null);
+      setProvincia("");
+      setPartido("");
+      return;
+    }
+    const ctrl = new AbortController();
+    const timer = setTimeout(async () => {
+      setBuscando(true);
+      try {
+        const z = await detectarZona(texto, ctrl.signal);
+        if (ctrl.signal.aborted) return;
+        setDetectada(z);
+        setProvincia(z ? z.provincia : "");
+        setPartido(z ? z.partido : "");
+      } catch {
+        if (!ctrl.signal.aborted) { setDetectada(null); setProvincia(""); setPartido(""); }
+      } finally {
+        if (!ctrl.signal.aborted) setBuscando(false);
+      }
+    }, 650);
+    return () => {
+      clearTimeout(timer);
+      ctrl.abort();
+    };
+  }, [localidad, manual]);
+
+  // Mostrar los selectores cuando no se reconoce la localidad, cuando hay que
+  // elegir entre La Matanza Norte/Sur o cuando el cliente quiere corregir.
+  const noReconocida = !buscando && localidad.trim().length >= 3 && !detectada;
+  const faltaPartido = !!detectada && detectada.provincia === "Buenos Aires" && !detectada.partido;
+  const verSelectores = manual || noReconocida || faltaPartido;
   const shipping = subtotal === 0 ? 0 : envioInfo.costo;
   const total = subtotal + shipping;
 
@@ -65,8 +104,14 @@ export default function CheckoutPage() {
     setError(null);
 
     const fd = new FormData(e.currentTarget);
-    if (entrega === "envio" && envioInfo.tipo === "pendiente") {
-      setError(provincia === "Buenos Aires" ? "Elegí tu partido para calcular el envío." : "Elegí tu provincia para calcular el envío.");
+    if (envioInfo.tipo === "pendiente") {
+      setError(
+        provincia === "Buenos Aires"
+          ? "Elegí tu partido para calcular el envío."
+          : verSelectores
+            ? "Elegí tu provincia para calcular el envío."
+            : "Escribí tu localidad o barrio para calcular el envío.",
+      );
       return;
     }
     const metodo = (String(fd.get("pago") || "Transferencia") as Metodo);
@@ -79,14 +124,11 @@ export default function CheckoutPage() {
     }
     const email = String(fd.get("email") || "").trim();
     const telefono = String(fd.get("telefono") || "").trim();
-    const direccion =
-      entrega === "retiro"
-        ? "Retiro en persona"
-        : [fd.get("direccion"), fd.get("ciudad"), partido, provincia, fd.get("cp")]
-            .map((v) => String(v || "").trim())
-            .filter(Boolean)
-            .join(", ");
-    // Texto del envío para el pedido: "Envío GBA 1 · Morón", "Retiro en persona", "Envío Vía Cargo · a coordinar"
+    const direccion = [fd.get("direccion"), fd.get("ciudad"), partido, provincia, fd.get("cp")]
+      .map((v) => String(v || "").trim())
+      .filter(Boolean)
+      .join(", ");
+    // Texto del envío para el pedido: "Envío GBA 1 · Morón", "Envío Vía Cargo · a coordinar"
     const envioTexto = [direccion, envioInfo.resumen].filter(Boolean).join(" · ");
     // Combos: las variantes elegidas van en el detalle (legible) y en items
     // (cv) para que al aprobar el pago se descuente la variante correcta.
@@ -316,36 +358,28 @@ export default function CheckoutPage() {
             <fieldset className="rounded-xl border border-line bg-white p-5">
               <legend className="px-2 font-display text-base font-bold text-primary">Envío</legend>
 
-              {/* Envío o retiro */}
-              <div className="grid grid-cols-2 gap-2" role="group" aria-label="Forma de entrega">
-                {([
-                  { v: "envio", t: "Envío a domicilio", h: "Capital, GBA o Vía Cargo" },
-                  { v: "retiro", t: "Retiro en persona", h: "Sin costo · coordinamos por WhatsApp" },
-                ] as const).map((o) => (
-                  <button
-                    key={o.v}
-                    type="button"
-                    aria-pressed={entrega === o.v}
-                    onClick={() => setEntrega(o.v)}
-                    className={`rounded-xl border-2 p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                      entrega === o.v ? "border-primary bg-accent-soft" : "border-line bg-white hover:border-primary/40"
-                    }`}
-                  >
-                    <span className="block text-sm font-bold text-ink">{o.t}</span>
-                    <span className="block text-xs text-muted">{o.h}</span>
-                  </button>
-                ))}
-              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <Field name="direccion" label="Dirección (calle y número)" required />
+                </div>
+                <label className="block">
+                  <span className="mb-1.5 block text-sm font-semibold text-ink">
+                    Localidad o barrio <span className="text-sale">*</span>
+                  </span>
+                  <input
+                    name="ciudad"
+                    required
+                    value={localidad}
+                    onChange={(e) => setLocalidad(e.target.value)}
+                    autoComplete="address-level2"
+                    placeholder="Ej.: Palermo, Castelar, Quilmes"
+                    className="input h-11 text-base"
+                  />
+                </label>
+                <Field name="cp" label="Código postal" required />
 
-              {entrega === "envio" && (
-                <>
-                  <p className="mb-2 mt-5 text-sm font-semibold text-ink">Zonas de envío</p>
-                  <ShippingZones selectedId={envioInfo.tipo === "zona" ? envioInfo.zona.id : null} />
-
-                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                    <div className="sm:col-span-2">
-                      <Field name="direccion" label="Dirección" required />
-                    </div>
+                {verSelectores ? (
+                  <>
                     <label className="block">
                       <span className="mb-1.5 block text-sm font-semibold text-ink">
                         Provincia <span className="text-sale">*</span>
@@ -355,6 +389,7 @@ export default function CheckoutPage() {
                         required
                         value={provincia}
                         onChange={(e) => {
+                          setManual(true);
                           setProvincia(e.target.value);
                           setPartido("");
                         }}
@@ -368,16 +403,19 @@ export default function CheckoutPage() {
                         ))}
                       </select>
                     </label>
-                    {provincia === "Buenos Aires" ? (
+                    {provincia === "Buenos Aires" && (
                       <label className="block">
                         <span className="mb-1.5 block text-sm font-semibold text-ink">
-                          Elegí tu partido <span className="text-sale">*</span>
+                          Partido <span className="text-sale">*</span>
                         </span>
                         <select
                           name="partido"
                           required
                           value={partido}
-                          onChange={(e) => setPartido(e.target.value)}
+                          onChange={(e) => {
+                            setManual(true);
+                            setPartido(e.target.value);
+                          }}
                           className="input h-11 text-base"
                         >
                           <option value="">Elegí tu partido…</option>
@@ -390,48 +428,74 @@ export default function CheckoutPage() {
                               ))}
                             </optgroup>
                           ))}
-                          <optgroup label="Interior de la provincia · Vía Cargo">
+                          <optgroup label="Resto de la provincia · Vía Cargo">
                             <option value="Otro partido">Otro partido</option>
                           </optgroup>
                         </select>
                       </label>
-                    ) : (
-                      <Field name="ciudad" label="Ciudad" required />
                     )}
-                    <Field name="cp" label="Código postal" required />
-                  </div>
+                  </>
+                ) : (
+                  <>
+                    <input type="hidden" name="provincia" value={provincia} />
+                    {partido && <input type="hidden" name="partido" value={partido} />}
+                  </>
+                )}
+              </div>
 
-                  <p
-                    className={`mt-4 rounded-lg px-3 py-2.5 text-sm font-semibold ${
-                      envioInfo.tipo === "zona"
-                        ? "bg-accent-soft text-ink"
-                        : envioInfo.tipo === "interior"
-                          ? "bg-page-soft text-ink"
-                          : "bg-page-soft text-muted"
-                    }`}
-                    aria-live="polite"
-                  >
-                    {envioInfo.tipo === "zona" && (
-                      <span
-                        className="mr-2 inline-block h-3 w-3 rounded-full align-middle"
-                        style={{ background: envioInfo.zona.color }}
-                        aria-hidden
-                      />
+              <div
+                className={`mt-4 rounded-lg px-3 py-2.5 text-sm ${
+                  envioInfo.tipo === "zona" ? "bg-accent-soft text-ink" : "bg-page-soft text-muted"
+                }`}
+                aria-live="polite"
+              >
+                {buscando ? (
+                  <span>Buscando tu zona de envío…</span>
+                ) : envioInfo.tipo === "zona" || envioInfo.tipo === "interior" ? (
+                  <>
+                    {detectada && !manual && (
+                      <span className="block text-xs text-muted">
+                        📍 {detectada.localidad}
+                        {detectada.departamento && detectada.provincia === "Buenos Aires"
+                          ? `, partido de ${detectada.departamento}`
+                          : ""}
+                        {detectada.provincia !== "CABA" && detectada.provincia !== "Buenos Aires"
+                          ? ` · ${detectada.provincia}`
+                          : ""}
+                      </span>
                     )}
-                    {envioInfo.etiqueta}
-                  </p>
-                  <p className="mt-2 text-xs text-muted">
-                    🛵 En Capital y GBA el envío va por motomensajería / logística propia. En el interior, por
-                    Vía Cargo (el costo se coordina por WhatsApp y no se suma acá).
-                  </p>
-                </>
-              )}
-
-              {entrega === "retiro" && (
-                <p className="mt-4 rounded-lg bg-accent-soft px-3 py-2.5 text-sm text-ink">
-                  Retirás en persona sin costo de envío. Al confirmar, coordinamos día y lugar por WhatsApp.
-                </p>
-              )}
+                    <span className="font-semibold text-ink">
+                      {envioInfo.tipo === "zona" && (
+                        <span
+                          className="mr-2 inline-block h-3 w-3 rounded-full align-middle"
+                          style={{ background: envioInfo.zona.color }}
+                          aria-hidden
+                        />
+                      )}
+                      {envioInfo.etiqueta}
+                    </span>
+                    {!manual && (
+                      <button
+                        type="button"
+                        onClick={() => setManual(true)}
+                        className="ml-2 text-xs font-semibold text-primary underline underline-offset-2"
+                      >
+                        ¿No es tu zona? Cambiar
+                      </button>
+                    )}
+                  </>
+                ) : faltaPartido ? (
+                  <span>Elegí tu partido para calcular el envío.</span>
+                ) : noReconocida ? (
+                  <span>No reconocimos esa localidad. Elegí tu provincia{provincia === "Buenos Aires" ? " y partido" : ""}.</span>
+                ) : (
+                  <span>Escribí tu localidad o barrio y calculamos el envío.</span>
+                )}
+              </div>
+              <p className="mt-2 text-xs text-muted">
+                🛵 En Capital y GBA el envío va por motomensajería / logística propia. En el interior, por
+                Vía Cargo (el costo se coordina por WhatsApp y no se suma acá).
+              </p>
             </fieldset>
           </div>
 
@@ -465,9 +529,7 @@ export default function CheckoutPage() {
                     )}
                   </dt>
                   <dd className="text-right font-medium text-ink">
-                    {envioInfo.tipo === "retiro"
-                      ? "Retiro · $ 0"
-                      : envioInfo.tipo === "interior"
+                    {envioInfo.tipo === "interior"
                         ? "A coordinar"
                         : envioInfo.tipo === "pendiente"
                           ? "A calcular"

@@ -11,7 +11,7 @@ const ICONS = {
   whatsapp: WhatsappIcon,
 } as const;
 
-/** Franja de confianza (envíos, pagos, originales, retiro). */
+/** Franja de confianza (envíos, pagos, originales). */
 export function TrustStrip() {
   return (
     <section className="border-y border-line bg-white/85 backdrop-blur-sm">

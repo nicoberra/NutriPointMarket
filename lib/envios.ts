@@ -133,7 +133,6 @@ export function zonaDePartido(partido: string): ZonaEnvio | undefined {
 }
 
 export type ResultadoEnvio =
-  | { tipo: "retiro"; costo: 0; etiqueta: "Retiro en persona"; resumen: "Retiro en persona" }
   | { tipo: "zona"; costo: number; zona: ZonaEnvio; partido: string; etiqueta: string; resumen: string }
   | { tipo: "interior"; costo: 0; etiqueta: string; resumen: string }
   | { tipo: "pendiente"; costo: 0; etiqueta: string; resumen: "" };
@@ -143,11 +142,9 @@ export type ResultadoEnvio =
  * - CABA → Capital. Buenos Aires → según el partido. Otra provincia → Vía Cargo (a coordinar).
  */
 export function calcularEnvio(opts: {
-  retiro: boolean;
   provincia: string;
   partido: string;
 }): ResultadoEnvio {
-  if (opts.retiro) return { tipo: "retiro", costo: 0, etiqueta: "Retiro en persona", resumen: "Retiro en persona" };
   if (!opts.provincia) return { tipo: "pendiente", costo: 0, etiqueta: "Elegí tu provincia", resumen: "" };
   if (opts.provincia === "CABA") {
     const zona = ZONAS_ENVIO[0];
@@ -180,4 +177,87 @@ export function calcularEnvio(opts: {
 /** $ 7.000 (formato argentino) */
 export function formatARS(n: number): string {
   return "$ " + Math.round(n).toLocaleString("es-AR");
+}
+
+/* ----------------------- Detección de zona por localidad ------------------- */
+
+const norm = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+// La Matanza tiene dos zonas: se decide por la localidad.
+const MATANZA_NORTE = ["san justo", "ramos mejia", "lomas del mirador", "isidro casanova", "tapiales"];
+const MATANZA_SUR = ["gregorio de laferrere", "laferrere", "gonzalez catan", "virrey del pino"];
+
+/** Partido de la planilla de zonas que corresponde a un departamento de Georef. */
+function partidoDeDepartamento(departamento: string, localidad: string): string | null {
+  const d = norm(departamento);
+  if (d === "la matanza") {
+    const l = norm(localidad);
+    const norte = ZONAS_ENVIO[1].partidos.find((p) => p.startsWith("La Matanza Norte"));
+    const sur = ZONAS_ENVIO[2].partidos.find((p) => p.startsWith("La Matanza Sur"));
+    if (MATANZA_NORTE.includes(l)) return norte ?? null;
+    if (MATANZA_SUR.includes(l)) return sur ?? null;
+    return null; // otra localidad de La Matanza: que el cliente elija Norte o Sur
+  }
+  for (const z of ZONAS_ENVIO) {
+    for (const p of z.partidos) if (norm(p.replace(/\s*\(.*\)$/, "")) === d) return p;
+  }
+  return "Otro partido"; // partido de Buenos Aires fuera de las zonas → Vía Cargo
+}
+
+export type ZonaDetectada = {
+  provincia: string; // valor de PROVINCIAS
+  partido: string; // "" si hay que elegirlo (La Matanza)
+  localidad: string; // nombre oficial
+  departamento: string; // partido / comuna / departamento oficial
+};
+
+/**
+ * Detecta provincia y partido a partir de la localidad o barrio que escribe el
+ * cliente, con la API pública Georef del Estado argentino (sin clave).
+ * Prioriza Capital y Gran Buenos Aires. Devuelve null si no la reconoce.
+ */
+export async function detectarZona(texto: string, signal?: AbortSignal): Promise<ZonaDetectada | null> {
+  const q = norm(texto);
+  if (q.length < 3) return null;
+  if (["caba", "capital", "capital federal", "ciudad autonoma de buenos aires", "ciudad de buenos aires"].includes(q)) {
+    return { provincia: "CABA", partido: "", localidad: "Ciudad Autónoma de Buenos Aires", departamento: "" };
+  }
+  const url =
+    "https://apis.datos.gob.ar/georef/api/localidades?max=20&campos=nombre,departamento.nombre,provincia.id,provincia.nombre&nombre=" +
+    encodeURIComponent(texto.trim());
+  const res = await fetch(url, { signal });
+  if (!res.ok) return null;
+  const j = (await res.json()) as {
+    localidades?: { nombre: string; departamento?: { nombre?: string }; provincia: { id: string; nombre: string } }[];
+  };
+  const list = j.localidades ?? [];
+  const amba = (l: (typeof list)[number]) => l.provincia.id === "02" || l.provincia.id === "06";
+  const exacta = (l: (typeof list)[number]) => norm(l.nombre) === q;
+  const parcial = (l: (typeof list)[number]) => norm(l.nombre).includes(q) || q.includes(norm(l.nombre));
+  const pick =
+    list.find((l) => amba(l) && exacta(l)) ??
+    list.find((l) => amba(l) && parcial(l)) ??
+    list.find((l) => exacta(l)) ??
+    null;
+  if (!pick) return null;
+  const departamento = pick.departamento?.nombre ?? "";
+  if (pick.provincia.id === "02") return { provincia: "CABA", partido: "", localidad: pick.nombre, departamento };
+  if (pick.provincia.id === "06") {
+    return {
+      provincia: "Buenos Aires",
+      partido: partidoDeDepartamento(departamento, pick.nombre) ?? "",
+      localidad: pick.nombre,
+      departamento,
+    };
+  }
+  const provNorm = norm(pick.provincia.nombre);
+  const provincia = PROVINCIAS.find((p) => provNorm.startsWith(norm(p))) ?? pick.provincia.nombre;
+  return { provincia, partido: "", localidad: pick.nombre, departamento };
 }
