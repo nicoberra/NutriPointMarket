@@ -1,7 +1,16 @@
 # Plan de escalabilidad · Suple Market
 
-Fecha: 2026-10-13. Estado: **plan, sin aplicar**. Nada de esto toca producción
-hasta que Nicolás dé el OK por etapa.
+Fecha: 2026-10-13. Estado: **etapas 1, 2 y 3 aplicadas en el código** (OK de
+Nicolás el 13/10). Backend versión `v3`. Tag previo: `antes-escalabilidad-20261013`.
+Pruebas: `node apps-script/test/test-gs.js` (planilla simulada, 46 casos).
+
+| Etapa | Estado |
+|---|---|
+| 1 · Integridad | Hecha: bloqueo en escrituras, pedidos idempotentes, control de stock |
+| 2 · Lecturas rápidas | Hecha en el servidor: caché de 2 min, se borra con cada escritura |
+| 3 · Visibilidad | Hecha: pestaña Errores y mail diario si hay avisos. Falta el panel en el CRM |
+| 4 · Crecimiento | Pendiente (no hace falta todavía) |
+| 5 · Migración | Solo si se cumplen las condiciones |
 
 ## 1. Cómo está armado hoy
 
