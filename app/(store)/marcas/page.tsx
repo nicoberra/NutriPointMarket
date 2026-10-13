@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useProducts } from "@/context/ProductsContext";
 import { PageBanner } from "@/components/PageBanner";
-import { ArrowRightIcon } from "@/components/Icons";
+import { ArrowRightIcon, StoreIcon } from "@/components/Icons";
 import { SeoFooter } from "@/components/SeoFooter";
+import { BrandsSkeleton, EmptyState } from "@/components/Estados";
 
 export default function MarcasPage() {
   const { brands, products, loading } = useProducts();
@@ -19,14 +20,14 @@ export default function MarcasPage() {
 
       <section className="container-page py-10">
         {loading && brands.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted">Cargando marcas…</p>
+          <BrandsSkeleton />
         ) : brands.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-line bg-white py-16 text-center">
-            <p className="font-semibold text-ink">Todavía no hay marcas cargadas</p>
-            <p className="mt-1 text-sm text-muted">
-              Aparecen automáticamente al cargar productos.
-            </p>
-          </div>
+          <EmptyState
+            icon={<StoreIcon className="h-7 w-7" />}
+            title="Todavía no hay marcas cargadas"
+            text="Aparecen automáticamente al cargar productos."
+            action={{ label: "Ver productos", href: "/productos" }}
+          />
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {brands.map((b) => {

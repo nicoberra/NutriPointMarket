@@ -7,6 +7,7 @@ import { useCategories } from "@/context/CategoriesContext";
 import { categorySeo, categoryHref, SITE_URL } from "@/lib/seo";
 import { deslugify } from "@/data/categories";
 import { SeoFooter } from "@/components/SeoFooter";
+import { CatalogSkeleton } from "@/components/Estados";
 
 /**
  * Página de una categoría: /categoria/<slug>/
@@ -40,7 +41,7 @@ export function CategoriaView({ slug, name: nameProp }: { slug: string; name?: s
         subtitle={seo.intro}
         crumbs={[{ label: "Productos", href: "/productos" }, { label: seo.h1 }]}
       />
-      <Suspense fallback={<div className="container-page py-16 text-center text-sm text-muted">Cargando productos…</div>}>
+      <Suspense fallback={<CatalogSkeleton />}>
         <Catalog initialCategory={slug} />
       </Suspense>
       <SeoFooter title={seo.h2} text={seo.body} />

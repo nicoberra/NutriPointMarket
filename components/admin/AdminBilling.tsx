@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { peekTable, ensureTable, subscribeTable } from "@/lib/tableCache";
 import { formatPrice } from "@/lib/format";
 import { ChartIcon } from "@/components/Icons";
+import { EmptyState, ErrorState } from "@/components/Estados";
 
 /**
  * CRM · Facturación. Lee la pestaña Pedidos y arma el resumen de ventas por
@@ -38,6 +39,8 @@ const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "o
 export function AdminBilling() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorCarga, setErrorCarga] = useState(false);
+  const [intento, setIntento] = useState(0);
 
   useEffect(() => {
     const calc = (rows: Record<string, unknown>[]) => {
@@ -56,11 +59,14 @@ export function AdminBilling() {
       setLoading(false);
     }
     const unsub = subscribeTable("Pedidos", calc);
+    setErrorCarga(false);
     ensureTable<Record<string, unknown>>("Pedidos")
-      .catch(() => {})
+      .catch(() => {
+        if (!cached) setErrorCarga(true);
+      })
       .finally(() => setLoading(false));
     return unsub;
-  }, []);
+  }, [intento]);
 
   const stats = useMemo(() => {
     const now = new Date();
@@ -125,6 +131,9 @@ export function AdminBilling() {
     };
   }, [sales]);
 
+  if (errorCarga && sales.length === 0) {
+    return <ErrorState onRetry={() => { setLoading(true); setIntento((n) => n + 1); }} />;
+  }
   if (loading) {
     return (
       <div className="space-y-6" aria-busy="true">
@@ -139,10 +148,11 @@ export function AdminBilling() {
   }
   if (sales.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-line bg-white py-12 text-center text-sm text-muted">
-        Todavía no hay ventas cargadas. Cargá pedidos con monto y fecha para ver
-        la facturación.
-      </div>
+      <EmptyState
+        icon={<ChartIcon className="h-7 w-7" />}
+        title="Todavía no hay ventas cargadas"
+        text="Cuando cargues pedidos con monto y fecha, acá ves la facturación y la ganancia."
+      />
     );
   }
 

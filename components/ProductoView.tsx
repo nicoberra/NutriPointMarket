@@ -8,6 +8,8 @@ import { RelatedProducts } from "@/components/RelatedProducts";
 import { PageBanner } from "@/components/PageBanner";
 import { brandName } from "@/data/brands";
 import { categoryHref } from "@/lib/seo";
+import { DetailSkeleton } from "@/components/Estados";
+import { SearchIcon } from "@/components/Icons";
 
 /** Ficha de un producto por slug (usada por /producto/<slug>/ y el fallback). */
 export function ProductoView({ slug }: { slug: string }) {
@@ -16,23 +18,17 @@ export function ProductoView({ slug }: { slug: string }) {
 
   if (!product) {
     // Mientras carga la planilla o si el producto no existe / no tiene foto
+    if (loading) return <DetailSkeleton />;
     return (
       <div className="container-page py-20 text-center">
-        {loading ? (
-          <p className="text-sm text-muted">Cargando producto…</p>
-        ) : (
-          <>
-            <h1 className="font-display text-xl font-bold text-primary">
-              Producto no encontrado
-            </h1>
-            <p className="mt-2 text-sm text-muted">
-              Puede que ya no esté disponible.
-            </p>
-            <Link href="/productos" className="btn btn-primary btn-md mt-5">
-              Ver productos
-            </Link>
-          </>
-        )}
+        <span aria-hidden className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-page-soft text-primary">
+          <SearchIcon className="h-7 w-7" />
+        </span>
+        <h1 className="font-display text-xl font-bold text-primary">Producto no encontrado</h1>
+        <p className="mt-2 text-sm text-muted">Puede que ya no esté disponible.</p>
+        <Link href="/productos" className="btn btn-primary btn-md mt-5">
+          Ver productos
+        </Link>
       </div>
     );
   }
