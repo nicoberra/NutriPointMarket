@@ -18,7 +18,7 @@
  * ============================================================================ */
 
 var SHEET_ID = "12paAzW6OcSgYv4u6L7QVI4tpvrEx1yqnujW0OjcieMc";
-var API_VERSION = "v3"; // v3: validación de pedidos, bloqueo, caché y registro de errores
+var API_VERSION = "v4"; // v3: validación de pedidos, bloqueo, caché y registro de errores
 
 // Repo de GitHub donde se guardan las fotos de productos (en public/productos/).
 // El token NO va acá: se guarda en Propiedades del script como GITHUB_TOKEN.
@@ -374,6 +374,13 @@ function addRow(tab, obj) {
   if (!TABLES[tab]) throw new Error("Pestaña inválida: " + tab);
   var sh = sheetFor(tab);
   var keys = keysOf(tab);
+  // Si ya existe una fila con este id, es la MISMA alta repetida (doble toque
+  // o el navegador reenviando la solicitud): no se crea otra ni se descuenta
+  // stock de nuevo. Las altas van con bloqueo, así que el control es seguro.
+  if (TABLES[tab].idField === "id" && obj.id && findRowById(tab, obj.id) > 0) {
+    obj.repetido = true;
+    return obj;
+  }
   if (tab === "Clientes" && !obj.sinFusion) {
     var existing = findClienteRow(obj);
     if (existing > 0) return updateRowByNumber(tab, existing, obj);

@@ -124,7 +124,7 @@ const items = (arr) => JSON.stringify(arr);
 
 /* --------------------------------- Pruebas -------------------------------- */
 console.log("Versión y lecturas");
-check("version v3", call({ action: "version" }).version === "v3");
+check("version v4", call({ action: "version" }).version === "v4");
 const l1 = call({ action: "productos_list" });
 check("productos_list público sin costos", l1.ok && l1.data.length === 5 && !("costo" in l1.data[0]));
 const hitsAntes = cacheHits;
@@ -220,6 +220,16 @@ const nAntesDoble = pedidos().length;
 const r2 = addPedido({ id: "ped1791900200001", cliente: "Doble", monto: 2000, pago: "Efectivo", items: items([{ n: "WHEY PROTEIN TRUE MADE 1kg", v: "Vainilla", q: 1 }]) });
 check("doble clic (mismo id) → un solo pedido", (r1.ok ? r2.repetido === true : true) && pedidos().length === nAntesDoble, [r1, r2]);
 
+console.log("Pedido del CRM repetido (mismo id)");
+filaCre[kPr.indexOf("cantidad")] = 5; filaCre[kPr.indexOf("stock")] = "sí";
+const nCrm = pedidos().length;
+const altaCrm = () => ctx.addRow("Pedidos", { id: "id1791900300000123", cliente: "Sandra", monto: "66000", pago: "Efectivo", items: items([{ n: "CREATINA MONOHIDRATO  300 gr", v: "", q: 2 }]), descontado: "no" });
+altaCrm(); altaCrm(); altaCrm();
+check("3 envíos del mismo pedido → 1 fila", pedidos().length === nCrm + 1, pedidos().length - nCrm);
+check("  ...stock descontado una sola vez (5→3)", prod("CREATINA MONOHIDRATO  300 gr").cantidad === 3, prod("CREATINA MONOHIDRATO  300 gr"));
+ctx.deleteRow("Pedidos", "id1791900300000123");
+check("eliminar el pedido repone el stock (3→5)", prod("CREATINA MONOHIDRATO  300 gr").cantidad === 5 && pedidos().length === nCrm);
+
 console.log("Avisos graves");
 const mailsAntes = mails.length;
 ctx.registrarError("add", new Error("Exception: Service Spreadsheets timed out"), {});
@@ -242,13 +252,14 @@ check("fórmula escapada", fForm && String(fForm[kP.indexOf("cliente")]).startsW
 
 console.log("Tareas pendientes y resumen diario");
 const cantAntes = prod("WHEY PROTEIN TRUE MADE 1kg").cantidad;
+const papAntes = book.sheets.Papelera ? book.sheets.Papelera.rows.length : 1;
 const msg = ctx.tareasPendientes();
 check("borra las 3 filas de prueba + cliente de prueba", /borradas: 4/.test(msg), msg);
 check("  ...el pedido real sigue", pedidos().some((x) => x[0] === "ped1700000000000"));
 check("  ...ids de prueba eliminados", !pedidos().some((x) => x[0] === "ped1791863284000" || x[0] === "hack"));
 check("  ...repone el stock del pedido de prueba", prod("WHEY PROTEIN TRUE MADE 1kg").cantidad === cantAntes + 1, [cantAntes, prod("WHEY PROTEIN TRUE MADE 1kg").cantidad]);
 check("  ...cliente de prueba eliminado", !book.sheets.Clientes.rows.some((x) => x.includes("no-es-email")));
-check("  ...todo queda en Papelera", book.sheets.Papelera && book.sheets.Papelera.rows.length === 5);
+check("  ...todo queda en Papelera", book.sheets.Papelera && book.sheets.Papelera.rows.length === papAntes + 4);
 pedidos().find((x) => x[0] === "ped1791900000010")[kP.indexOf("estado")] = "revisar pago";
 const res = ctx.resumenDiario();
 check("resumen diario manda mail con errores y pagos a revisar", mails.length >= 1 && /avisos del sistema/.test(mails[mails.length - 1].subj) && /Errores/.test(mails[mails.length - 1].body) && /revisar/.test(mails[mails.length - 1].body), res);
