@@ -33,6 +33,7 @@ function makeSheet(name, rows) {
 const book = { sheets: {} };
 const bookApi = {
   getId: () => "TEST",
+  getName: () => "Planilla simulada",
   getSheetByName: (n) => book.sheets[n] || null,
   insertSheet: (n) => (book.sheets[n] = makeSheet(n, [])),
   getSheets: () => Object.values(book.sheets),
@@ -192,6 +193,41 @@ mpPayment = { status: "approved", external_reference: "ped1791900000010", transa
 call({ action: "mp_webhook", type: "payment", "data.id": "556" });
 check("webhook con monto correcto → pagado", est() === "pagado");
 
+// Webhook repetido: no vuelve a tocar el pedido
+const nNotas = () => pedidos().find((x) => x[0] === "ped1791900000010")[kP.indexOf("notas")];
+const notasAntes = nNotas();
+pedidos().find((x) => x[0] === "ped1791900000010")[kP.indexOf("estado")] = "Entregado";
+r = call({ action: "mp_webhook", type: "payment", "data.id": "556" });
+check("webhook repetido → no cambia nada", est() === "Entregado" && nNotas() === notasAntes, [est(), nNotas()]);
+mpPayment = { status: "approved", external_reference: "ped1791900000010", transaction_amount: totalMP };
+call({ action: "mp_webhook", type: "payment", "data.id": "557" });
+check("pago nuevo sobre pedido entregado → no pisa Entregado, marca cobrado", est() === "Entregado" && pedidos().find((x) => x[0] === "ped1791900000010")[kP.indexOf("cobrado")] === "sí");
+
+console.log("Compras simultáneas (serializadas por el bloqueo) sobre stock bajo");
+// Stock de creatina: 1 unidad. 5 clientes intentan comprarla.
+const kPr = ctx.__keysOf("Productos");
+const filaCre = book.sheets.Productos.rows.find((x) => x[0] === "CREATINA MONOHIDRATO  300 gr");
+filaCre[kPr.indexOf("cantidad")] = 2; filaCre[kPr.indexOf("stock")] = "sí";
+let exitos = 0, sinStock = 0;
+for (let i = 0; i < 5; i++) {
+  const rr = addPedido({ id: "ped17919001000" + (10 + i), cliente: "Comprador " + i, monto: 33000, pago: "Efectivo", items: items([{ n: "CREATINA MONOHIDRATO  300 gr", q: 1 }]) });
+  if (rr.ok) exitos++; else if (/Sin stock|Solo quedan/.test(rr.error)) sinStock++;
+}
+check("5 compradores, 2 unidades → 2 pedidos y 3 rechazos", exitos === 2 && sinStock === 3, [exitos, sinStock]);
+check("  ...stock final 0 y sin negativos", prod("CREATINA MONOHIDRATO  300 gr").cantidad === 0 && prod("CREATINA MONOHIDRATO  300 gr").stock === "no", prod("CREATINA MONOHIDRATO  300 gr"));
+const r1 = addPedido({ id: "ped1791900200001", cliente: "Doble", monto: 2000, pago: "Efectivo", items: items([{ n: "WHEY PROTEIN TRUE MADE 1kg", v: "Vainilla", q: 1 }]) });
+const nAntesDoble = pedidos().length;
+const r2 = addPedido({ id: "ped1791900200001", cliente: "Doble", monto: 2000, pago: "Efectivo", items: items([{ n: "WHEY PROTEIN TRUE MADE 1kg", v: "Vainilla", q: 1 }]) });
+check("doble clic (mismo id) → un solo pedido", (r1.ok ? r2.repetido === true : true) && pedidos().length === nAntesDoble, [r1, r2]);
+
+console.log("Avisos graves");
+const mailsAntes = mails.length;
+ctx.registrarError("add", new Error("Exception: Service Spreadsheets timed out"), {});
+ctx.registrarError("add", new Error("Exception: Service Spreadsheets timed out"), {});
+ctx.registrarError("add", new Error("Sin stock: X"), {});
+check("falla grave → 1 mail (límite 1 por hora); aviso al cliente → sin mail", mails.length === mailsAntes + 1, mails.length - mailsAntes);
+check("verificarPlanilla informa producción", /PRODUCCIÓN|copia/.test(ctx.verificarPlanilla()));
+
 console.log("Comprobante, registro y fórmulas");
 check("comprobante no JPEG → rechazo", /JPEG/.test(call({ action: "subir_comprobante" }, { pedido: "ped1791900000007", data: "PHNjcmlwdD4=" }).error));
 check("comprobante de pedido no transferencia → rechazo", /no es por transferencia/.test(call({ action: "subir_comprobante" }, { pedido: "ped1791900000007", data: "/9j/AAAA" }).error));
@@ -199,6 +235,7 @@ check("registro con email inválido → rechazo", /Email inválido/.test(call({ 
 const nCli = book.sheets.Clientes.rows.length;
 r = call({ action: "registrar", data: JSON.stringify({ nombre: "Juan Perez", email: "otro@test.com", password: "123456" }) });
 check("registro con nombre existente → fila nueva (no pisa)", r.ok && book.sheets.Clientes.rows.length === nCli + 1, r);
+filaCre[kPr.indexOf("cantidad")] = 5; filaCre[kPr.indexOf("stock")] = "sí";
 const rF = addPedido({ id: "ped1791900000013", cliente: "=HYPERLINK(\"http://x\")", monto: 33000, pago: "Efectivo", items: items([{ n: "CREATINA MONOHIDRATO  300 gr", q: 1 }]) }); if (!rF.ok) console.log(rF);
 const fForm = pedidos().find((x) => x[0] === "ped1791900000013");
 check("fórmula escapada", fForm && String(fForm[kP.indexOf("cliente")]).startsWith("'="), fForm && fForm[kP.indexOf("cliente")]);
@@ -214,7 +251,7 @@ check("  ...cliente de prueba eliminado", !book.sheets.Clientes.rows.some((x) =>
 check("  ...todo queda en Papelera", book.sheets.Papelera && book.sheets.Papelera.rows.length === 5);
 pedidos().find((x) => x[0] === "ped1791900000010")[kP.indexOf("estado")] = "revisar pago";
 const res = ctx.resumenDiario();
-check("resumen diario manda mail con errores y pagos a revisar", mails.length === 1 && /Errores/.test(mails[0].body) && /revisar/.test(mails[0].body), res);
+check("resumen diario manda mail con errores y pagos a revisar", mails.length >= 1 && /avisos del sistema/.test(mails[mails.length - 1].subj) && /Errores/.test(mails[mails.length - 1].body) && /revisar/.test(mails[mails.length - 1].body), res);
 
 console.log(`\n${ok} OK · ${fail} fallas`);
 process.exit(fail ? 1 : 0);

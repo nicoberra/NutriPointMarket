@@ -312,8 +312,24 @@ function respond(obj, callback) {
 
 /* ============================ ACCESO A LA PLANILLA ======================== */
 
+var _libro = null;
 function ss() {
-  return SHEET_ID ? SpreadsheetApp.openById(SHEET_ID) : SpreadsheetApp.getActiveSpreadsheet();
+  if (_libro) return _libro;
+  // Para pruebas en una COPIA de la planilla: en el script de la copia se crea
+  // la propiedad SHEET_ID con el id de la copia. En producción no existe.
+  var otro = PropertiesService.getScriptProperties().getProperty("SHEET_ID");
+  var id = otro || SHEET_ID;
+  _libro = id ? SpreadsheetApp.openById(id) : SpreadsheetApp.getActiveSpreadsheet();
+  return _libro;
+}
+
+// Ejecutar desde el editor para ver qué planilla usa este script (útil en la copia).
+function verificarPlanilla() {
+  var b = ss();
+  var msg = "Este script usa la planilla: " + b.getName() + " (" + b.getId() + ")" +
+    (b.getId() === SHEET_ID ? " · PRODUCCIÓN" : " · copia");
+  Logger.log(msg);
+  return msg;
 }
 function sheetFor(tab) {
   var sh = ss().getSheetByName(tab);
@@ -697,7 +713,15 @@ function borrarCacheCatalogo() {
 
 // Anota el error en la pestaña "Errores" (se crea sola). Sin datos sensibles:
 // solo acción, mensaje, pestaña e id. Nunca debe romper la respuesta.
-function registrarError(action, err, p) {
+// Mensajes que son avisos normales al cliente (no fallas del sistema).
+var ERRORES_ESPERADOS = /inválid|Sin stock|Solo quedan|precios se actualizaron|no disponible|ya existe|no encontrado|Faltan|Falta el|Demasiad|Cantidad|no es por|ya está|demasiado grande|JPEG|sin precio|no tiene productos|Ya existe una cuenta|Contraseña|al menos 6/i;
+
+function registrarError(action, err, p, grave) {
+  try {
+    var texto = String(err && err.message ? err.message : err);
+    if (grave === undefined) grave = !ERRORES_ESPERADOS.test(texto);
+    if (grave) avisarFallaGrave(action, texto);
+  } catch (eA) {}
   try {
     var book = ss();
     var sh = book.getSheetByName("Errores");
@@ -712,6 +736,18 @@ function registrarError(action, err, p) {
   } catch (e2) {
     console.error("registrarError: " + e2);
   }
+}
+
+// Mail inmediato ante una falla grave (no los avisos normales al cliente).
+// Para no llenar la casilla: como máximo uno por hora; el resto queda en la
+// pestaña Errores y en el resumen diario.
+function avisarFallaGrave(action, texto) {
+  var cache = CacheService.getScriptCache();
+  if (cache.get("aviso_grave")) return;
+  cache.put("aviso_grave", "1", 3600);
+  MailApp.sendEmail(Session.getEffectiveUser().getEmail(), "Suple Market · falla en el sistema",
+    "Acción: " + action + "\nError: " + texto.slice(0, 500) +
+    "\n\nRevisá la pestaña Errores de la planilla. No se mandan más avisos por una hora.");
 }
 
 // Mail diario (lo dispara backupDiario) SOLO si hubo errores, pagos para
@@ -1093,6 +1129,7 @@ function mpCrearPreferencia(p) {
   var body = {};
   try { body = JSON.parse(res.getContentText()); } catch (e1) {}
   if (code < 200 || code >= 300) {
+    registrarError("mp_crear_pref", new Error("MP " + code + ": " + res.getContentText().slice(0, 180)), { id: p.pedido }, true);
     return { ok: false, error: "MP " + code + ": " + res.getContentText().slice(0, 180) };
   }
   return { ok: true, init_point: body.init_point, id: body.id };
@@ -1124,6 +1161,10 @@ function mpWebhook(p, e) {
     });
     var pay = {};
     try { pay = JSON.parse(r.getContentText()); } catch (er2) {}
+    if (r.getResponseCode() !== 200) {
+      registrarError("mp_webhook", new Error("Mercado Pago respondió " + r.getResponseCode() + " al consultar el pago " + payId), { id: payId }, true);
+      return { ok: true };
+    }
 
     var ref = pay.external_reference;
     if (pay.status === "approved" && ref) {
@@ -1135,9 +1176,16 @@ function mpWebhook(p, e) {
         var pagado = Number(pay.transaction_amount) || 0;
         var notasW = String(rowW[keysW.indexOf("notas")] || "");
         var marca = "MP #" + payId;
-        if (notasW.indexOf(marca) === -1) notasW = (notasW ? notasW + " · " : "") + marca + " $" + pagado;
+        // Mercado Pago avisa varias veces el mismo pago: si ya se anotó, no se
+        // vuelve a tocar el pedido (ni el estado ni el stock).
+        if (notasW.indexOf(marca) !== -1) return { ok: true, yaProcesado: true };
+        notasW = (notasW ? notasW + " · " : "") + marca + " $" + pagado;
+        var estadoActual = low(rowW[keysW.indexOf("estado")]);
         if (Math.abs(pagado - montoPedido) <= 1) {
-          updateRowByNumber("Pedidos", n, { estado: "pagado", notas: notasW });
+          var cambios = { notas: notasW, cobrado: "sí" };
+          // Si ya estaba entregado, se respeta; si no, pasa a "pagado".
+          if (estadoActual !== "entregado") cambios.estado = "pagado";
+          updateRowByNumber("Pedidos", n, cambios);
         } else {
           // Pagó otro monto: no se marca pagado, queda para revisar en el CRM.
           updateRowByNumber("Pedidos", n, {
@@ -1149,6 +1197,7 @@ function mpWebhook(p, e) {
     }
     return { ok: true };
   } catch (err) {
+    registrarError("mp_webhook", err, p, true);
     return { ok: false, error: String(err) };
   }
 }
