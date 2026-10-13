@@ -7,7 +7,7 @@
  *   - El CATÁLOGO (nombre, categoría, descripción, fotos, sabores) vive en el
  *     código de la web (data/products.ts). Casi no cambia.
  *   - La PLANILLA guarda solo lo que cambia seguido: Precio, Stock (sí/no),
- *     Precio ML (precio tachado, opcional) y Destacado (sí/no).
+ *     Precio sin descuento (solo si hay descuento cargado) y Destacado (sí/no).
  *   - La web cruza ambos por el NOMBRE del producto (tiene que coincidir EXACTO).
  *
  * PUESTA EN MARCHA (una vez): Extensiones → Apps Script → pegar esto → guardar →
@@ -48,7 +48,7 @@ var TABLES = {
       ["marca", "Marca"],
       ["categoria", "Categoría"],
       ["precio", "Precio"],
-      ["precioML", "Precio ML"],
+      ["precioML", "Precio sin descuento"], // precio normal cuando el CRM carga un descuento (vacío = sin descuento)
       ["variantes", "Variantes"],
       ["stock", "Stock"],
       ["destacado", "Destacado"],
