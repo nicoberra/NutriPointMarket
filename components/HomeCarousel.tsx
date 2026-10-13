@@ -22,7 +22,7 @@ const CONFIG = {
   },
   bestSellers: {
     eyebrow: "Ranking",
-    title: "Los más vendidos",
+    title: "Suplementos deportivos más vendidos",
     viewAllHref: "/productos?orden=mas-vendidos",
     bg: "",
     video: null,

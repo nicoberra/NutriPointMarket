@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getBuildProducts, absoluteImage } from "@/lib/build-products";
 import { ProductoView } from "@/components/ProductoView";
+import { productTitle, productDescription } from "@/lib/seo";
 
 /**
  * Página propia de cada producto: /producto/<slug>/
@@ -23,21 +24,21 @@ export async function generateMetadata({
   const p = (await getBuildProducts()).find((x) => x.slug === params.slug);
   if (!p) return { title: "Producto" };
   const url = `https://suplemarket.com.ar/producto/${p.slug}/`;
-  const description =
-    p.description.slice(0, 160) || `${p.brand ? p.brand + " · " : ""}${p.name} en Suple Market.`;
+  const title = productTitle(p.name, p.brand);
+  const description = productDescription(p.name, p.brand, p.description);
   const img = absoluteImage(p.image);
   return {
-    title: p.name, // la plantilla del layout agrega "| Suple Market"
+    title, // la plantilla del layout agrega "| Suple Market"
     description,
     alternates: { canonical: url },
     openGraph: {
-      title: p.name,
+      title,
       description,
       url,
       type: "website",
       images: img ? [{ url: img }] : [],
     },
-    twitter: { card: img ? "summary_large_image" : "summary", title: p.name, description },
+    twitter: { card: img ? "summary_large_image" : "summary", title, description },
   };
 }
 

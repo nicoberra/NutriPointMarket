@@ -9,7 +9,12 @@ import { NutriRecomendada } from "@/components/NutriRecomendada";
 import { SmartImg } from "@/components/SmartImg";
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { alternates: { canonical: "/" } };
+export const metadata: Metadata = {
+  title: { absolute: "Suplementos deportivos en Argentina | Suple Market" },
+  description:
+    "Suplementos deportivos en Argentina: proteína whey, creatina, combos y pancakes proteicos 100% originales. 10% off por transferencia. ¡Comprá online!",
+  alternates: { canonical: "/" },
+};
 
 export default function HomePage() {
   return (

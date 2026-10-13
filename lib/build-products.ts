@@ -1,6 +1,7 @@
 import { SHEETS_API_URL } from "./config";
 import { slugify } from "./api";
 import { productSeedRaw } from "@/data/products-seed";
+import { categories as defaultCategories } from "@/data/categories";
 
 /**
  * Lista de productos para el BUILD (páginas estáticas /producto/<slug>/ y
@@ -14,6 +15,9 @@ export type BuildProduct = {
   brand: string;
   image: string;
   description: string;
+  /** slug y nombre de la categoría (como en la planilla) */
+  category: string;
+  categoryName: string;
 };
 
 const BASE = "https://suplemarket.com.ar";
@@ -36,6 +40,8 @@ export async function getBuildProducts(): Promise<BuildProduct[]> {
       brand: String(r.marca ?? "").trim(),
       image: String(r.imagen ?? "").split("|")[0].trim(),
       description: String(r.descripcion ?? "").trim(),
+      category: slugify(String(r.categoria ?? "").trim()) || "proteinas",
+      categoryName: String(r.categoria ?? "").trim() || "Proteínas",
     });
   };
   for (const r of productSeedRaw) add(r);
@@ -50,4 +56,13 @@ export async function getBuildProducts(): Promise<BuildProduct[]> {
     /* sin red en el build: queda el snapshot */
   }
   return Array.from(map.values());
+}
+
+/** Categorías para el BUILD (páginas /categoria/<slug>/ y sitemap): las del
+ * snapshot + las que tengan productos. */
+export async function getBuildCategories(): Promise<{ slug: string; name: string }[]> {
+  const map = new Map<string, string>();
+  for (const c of defaultCategories) map.set(c.slug, c.name);
+  for (const p of await getBuildProducts()) if (p.category && !map.has(p.category)) map.set(p.category, p.categoryName);
+  return Array.from(map, ([slug, name]) => ({ slug, name }));
 }

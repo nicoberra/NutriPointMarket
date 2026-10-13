@@ -61,7 +61,7 @@ export function PromoBannerRow() {
           title="Combos Suple Market"
           text="Combiná proteína + creatina y obtené un mejor precio."
           ctaLabel="Ver combos"
-          ctaHref="/productos?categoria=combos"
+          ctaHref="/categoria/combos/"
         />
         <PromoBanner
           variant="primary"

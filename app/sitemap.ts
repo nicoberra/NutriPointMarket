@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getBuildProducts } from "@/lib/build-products";
+import { getBuildProducts, getBuildCategories } from "@/lib/build-products";
 
 export const dynamic = "force-static";
 
@@ -22,5 +22,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "weekly",
       priority: 0.8,
     }));
-  return [...routes, ...products];
+  const cats: MetadataRoute.Sitemap = (await getBuildCategories()).map((c) => ({
+    url: `${BASE}/categoria/${c.slug}/`,
+    lastModified: now,
+    changeFrequency: "weekly",
+    priority: 0.8,
+  }));
+  return [...routes, ...cats, ...products];
 }

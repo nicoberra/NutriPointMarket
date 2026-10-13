@@ -7,6 +7,7 @@ import { useProducts } from "@/context/ProductsContext";
 import { SITE, whatsappLink } from "@/lib/config";
 import { formatPrice } from "@/lib/format";
 import { ChevronDownIcon, WhatsappIcon, MailIcon, InstagramIcon } from "./Icons";
+import { categoryHref } from "@/lib/seo";
 
 /** Marcas con las que trabajamos (menú desplegable). */
 const BRANDS = [
@@ -87,7 +88,7 @@ export function Navbar() {
                   return (
                     <div key={c.slug} className="min-w-0">
                       <Link
-                        href={`/productos?categoria=${c.slug}`}
+                        href={categoryHref(c.slug)}
                         className="font-display text-sm font-extrabold text-primary hover:opacity-80"
                       >
                         {c.name}
@@ -105,7 +106,7 @@ export function Navbar() {
                         ))}
                         <li>
                           <Link
-                            href={`/productos?categoria=${c.slug}`}
+                            href={categoryHref(c.slug)}
                             className="block text-sm font-semibold text-ink/50 transition-colors hover:text-primary"
                           >
                             Ver todos
@@ -133,7 +134,7 @@ export function Navbar() {
         </Menu>
 
         {/* Combos: cada combo lleva directo a su ficha */}
-        <Menu label="Combos" href="/productos?categoria=combos" width="w-72">
+        <Menu label="Combos" href="/categoria/combos/" width="w-72">
           {combos.length > 0 ? (
             combos.map((p) => (
               <Link key={p.id} href={`/producto/${p.slug}/`} className={ITEM}>
@@ -144,7 +145,7 @@ export function Navbar() {
           ) : (
             <p className="px-3 py-2.5 text-sm text-muted">Pronto, nuevos combos.</p>
           )}
-          <Link href="/productos?categoria=combos" className={FOOT}>
+          <Link href="/categoria/combos/" className={FOOT}>
             Ver todos los combos →
           </Link>
         </Menu>

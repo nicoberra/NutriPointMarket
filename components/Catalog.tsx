@@ -27,7 +27,19 @@ const SORTS: { key: SortKey; label: string }[] = [
 const PRICE_FALLBACK = 80000;
 const ceil5k = (n: number) => Math.ceil(n / 5000) * 5000;
 
-export function Catalog({ onlyOffers = false }: { onlyOffers?: boolean }) {
+export function Catalog({
+  onlyOffers = false,
+  initialCategory,
+}: {
+  onlyOffers?: boolean;
+  /** Categoría fija de la página (/categoria/<slug>/) si la URL no trae ?categoria= */
+  initialCategory?: string;
+}) {
+  const catsFromUrl = (sp: URLSearchParams | { get(k: string): string | null }) => {
+    const raw = sp.get("categoria");
+    if (raw) return raw.split(",").filter(Boolean) as CategorySlug[];
+    return initialCategory ? [initialCategory as CategorySlug] : [];
+  };
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -46,9 +58,7 @@ export function Catalog({ onlyOffers = false }: { onlyOffers?: boolean }) {
     brands.find((b) => b.slug === s || b.slug.startsWith(s + " "))?.slug ?? s;
 
   const [search, setSearch] = useState(searchParams.get("buscar") ?? "");
-  const [selectedCats, setSelectedCats] = useState<CategorySlug[]>(
-    (searchParams.get("categoria")?.split(",").filter(Boolean) as CategorySlug[]) ?? [],
-  );
+  const [selectedCats, setSelectedCats] = useState<CategorySlug[]>(catsFromUrl(searchParams));
   const [selectedBrands, setSelectedBrands] = useState<string[]>(
     (searchParams.get("marca")?.split(",").filter(Boolean) ?? []).map(resolveBrand),
   );
@@ -63,9 +73,7 @@ export function Catalog({ onlyOffers = false }: { onlyOffers?: boolean }) {
   // Sincronizar cuando cambian los parámetros de la URL (navegación desde menú)
   useEffect(() => {
     setSearch(searchParams.get("buscar") ?? "");
-    setSelectedCats(
-      (searchParams.get("categoria")?.split(",").filter(Boolean) as CategorySlug[]) ?? [],
-    );
+    setSelectedCats(catsFromUrl(searchParams));
     setSelectedBrands(
       (searchParams.get("marca")?.split(",").filter(Boolean) ?? []).map(resolveBrand),
     );
