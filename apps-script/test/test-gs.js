@@ -45,6 +45,8 @@ const fetches = [];
 let lockCalls = 0;
 const props = { MP_ACCESS_TOKEN: "TEST-TOKEN", GITHUB_TOKEN: "GH" };
 let mpPayment = null;
+// Simula los dos disparadores de copias que habían quedado repetidos.
+const triggers = [{ getHandlerFunction: () => "backupDiario" }, { getHandlerFunction: () => "backupDiario" }];
 const ctx = {
   console,
   SpreadsheetApp: { openById: () => bookApi, getActiveSpreadsheet: () => bookApi, getActive: () => ({ toast: () => {} }) },
@@ -64,7 +66,12 @@ const ctx = {
     getUuid: () => "uuid-" + Math.random(),
   },
   ContentService: { createTextOutput: (t) => ({ text: t, setMimeType() { return this; } }), MimeType: { JAVASCRIPT: "js", JSON: "json" } },
-  ScriptApp: { getService: () => ({ getUrl: () => "https://exec" }), getProjectTriggers: () => [], newTrigger: () => ({ timeBased: () => ({ everyDays: () => ({ atHour: () => ({ create: () => {} }) }) }) }) },
+  ScriptApp: {
+    getService: () => ({ getUrl: () => "https://exec" }),
+    getProjectTriggers: () => triggers.slice(),
+    deleteTrigger: (t) => { triggers.splice(triggers.indexOf(t), 1); },
+    newTrigger: (h) => ({ timeBased: () => ({ everyDays: () => ({ atHour: () => ({ create: () => { triggers.push({ getHandlerFunction: () => h }); } }) }) }) }),
+  },
   Session: { getEffectiveUser: () => ({ getEmail: () => "owner@test" }) },
   MailApp: { sendEmail: (to, subj, body) => mails.push({ to, subj, body }) },
   DriveApp: { getFileById: () => ({ makeCopy: () => {} }), getFoldersByName: () => ({ hasNext: () => false }), createFolder: () => ({ getFiles: () => ({ hasNext: () => false }) }) },
@@ -124,7 +131,7 @@ const items = (arr) => JSON.stringify(arr);
 
 /* --------------------------------- Pruebas -------------------------------- */
 console.log("Versión y lecturas");
-check("version v4", call({ action: "version" }).version === "v4");
+check("version v5", call({ action: "version" }).version === "v5");
 const l1 = call({ action: "productos_list" });
 check("productos_list público sin costos", l1.ok && l1.data.length === 5 && !("costo" in l1.data[0]));
 const hitsAntes = cacheHits;
@@ -263,6 +270,12 @@ check("  ...todo queda en Papelera", book.sheets.Papelera && book.sheets.Papeler
 pedidos().find((x) => x[0] === "ped1791900000010")[kP.indexOf("estado")] = "revisar pago";
 const res = ctx.resumenDiario();
 check("resumen diario manda mail con errores y pagos a revisar", mails.length >= 1 && /avisos del sistema/.test(mails[mails.length - 1].subj) && /Errores/.test(mails[mails.length - 1].body) && /revisar/.test(mails[mails.length - 1].body), res);
+
+console.log("Copias automáticas");
+const mq = ctx.quitarBackupsAutomaticos();
+check("quita los 2 disparadores de copias y deja 1 de avisos", triggers.length === 1 && triggers[0].getHandlerFunction() === "resumenDiario", [mq, triggers.map((t) => t.getHandlerFunction())]);
+ctx.quitarBackupsAutomaticos();
+check("  ...repetirlo no agrega otro", triggers.length === 1);
 
 console.log(`\n${ok} OK · ${fail} fallas`);
 process.exit(fail ? 1 : 0);

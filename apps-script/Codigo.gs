@@ -18,7 +18,7 @@
  * ============================================================================ */
 
 var SHEET_ID = "12paAzW6OcSgYv4u6L7QVI4tpvrEx1yqnujW0OjcieMc";
-var API_VERSION = "v4"; // v3: validación de pedidos, bloqueo, caché y registro de errores
+var API_VERSION = "v5"; // v3: validación de pedidos, bloqueo, caché y registro de errores
 
 // Repo de GitHub donde se guardan las fotos de productos (en public/productos/).
 // El token NO va acá: se guarda en Propiedades del script como GITHUB_TOKEN.
@@ -757,7 +757,7 @@ function avisarFallaGrave(action, texto) {
     "\n\nRevisá la pestaña Errores de la planilla. No se mandan más avisos por una hora.");
 }
 
-// Mail diario (lo dispara backupDiario) SOLO si hubo errores, pagos para
+// Mail diario (disparador "resumenDiario", 9 am) SOLO si hubo errores, pagos para
 // revisar o la planilla se acerca al límite de celdas.
 function resumenDiario() {
   var book = ss();
@@ -1561,8 +1561,8 @@ function low(v) {
 
 /* ============================ SETUP / MANTENIMIENTO ====================== */
 
-// Copia de seguridad: duplica la planilla completa en una carpeta "Backups
-// Suple Market" de tu Drive y conserva las últimas 30 copias.
+// Copia de seguridad MANUAL (ya no hay copias automáticas): duplica la planilla
+// en la carpeta "Backups Suple Market" de tu Drive y conserva las últimas 30.
 function backupAhora() {
   var file = DriveApp.getFileById(ss().getId());
   var folders = DriveApp.getFoldersByName("Backups Suple Market");
@@ -1581,16 +1581,28 @@ function backupAhora() {
   return copias.length;
 }
 
-// Ejecutar UNA vez: deja programado el backup automático todos los días a las 4 am.
-function instalarBackupDiario() {
-  var ya = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === "backupDiario"; });
-  if (!ya) ScriptApp.newTrigger("backupDiario").timeBased().everyDays(1).atHour(4).create();
-  backupAhora();
-  SpreadsheetApp.getActive().toast("Backup diario instalado y primera copia hecha.", "Suple Market", 5);
+// Ejecutar UNA vez desde el editor (▶ quitarBackupsAutomaticos):
+//  - borra los disparadores de copias diarias (había quedado uno repetido);
+//  - deja UN disparador diario para el mail de avisos (solo manda algo si hubo
+//    errores, pagos para revisar o la planilla se acerca al límite).
+// Las copias que ya están en Drive NO se tocan (podés borrarlas a mano).
+// Si alguna vez querés una copia, ejecutá ▶ backupAhora.
+function quitarBackupsAutomaticos() {
+  var quitados = 0, hayResumen = false;
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    var h = t.getHandlerFunction();
+    if (h === "backupDiario") { ScriptApp.deleteTrigger(t); quitados++; }
+    else if (h === "resumenDiario") hayResumen = true;
+  });
+  if (!hayResumen) ScriptApp.newTrigger("resumenDiario").timeBased().everyDays(1).atHour(9).create();
+  var msg = "Copias automáticas quitadas: " + quitados + " · Mail de avisos " + (hayResumen ? "ya estaba" : "programado (9 am)");
+  Logger.log(msg);
+  try { SpreadsheetApp.getActive().toast(msg, "Suple Market", 8); } catch (e) {}
+  return msg;
 }
 
+// Por si un disparador viejo de copias llega a correr antes de quitarlo: ya no copia nada.
 function backupDiario() {
-  backupAhora();
   try { resumenDiario(); } catch (e) { registrarError("resumenDiario", e, {}); }
 }
 
@@ -1598,7 +1610,6 @@ function backupDiario() {
 //  1) borra los pedidos de prueba "PRUEBA CLAUDE (borrar)" (quedan en Papelera
 //     y, si habían descontado stock, lo repone);
 //  2) actualiza los encabezados de Pedidos;
-//  3) instala el backup diario (4 am) y hace la primera copia en Drive.
 // Es seguro repetirla: si no hay nada que hacer, no cambia nada.
 // Pedidos creados por pruebas automáticas (13/10/2026) contra la versión vieja.
 var IDS_PRUEBA = ["ped1791863284000", "hack"];
@@ -1632,11 +1643,7 @@ function tareasPendientes() {
     }
   }
   borrarCacheCatalogo();
-  var ya = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === "backupDiario"; });
-  if (!ya) ScriptApp.newTrigger("backupDiario").timeBased().everyDays(1).atHour(4).create();
-  var copias = backupAhora();
-  var msg = "Filas de prueba borradas: " + borrados + " · Backup diario " + (ya ? "ya estaba instalado" : "instalado") +
-    " · Copias en Drive: " + copias;
+  var msg = "Filas de prueba borradas: " + borrados;
   Logger.log(msg);
   try { SpreadsheetApp.getActive().toast(msg, "Suple Market", 8); } catch (e) {}
   return msg;
