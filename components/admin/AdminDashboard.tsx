@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useProducts } from "@/context/ProductsContext";
-import { peekTable, fetchTable, subscribeTable } from "@/lib/tableCache";
+import { peekTable, ensureTable, subscribeTable } from "@/lib/tableCache";
 import { formatPrice } from "@/lib/format";
 import { UserIcon, ClipboardIcon, ChevronRightIcon } from "@/components/Icons";
 import { useCountUp } from "./useCountUp";
@@ -98,7 +98,7 @@ export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
     run();
     const u1 = subscribeTable("Clientes", run);
     const u2 = subscribeTable("Pedidos", run);
-    Promise.all([fetchTable("Clientes"), fetchTable("Pedidos")]).catch(() => {}).finally(run);
+    Promise.all([ensureTable("Clientes"), ensureTable("Pedidos")]).catch(() => {}).finally(run);
     return () => {
       u1();
       u2();

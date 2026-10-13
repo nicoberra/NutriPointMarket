@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useConfirm } from "./useConfirm";
 import { OrderSheet } from "./OrderSheet";
 import { addRow, updateRow, deleteRow, aprobarPedido, localAsset, lastApiError } from "@/lib/api";
-import { peekTable, fetchTable, subscribeTable } from "@/lib/tableCache";
+import { peekTable, fetchTable, ensureTable, subscribeTable, patchTable } from "@/lib/tableCache";
 import { useProducts } from "@/context/ProductsContext";
 import { whatsappLink } from "@/lib/config";
 import { formatPrice } from "@/lib/format";
@@ -85,13 +85,13 @@ export function AdminRecords({
   const [editRow, setEditRow] = useState<Row | null>(null);
   const [orderFor, setOrderFor] = useState<Row | null>(null);
   const [editOrder, setEditOrder] = useState<Row | null>(null);
-  const loadPedidos = () => {
+  const loadPedidos = (forzar = false) => {
     if (!isClientes) return;
     const cached = peekTable<Row>("Pedidos");
     if (cached) setPedidos([...cached].reverse());
-    fetchTable<Row>("Pedidos").catch(() => {});
+    (forzar ? fetchTable<Row>("Pedidos") : ensureTable<Row>("Pedidos")).catch(() => {});
   };
-  useEffect(loadPedidos, [config.tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => loadPedidos(), [config.tab]); // eslint-disable-line react-hooks/exhaustive-deps
   // Cuando llegan datos nuevos de Pedidos (de esta u otra sección), se muestran.
   useEffect(() => {
     if (!isClientes) return;
@@ -112,32 +112,32 @@ export function AdminRecords({
 
   // Muestra al instante lo último cargado y actualiza en segundo plano
   // (más reciente primero). Solo muestra "Cargando…" la primera vez.
-  const load = () => {
+  const load = (forzar = false) => {
     const cached = peekTable<Row>(config.tab);
     if (cached) {
       setRows([...cached].reverse());
       setLoading(false);
     } else setLoading(true);
-    fetchTable<Row>(config.tab)
+    (forzar ? fetchTable<Row>(config.tab) : ensureTable<Row>(config.tab))
       .catch(() => {
         if (!cached) onToast("No se pudo cargar");
       })
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, [config.tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => load(), [config.tab]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => subscribeTable(config.tab, (d) => setRows([...(d as Row[])].reverse())), [config.tab]);
   // Tras guardar: el servidor responde cuando ya escribió, así que alcanza con
   // una recarga. Si tardó demasiado (no sabemos si se guardó), una más a los 6 s.
   const tardo = useRef(false);
-  const recargar = (extra?: () => void) => {
-    load();
-    extra?.();
+  const recargar = (extra?: (forzar?: boolean) => void) => {
+    load(true);
+    extra?.(true);
     if (tardo.current) {
       tardo.current = false;
       setTimeout(() => {
-        load();
-        extra?.();
+        load(true);
+        extra?.(true);
       }, 6000);
     }
   };
@@ -188,7 +188,14 @@ export function AdminRecords({
     try {
       const ok = await addRow(orderConfig.tab, obj);
       onToast(ok ? "Pedido creado ✓ (stock descontado)" : "No se pudo guardar" + detalleError());
-      if (ok) setOrderFor(null);
+      if (ok) {
+        setOrderFor(null);
+        // Aparece al instante en el historial; la recarga trae la fila real.
+        const ahora = new Date();
+        const p2 = (n: number) => String(n).padStart(2, "0");
+        const fecha = `${ahora.getFullYear()}-${p2(ahora.getMonth() + 1)}-${p2(ahora.getDate())} ${p2(ahora.getHours())}:${p2(ahora.getMinutes())}`;
+        patchTable("Pedidos", (rows) => (rows.some((r) => r.id === obj.id) ? rows : [...rows, { ...obj, fecha, descontado: "sí" }]));
+      }
     } catch {
       onToast("Tardó demasiado: verificá si se guardó");
       tardo.current = true;
@@ -209,7 +216,7 @@ export function AdminRecords({
       if (r === false) throw new Error("no ok");
     } catch {
       onToast("No se pudo cambiar" + detalleError());
-      load();
+      load(true);
     }
   };
 
@@ -242,7 +249,7 @@ export function AdminRecords({
       if (r === false) throw new Error("no ok");
     } catch {
       onToast("No se pudo cambiar el estado" + detalleError());
-      load();
+      load(true);
     }
   };
 
@@ -302,7 +309,7 @@ export function AdminRecords({
       );
     } catch {
       onToast("No se pudo eliminar" + detalleError());
-      load();
+      load(true);
     }
   };
 
@@ -314,10 +321,10 @@ export function AdminRecords({
     try {
       const ok = await aprobarPedido(row.id);
       onToast(ok ? "Stock descontado ✓" : "No se pudo descontar");
-      if (!ok) load();
+      if (!ok) load(true);
     } catch {
       onToast("Tardó demasiado: verificá el pedido");
-      load();
+      load(true);
     }
   };
 

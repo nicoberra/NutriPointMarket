@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { peekTable, fetchTable, subscribeTable } from "@/lib/tableCache";
+import { peekTable, ensureTable, subscribeTable } from "@/lib/tableCache";
 import { formatPrice } from "@/lib/format";
 import { ChartIcon } from "@/components/Icons";
 
@@ -56,7 +56,7 @@ export function AdminBilling() {
       setLoading(false);
     }
     const unsub = subscribeTable("Pedidos", calc);
-    fetchTable<Record<string, unknown>>("Pedidos")
+    ensureTable<Record<string, unknown>>("Pedidos")
       .catch(() => {})
       .finally(() => setLoading(false));
     return unsub;
