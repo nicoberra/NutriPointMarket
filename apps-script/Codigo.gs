@@ -1311,6 +1311,37 @@ function backupDiario() {
   backupAhora();
 }
 
+// Ejecutar UNA vez desde el editor (▶ tareasPendientes). Hace los pendientes:
+//  1) borra los pedidos de prueba "PRUEBA CLAUDE (borrar)" (quedan en Papelera
+//     y, si habían descontado stock, lo repone);
+//  2) actualiza los encabezados de Pedidos;
+//  3) instala el backup diario (4 am) y hace la primera copia en Drive.
+// Es seguro repetirla: si no hay nada que hacer, no cambia nada.
+function tareasPendientes() {
+  var sh = sheetFor("Pedidos");
+  var keys = keysOf("Pedidos");
+  var iCli = keys.indexOf("cliente");
+  var data = sh.getDataRange().getValues();
+  var borrados = 0;
+  for (var r = data.length - 1; r >= 1; r--) {
+    if (String(data[r][iCli] || "").toUpperCase().indexOf("PRUEBA CLAUDE") !== -1) {
+      reponerStockPedido(r + 1);
+      guardarEnPapelera("Pedidos", r + 1);
+      sh.deleteRow(r + 1);
+      borrados++;
+    }
+  }
+  writeHeader(sh, "Pedidos");
+  var ya = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === "backupDiario"; });
+  if (!ya) ScriptApp.newTrigger("backupDiario").timeBased().everyDays(1).atHour(4).create();
+  var copias = backupAhora();
+  var msg = "Pedidos de prueba borrados: " + borrados + " · Backup diario " + (ya ? "ya estaba instalado" : "instalado") +
+    " · Copias en Drive: " + copias;
+  Logger.log(msg);
+  try { SpreadsheetApp.getActive().toast(msg, "Suple Market", 8); } catch (e) {}
+  return msg;
+}
+
 function setup() {
   var book = ss();
   Object.keys(TABLES).forEach(function (tab, idx) {
