@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Product } from "@/lib/types";
 import { useProducts } from "@/context/ProductsContext";
 import { formatPrice } from "@/lib/format";
+import { brandName } from "@/data/brands";
 import { CloseIcon, PlusIcon, TrashIcon } from "@/components/Icons";
 import { useDollar, costToPesos } from "./AdminProducts";
 
@@ -248,6 +249,7 @@ export function OrderSheet({
                           <option value="">Seleccionar producto…</option>
                           {sorted.map((op) => (
                             <option key={op.id} value={op.id}>
+                              {op.brand ? `${brandName(op.brand)} · ` : ""}
                               {op.name}
                               {op.inStock === false ? " (sin stock)" : ""}
                             </option>
