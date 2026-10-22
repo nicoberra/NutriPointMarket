@@ -9,7 +9,7 @@ import { whatsappLink, TRANSFER, transferPrice } from "@/lib/config";
 import { createOrder, mpCreatePreference, uploadComprobante } from "@/lib/api";
 import { PageBanner } from "@/components/PageBanner";
 import { CheckIcon, WhatsappIcon } from "@/components/Icons";
-import { PROVINCIAS, ZONAS_ENVIO, calcularEnvio, detectarZona, type ZonaDetectada } from "@/lib/envios";
+import { PROVINCIAS, ZONAS_ENVIO, ENVIO_GRATIS_DESDE, calcularEnvio, detectarZona, type ZonaDetectada } from "@/lib/envios";
 import { Trampa, CAMPO_TRAMPA } from "@/components/Trampa";
 
 type Metodo = "Transferencia" | "Mercado Pago";
@@ -81,7 +81,9 @@ export default function CheckoutPage() {
   const noReconocida = !buscando && localidad.trim().length >= 3 && !detectada;
   const faltaPartido = !!detectada && detectada.provincia === "Buenos Aires" && !detectada.partido;
   const verSelectores = manual || noReconocida || faltaPartido;
-  const shipping = subtotal === 0 ? 0 : envioInfo.costo;
+  // Envío gratis en CABA y GBA desde ENVIO_GRATIS_DESDE (subtotal a precio publicado).
+  const envioGratis = envioInfo.tipo === "zona" && subtotal >= ENVIO_GRATIS_DESDE;
+  const shipping = subtotal === 0 || envioGratis ? 0 : envioInfo.costo;
   const total = subtotal + shipping;
 
   // Descuento por pagar con transferencia (no aplica a Mercado Pago): cada
@@ -130,7 +132,7 @@ export default function CheckoutPage() {
       .filter(Boolean)
       .join(", ");
     // Texto del envío para el pedido: "Envío GBA 1 · Morón", "Envío Vía Cargo · a coordinar"
-    const envioTexto = [direccion, envioInfo.resumen].filter(Boolean).join(" · ");
+    const envioTexto = [direccion, envioInfo.resumen, envioGratis ? "Envío gratis (compra desde $120.000)" : ""].filter(Boolean).join(" · ");
     // Combos: las variantes elegidas van en el detalle (legible) y en items
     // (cv) para que al aprobar el pago se descuente la variante correcta.
     const choicesTxt = (i: (typeof items)[number]) =>
@@ -475,7 +477,7 @@ export default function CheckoutPage() {
                           aria-hidden
                         />
                       )}
-                      {envioInfo.etiqueta}
+                      {envioGratis ? `${envioInfo.etiqueta.replace(/:.*$/, "")}: ¡gratis!` : envioInfo.etiqueta}
                     </span>
                     {!manual && (
                       <button
@@ -536,7 +538,9 @@ export default function CheckoutPage() {
                         ? "A coordinar"
                         : envioInfo.tipo === "pendiente"
                           ? "A calcular"
-                          : formatPrice(shipping)}
+                          : envioGratis
+                            ? "Gratis"
+                            : formatPrice(shipping)}
                   </dd>
                 </div>
                 {descuento > 0 && (

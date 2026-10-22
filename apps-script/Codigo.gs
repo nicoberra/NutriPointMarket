@@ -18,7 +18,7 @@
  * ============================================================================ */
 
 var SHEET_ID = "12paAzW6OcSgYv4u6L7QVI4tpvrEx1yqnujW0OjcieMc";
-var API_VERSION = "v7"; // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
+var API_VERSION = "v8"; // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
 
 // Repo de GitHub donde se guardan las fotos de productos (en public/productos/).
 // El token NO va acá: se guarda en Propiedades del script como GITHUB_TOKEN.
@@ -34,6 +34,8 @@ var SITE_URL = "https://suplemarket.com.ar";
 var DESCUENTO_TRANSFERENCIA = 0.1;
 // Costos de envío por zona (tienen que coincidir con lib/envios.ts).
 var ENVIOS = { "Capital": 5500, "GBA 1": 7000, "GBA 2": 9000, "GBA 3": 15000 };
+// Envío gratis (CABA y GBA) cuando los productos suman desde este monto a precio publicado.
+var ENVIO_GRATIS_DESDE = 120000;
 // Tamaño máximo del comprobante (base64, ~2.5 MB de imagen).
 var COMPROBANTE_MAX_B64 = 3500000;
 
@@ -680,6 +682,7 @@ function validarAltaPublica(tab, obj) {
   verificarStock(items);
   var calc = calcularTotalPedido(items, pago);
   var envio = envioSegunTexto(limpio.envio);
+  if (calc.subtotalWeb >= ENVIO_GRATIS_DESDE) envio = 0;
   var total = calc.subtotal + envio;
   if (Math.abs(Number(limpio.monto) - total) > 1) {
     throw new Error("Los precios se actualizaron. Recargá la página y volvé a confirmar el pedido.");
@@ -900,7 +903,7 @@ function calcularTotalPedido(items, pago) {
     var nombre = low(values[r][0]);
     if (nombre) precios[nombre] = Number(values[r][3]) || 0;
   }
-  var subtotal = 0;
+  var subtotal = 0, subtotalWeb = 0;
   for (var i = 0; i < items.length; i++) {
     var it = items[i] || {};
     var q = Math.floor(Number(it.q) || 0);
@@ -909,8 +912,9 @@ function calcularTotalPedido(items, pago) {
     if (base === undefined) throw new Error("Producto no disponible: " + String(it.n || "").slice(0, 60));
     if (!base) throw new Error("Producto sin precio: " + String(it.n || "").slice(0, 60));
     subtotal += (pago === "Mercado Pago" ? precioWeb(base) : base) * q;
+    subtotalWeb += precioWeb(base) * q;
   }
-  return { subtotal: subtotal };
+  return { subtotal: subtotal, subtotalWeb: subtotalWeb };
 }
 
 // Costo de envío según el texto que guarda el checkout ("... · Envío GBA 1 · Morón").

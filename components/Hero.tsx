@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRightIcon, ShieldIcon, PercentIcon, CardIcon } from "./Icons";
+import { ArrowRightIcon, ShieldIcon, PercentIcon, CardIcon, TruckIcon } from "./Icons";
 import { HeroShowcase } from "./HeroShowcase";
 import { HeroIntro } from "./HeroIntro";
 
@@ -55,6 +55,9 @@ export function Hero() {
             </li>
             <li className="flex items-center gap-1.5">
               <PercentIcon className="h-4 w-4 text-primary" /> 10% de descuento por transferencia
+            </li>
+            <li className="flex items-center gap-1.5">
+              <TruckIcon className="h-4 w-4 text-primary" /> Envío gratis desde $120.000
             </li>
             <li className="flex items-center gap-1.5">
               <CardIcon className="h-4 w-4 text-primary" /> Pago seguro

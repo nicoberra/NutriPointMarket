@@ -15,11 +15,11 @@ const ICONS = {
 export function TrustStrip() {
   return (
     <section className="border-y border-line bg-white/85 backdrop-blur-sm">
-      <Reveal className="container-page grid grid-cols-2 gap-x-4 gap-y-6 py-7 sm:py-8 lg:grid-cols-4" y={16}>
+      <Reveal className="container-page grid grid-cols-2 gap-x-4 gap-y-6 py-7 sm:py-8 lg:grid-cols-5" y={16}>
         {TRUST_ITEMS.map((item) => {
           const Icon = ICONS[item.icon as keyof typeof ICONS] ?? ShieldIcon;
           return (
-            <div key={item.title} className="flex items-center gap-3">
+            <div key={item.title} className="flex items-center gap-3 last:col-span-2 lg:last:col-span-1">
               <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-accent-soft text-primary shadow-soft">
                 <Icon className="h-6 w-6" />
               </span>

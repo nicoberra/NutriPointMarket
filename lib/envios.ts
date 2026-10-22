@@ -141,6 +141,9 @@ export type ResultadoEnvio =
  * Calcula el envío según lo elegido en el checkout.
  * - CABA → Capital. Buenos Aires → según el partido. Otra provincia → Vía Cargo (a coordinar).
  */
+/** Envío gratis en CABA y GBA cuando los productos suman desde este monto (precio publicado). */
+export const ENVIO_GRATIS_DESDE = 120000;
+
 export function calcularEnvio(opts: {
   provincia: string;
   partido: string;
