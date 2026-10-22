@@ -136,7 +136,7 @@ const items = (arr) => JSON.stringify(arr);
 
 /* --------------------------------- Pruebas -------------------------------- */
 console.log("Versión y lecturas");
-check("version v7", call({ action: "version" }).version === "v7");
+check("version v8", call({ action: "version" }).version === "v8");
 const l1 = call({ action: "productos_list" });
 check("productos_list público sin costos", l1.ok && l1.data.length === 5 && !("costo" in l1.data[0]));
 const hitsAntes = cacheHits;
@@ -301,6 +301,16 @@ for (let i = 0; i < 8; i++) ctx.handle({ parameter: { action: "version" } }); //
 for (let i = 0; i < 8; i++) ctx.addRow("Pedidos", { id: "idRL" + i, cliente: "Comprador RL", telefono: "11 5555-0000", monto: "1", pago: "Efectivo", items: "[]" });
 check("CRM: sin límite (8 altas del mismo cliente)", pedidos().length === nCrmRL + 8);
 limpiarLimites = true;
+
+console.log("Envío gratis desde $120.000");
+book.sheets.Productos.rows.push(rowFrom("Productos", { nombre: "Combo grande", categoria: "Combos", precio: 110000, stock: "sí", cantidad: 10 }), rowFrom("Productos", { nombre: "Chico", categoria: "Varios", precio: 1000, stock: "sí", cantidad: 50 }));
+const eg = (i, extra) => addPedido(Object.assign({ id: "ped17919009" + String(i).padStart(5, "0"), cliente: "Cliente envío " + i, telefono: "11 4000-00" + String(i).padStart(2, "0"), pago: "Transferencia", envio: "Calle 1 · Envío GBA 1 · Morón" }, extra));
+const egA = eg(1, { monto: 110000, items: items([{ n: "Combo grande", q: 1 }]) });
+check("compra desde $120.000 (precio web $122.200): envío gratis", egA.ok === true && pedidos().some((x) => x[0] === "ped1791900900001"), egA);
+const egB = eg(2, { monto: 17000, items: items([{ n: "Chico", q: 10 }]) });
+check("compra chica ($11.000 web): se cobra el envío GBA 1", egB.ok === true, egB);
+const egC = eg(3, { monto: 117000, items: items([{ n: "Combo grande", q: 1 }]) });
+check("compra grande cobrando envío → rechazo (la web y el CRM calculan igual)", egC.ok === false && /Los precios se actualizaron/.test(egC.error || ""), egC);
 
 console.log("Compras de mercadería");
 check("Compras sin token → auth (ver)", call({ action: "list", tab: "Compras" }).error === "auth");

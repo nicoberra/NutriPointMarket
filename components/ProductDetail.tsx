@@ -365,6 +365,9 @@ export function ProductDetail({ product: initial }: { product: Product }) {
             <li className="flex items-center gap-2">
               <WhatsappIcon className="h-5 w-5 text-primary" /> Coordinás por WhatsApp
             </li>
+            <li className="col-span-2 flex items-center gap-2 font-semibold text-ink">
+              <TruckIcon className="h-5 w-5 text-primary" /> Envío gratis en CABA y GBA desde $120.000
+            </li>
           </ul>
         </div>
       </div>

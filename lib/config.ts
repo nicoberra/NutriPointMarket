@@ -87,6 +87,7 @@ export function whatsappLink(message: string = WHATSAPP_MESSAGE): string {
 /** Mensajes de la barra promocional superior (rotan en mobile) */
 export const PROMO_MESSAGES = [
   "✅ Productos 100% originales",
+  "🚚 Envío gratis en CABA y GBA desde $120.000",
   "💰 10% de descuento pagando por transferencia",
   "🏦 Aceptamos transferencia bancaria y Mercado Pago",
 ];
@@ -107,6 +108,11 @@ export const TRUST_ITEMS = [
     icon: "card",
     title: "Pago seguro",
     text: "Transferencia bancaria y Mercado Pago.",
+  },
+  {
+    icon: "truck",
+    title: "Envío gratis desde $120.000",
+    text: "En CABA y GBA, en compras desde $120.000.",
   },
   {
     icon: "whatsapp",
