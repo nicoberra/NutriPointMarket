@@ -6,7 +6,6 @@ import { OrderSheet } from "./OrderSheet";
 import { addRow, updateRow, deleteRow, aprobarPedido, localAsset, lastApiError } from "@/lib/api";
 import { peekTable, fetchTable, ensureTable, subscribeTable, patchTable } from "@/lib/tableCache";
 import { useProducts } from "@/context/ProductsContext";
-import { whatsappLink } from "@/lib/config";
 import { formatPrice } from "@/lib/format";
 import { EmptyState, ErrorState } from "@/components/Estados";
 import {
@@ -61,6 +60,25 @@ function isWebRow(r: Record<string, string>): boolean {
 }
 
 type Row = Record<string, string>;
+
+/**
+ * Link de WhatsApp al celular del CLIENTE (no al de la tienda). Acepta el número como
+ * se cargue: con o sin 54/9, con 0 de área o con el 15 (ej. "11 15 2345 6789").
+ */
+function whatsappCliente(telefono: string | undefined, texto = ""): string {
+  let d = String(telefono ?? "").replace(/\D/g, "").replace(/^00/, "");
+  if (!d) return "";
+  if (d.startsWith("54")) {
+    d = d.slice(2).replace(/^0/, "");
+    if (d.startsWith("9")) d = d.slice(1);
+  } else d = d.replace(/^0/, "");
+  if (d.length === 12) {
+    // número local con el 15 después del código de área (2, 3 o 4 dígitos)
+    for (const k of [2, 3, 4]) if (d.slice(k, k + 2) === "15") { d = d.slice(0, k) + d.slice(k + 2); break; }
+  }
+  const num = d.length === 10 ? "549" + d : d;
+  return `https://wa.me/${num}${texto ? `?text=${encodeURIComponent(texto)}` : ""}`;
+}
 
 export function AdminRecords({
   config,
@@ -563,7 +581,7 @@ export function AdminRecords({
               </div>
               {r.telefono && (
                 <a
-                  href={whatsappLink(`Hola ${r.cliente || r.nombre || ""}`)}
+                  href={whatsappCliente(r.telefono, `Hola ${String(r.cliente || r.nombre || "").replace(/\s*lote\s*\d+\s*$/i, "").trim()}`)}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="WhatsApp"
@@ -969,8 +987,7 @@ function ClientSheet({
   onOpenOrder: (p: Row) => void;
   onDeleteOrder: (p: Row) => void;
 }) {
-  const tel = String(row.telefono ?? "").replace(/\D/g, "");
-  const wa = tel ? "https://wa.me/" + (tel.startsWith("54") ? tel : "549" + tel.replace(/^0/, "")) : "";
+  const wa = whatsappCliente(row.telefono);
   const esWeb = String(row.origen ?? "").trim().toLowerCase() === "web";
   const datos: [string, string | undefined][] = [
     ["Teléfono", row.telefono],

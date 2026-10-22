@@ -136,7 +136,7 @@ const items = (arr) => JSON.stringify(arr);
 
 /* --------------------------------- Pruebas -------------------------------- */
 console.log("Versión y lecturas");
-check("version v6", call({ action: "version" }).version === "v6");
+check("version v7", call({ action: "version" }).version === "v7");
 const l1 = call({ action: "productos_list" });
 check("productos_list público sin costos", l1.ok && l1.data.length === 5 && !("costo" in l1.data[0]));
 const hitsAntes = cacheHits;
@@ -301,6 +301,15 @@ for (let i = 0; i < 8; i++) ctx.handle({ parameter: { action: "version" } }); //
 for (let i = 0; i < 8; i++) ctx.addRow("Pedidos", { id: "idRL" + i, cliente: "Comprador RL", telefono: "11 5555-0000", monto: "1", pago: "Efectivo", items: "[]" });
 check("CRM: sin límite (8 altas del mismo cliente)", pedidos().length === nCrmRL + 8);
 limpiarLimites = true;
+
+console.log("Compras de mercadería");
+check("Compras sin token → auth (ver)", call({ action: "list", tab: "Compras" }).error === "auth");
+check("Compras sin token → auth (cargar)", call({ action: "add", tab: "Compras", data: JSON.stringify({ proveedor: "X" }) }).error === "auth");
+check("  ...y no se creó la pestaña", !book.sheets.Compras);
+ctx.addRow("Compras", { fecha: "2026-10-20", proveedor: "Distribuidora Sur", detalle: "10x Creatina 300 g", total: "250000", pago: "Transferencia" });
+check("CRM: primera compra crea la pestaña Compras con títulos", !!book.sheets.Compras && book.sheets.Compras.rows[0][2] === "Proveedor");
+const lc = ctx.listTable("Compras");
+check("  ...y se lista con id, proveedor y total", lc.length === 1 && /^id\d+/.test(lc[0].id) && lc[0].proveedor === "Distribuidora Sur" && String(lc[0].total) === "250000", lc);
 
 console.log("Copias automáticas");
 const mq = ctx.quitarBackupsAutomaticos();

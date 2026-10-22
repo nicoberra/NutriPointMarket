@@ -16,13 +16,14 @@ import {
   UserIcon,
   ClipboardIcon,
   ChartIcon,
+  CartIcon,
   LogoutIcon,
   CheckIcon,
 } from "@/components/Icons";
 
 const AUTH_KEY = "npm-crm-auth-v1";
 
-type Section = "dashboard" | "facturacion" | "productos" | "clientes" | "pedidos";
+type Section = "dashboard" | "facturacion" | "productos" | "clientes" | "pedidos" | "compras";
 
 const NAV: { id: Section; label: string; Icon: typeof GridIcon }[] = [
   { id: "dashboard", label: "Inicio", Icon: GridIcon },
@@ -30,6 +31,7 @@ const NAV: { id: Section; label: string; Icon: typeof GridIcon }[] = [
   { id: "productos", label: "Productos", Icon: PackageIcon },
   { id: "clientes", label: "Clientes", Icon: UserIcon },
   { id: "pedidos", label: "Pedidos", Icon: ClipboardIcon },
+  { id: "compras", label: "Compras", Icon: CartIcon },
 ];
 
 const CLIENTES_CFG: RecordsConfig = {
@@ -74,6 +76,29 @@ const PEDIDOS_CFG: RecordsConfig = {
     [r.detalle, r.monto ? `$${r.monto}` : "", r.pago].filter(Boolean).join(" · "),
   estado: true,
   aprobar: true,
+  deletable: true,
+  detail: true,
+};
+
+// Compras de mercadería a proveedores (pestaña "Compras" de la planilla).
+const COMPRAS_CFG: RecordsConfig = {
+  tab: "Compras",
+  addLabel: "Nueva compra",
+  searchable: true,
+  searchPlaceholder: "Buscar por proveedor o producto…",
+  fields: [
+    { key: "fecha", label: "Fecha de compra", type: "date" },
+    { key: "proveedor", label: "Proveedor", required: true },
+    { key: "detalle", label: "Productos (uno por línea: cantidad, producto y precio)", type: "textarea" },
+    { key: "total", label: "Total pagado", type: "number" },
+    { key: "pago", label: "Forma de pago", type: "select", options: ["Efectivo", "Transferencia", "Mercado Pago", "Otro"] },
+    { key: "notas", label: "Notas", type: "textarea" },
+  ],
+  primary: (r) => r.proveedor || "Compra",
+  secondary: (r) =>
+    [String(r.fecha || "").replace(/ 00:00$/, ""), r.total ? `$${Number(r.total).toLocaleString("es-AR")}` : "", String(r.detalle || "").split("\n")[0]]
+      .filter(Boolean)
+      .join(" · "),
   deletable: true,
   detail: true,
 };
@@ -176,6 +201,7 @@ export function AdminApp() {
     productos: "Productos",
     clientes: "Clientes",
     pedidos: "Pedidos",
+    compras: "Compras de mercadería",
   };
 
   return (
@@ -296,6 +322,7 @@ export function AdminApp() {
           {section === "pedidos" && (
             <AdminRecords config={PEDIDOS_CFG} onToast={setToast} />
           )}
+          {section === "compras" && <AdminRecords config={COMPRAS_CFG} onToast={setToast} />}
           </div>
         </main>
       </div>
@@ -304,8 +331,8 @@ export function AdminApp() {
       <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto flex max-w-lg items-stretch justify-around border-t border-line bg-white pb-[env(safe-area-inset-bottom)] lg:hidden">
         <span
           aria-hidden
-          className="pointer-events-none absolute left-0 top-0 h-0.5 w-1/5 rounded-full bg-primary transition-transform duration-200 ease-move motion-reduce:transition-none"
-          style={{ transform: `translateX(${Math.max(0, NAV.findIndex((n) => n.id === section)) * 100}%)` }}
+          className="pointer-events-none absolute left-0 top-0 h-0.5 rounded-full bg-primary transition-transform duration-200 ease-move motion-reduce:transition-none"
+          style={{ width: `${100 / NAV.length}%`, transform: `translateX(${Math.max(0, NAV.findIndex((n) => n.id === section)) * 100}%)` }}
         />
         {NAV.map(({ id, label, Icon }) => {
           const active = section === id;
