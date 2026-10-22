@@ -18,7 +18,7 @@
  * ============================================================================ */
 
 var SHEET_ID = "12paAzW6OcSgYv4u6L7QVI4tpvrEx1yqnujW0OjcieMc";
-var API_VERSION = "v6"; // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
+var API_VERSION = "v7"; // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
 
 // Repo de GitHub donde se guardan las fotos de productos (en public/productos/).
 // El token NO va acá: se guarda en Propiedades del script como GITHUB_TOKEN.
@@ -117,6 +117,19 @@ var TABLES = {
       ["descontado", "Descontado"],
       ["comprobante", "Comprobante"],
       ["cobrado", "Cobrado"],
+    ],
+    idField: "id",
+  },
+  Compras: {
+    // Compras de mercadería (lo que se le compra a los proveedores). Solo CRM.
+    columns: [
+      ["id", "id"],
+      ["fecha", "Fecha"],
+      ["proveedor", "Proveedor"],
+      ["detalle", "Detalle"],
+      ["total", "Total"],
+      ["pago", "Pago"],
+      ["notas", "Notas"],
     ],
     idField: "id",
   },
@@ -409,6 +422,11 @@ function verificarPlanilla() {
 }
 function sheetFor(tab) {
   var sh = ss().getSheetByName(tab);
+  if (!sh && TABLES[tab]) {
+    // Pestaña nueva del esquema (ej. Compras): se crea sola con sus títulos.
+    sh = ss().insertSheet(tab);
+    writeHeader(sh, tab);
+  }
   if (!sh) throw new Error("No existe la pestaña: " + tab);
   return sh;
 }
