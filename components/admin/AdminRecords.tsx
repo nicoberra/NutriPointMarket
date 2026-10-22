@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useConfirm } from "./useConfirm";
 import { OrderSheet } from "./OrderSheet";
+import { CompraDetail, CompraSheet } from "./Compras";
 import { addRow, updateRow, deleteRow, aprobarPedido, localAsset, lastApiError } from "@/lib/api";
 import { peekTable, fetchTable, ensureTable, subscribeTable, patchTable } from "@/lib/tableCache";
 import { useProducts } from "@/context/ProductsContext";
@@ -642,11 +643,16 @@ export function AdminRecords({
       {adding &&
         (config.tab === "Pedidos" ? (
           <OrderSheet saving={saving} onClose={() => setAdding(false)} onSave={handleAdd} />
+        ) : config.tab === "Compras" ? (
+          <CompraSheet saving={saving} onClose={() => setAdding(false)} onSave={handleAdd} />
         ) : (
           <AddSheet config={config} saving={saving} onClose={() => setAdding(false)} onSave={handleAdd} />
         ))}
 
-      {editRow && (
+      {editRow && config.tab === "Compras" && (
+        <CompraSheet initial={editRow} saving={saving} onClose={() => setEditRow(null)} onSave={handleEdit} />
+      )}
+      {editRow && config.tab !== "Compras" && (
         <AddSheet
           config={config}
           saving={saving}
@@ -701,7 +707,10 @@ export function AdminRecords({
           onSave={handleEditOrder}
         />
       )}
-      {detailRow && !editOrder && (
+      {detailRow && config.tab === "Compras" && (
+        <CompraDetail row={detailRow} onClose={() => setDetailRow(null)} onEdit={() => { setEditRow(detailRow); setDetailRow(null); }} />
+      )}
+      {detailRow && !editOrder && config.tab !== "Compras" && (
         <DetailSheet row={detailRow} onClose={() => setDetailRow(null)} onEdit={() => setEditOrder(detailRow)} />
       )}
     </div>
