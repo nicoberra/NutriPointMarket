@@ -65,9 +65,8 @@ type Row = Record<string, string>;
  * Link de WhatsApp al celular del CLIENTE (no al de la tienda). Acepta el número como
  * se cargue: con o sin 54/9, con 0 de área o con el 15 (ej. "11 15 2345 6789").
  */
-function whatsappCliente(telefono: string | undefined, texto = ""): string {
+function telNacional(telefono: string | undefined): string {
   let d = String(telefono ?? "").replace(/\D/g, "").replace(/^00/, "");
-  if (!d) return "";
   if (d.startsWith("54")) {
     d = d.slice(2).replace(/^0/, "");
     if (d.startsWith("9")) d = d.slice(1);
@@ -76,6 +75,12 @@ function whatsappCliente(telefono: string | undefined, texto = ""): string {
     // número local con el 15 después del código de área (2, 3 o 4 dígitos)
     for (const k of [2, 3, 4]) if (d.slice(k, k + 2) === "15") { d = d.slice(0, k) + d.slice(k + 2); break; }
   }
+  return d;
+}
+
+function whatsappCliente(telefono: string | undefined, texto = ""): string {
+  const d = telNacional(telefono);
+  if (!d) return "";
   const num = d.length === 10 ? "549" + d : d;
   return `https://wa.me/${num}${texto ? `?text=${encodeURIComponent(texto)}` : ""}`;
 }
@@ -120,7 +125,7 @@ export function AdminRecords({
     return subscribeTable("Pedidos", (d) => setPedidos([...(d as Row[])].reverse()));
   }, [isClientes]);
   // Cruce cliente ↔ pedidos: por teléfono (últimos 10 dígitos) o por nombre exacto
-  const normTel = (v?: string) => String(v ?? "").replace(/\D/g, "").replace(/^549?/, "").replace(/^0/, "").slice(-10);
+  const normTel = (v?: string) => telNacional(v).slice(-10);
   const ordersOf = (c: Row): Row[] => {
     const tel = normTel(c.telefono);
     const name = String(c.nombre ?? "").trim().toLowerCase();
@@ -169,6 +174,30 @@ export function AdminRecords({
 
   // Todas las acciones con try/catch: si la planilla tarda o falla, avisa y
   // recarga (para volver a la verdad) en vez de quedar trabado o mentir.
+  // Pedido cargado a mano desde Pedidos: si esa persona todavía no está en
+  // Clientes (mismo teléfono o mismo nombre), se la anota. Devuelve true si la agregó.
+  const anotarClienteDelPedido = async (pedido: Row): Promise<boolean> => {
+    const nombre = String(pedido.cliente ?? "").trim();
+    if (!nombre) return false;
+    const clientes = (peekTable<Row>("Clientes") ?? (await ensureTable<Row>("Clientes"))) || [];
+    const tel = normTel(pedido.telefono);
+    const existe = clientes.some(
+      (c) =>
+        (tel.length >= 8 && normTel(c.telefono) === tel) ||
+        String(c.nombre ?? "").trim().toLowerCase() === nombre.toLowerCase(),
+    );
+    if (existe) return false;
+    const nuevo: Row = {
+      id: "id" + Date.now() + String(Math.floor(Math.random() * 1000)).padStart(3, "0"),
+      nombre,
+      telefono: String(pedido.telefono ?? ""),
+      direccion: String(pedido.envio ?? ""),
+    };
+    const ok = await addRow("Clientes", nuevo);
+    if (ok) patchTable("Clientes", (rows) => (rows.some((r) => r.id === nuevo.id) ? rows : [...rows, nuevo]));
+    return ok;
+  };
+
   const handleAdd = async (obj: Row) => {
     if (saving) return;
     setSaving(true);
@@ -177,7 +206,9 @@ export function AdminRecords({
       if (!obj.id && config.tab !== "Clientes") obj = { ...obj, id: "id" + Date.now() + String(Math.floor(Math.random() * 1000)).padStart(3, "0") };
       const ok = await addRow(config.tab, obj);
       if (ok) setAdding(false);
-      onToast(ok ? "Guardado ✓" : "No se pudo guardar" + detalleError());
+      let clienteNuevo = false;
+      if (ok && config.tab === "Pedidos") clienteNuevo = await anotarClienteDelPedido(obj).catch(() => false);
+      onToast(ok ? (clienteNuevo ? "Guardado ✓ · cliente agregado a Clientes" : "Guardado ✓") : "No se pudo guardar" + detalleError());
     } catch {
       onToast("Tardó demasiado: verificá si se guardó");
       tardo.current = true;
