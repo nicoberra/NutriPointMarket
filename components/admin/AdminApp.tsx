@@ -8,6 +8,7 @@ import { useProducts } from "@/context/ProductsContext";
 import { AdminRecords, type RecordsConfig } from "./AdminRecords";
 import { AdminDashboard } from "./AdminDashboard";
 import { AdminBilling } from "./AdminBilling";
+import { resumenCompra } from "./Compras";
 import { PullToRefresh } from "./PullToRefresh";
 import { prefetchTables, clearTables } from "@/lib/tableCache";
 import {
@@ -94,11 +95,12 @@ const COMPRAS_CFG: RecordsConfig = {
     { key: "pago", label: "Forma de pago", type: "select", options: ["Efectivo", "Transferencia", "Mercado Pago", "Otro"] },
     { key: "notas", label: "Notas", type: "textarea" },
   ],
-  primary: (r) => r.proveedor || "Compra",
+  primary: (r) => {
+    const m = String(r.fecha || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return [r.proveedor || "Compra", m ? `${m[3]}/${m[2]}/${m[1]}` : ""].filter(Boolean).join(" · ");
+  },
   secondary: (r) =>
-    [String(r.fecha || "").replace(/ 00:00$/, ""), r.total ? `$${Number(r.total).toLocaleString("es-AR")}` : "", String(r.detalle || "").split("\n")[0]]
-      .filter(Boolean)
-      .join(" · "),
+    [r.total ? `$${Number(r.total).toLocaleString("es-AR")}` : "", resumenCompra(r)].filter(Boolean).join(" · "),
   deletable: true,
   detail: true,
 };
