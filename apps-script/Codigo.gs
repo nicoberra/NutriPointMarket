@@ -18,7 +18,7 @@
  * ============================================================================ */
 
 var SHEET_ID = "12paAzW6OcSgYv4u6L7QVI4tpvrEx1yqnujW0OjcieMc";
-var API_VERSION = "v8"; // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
+var API_VERSION = "v9"; // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
 
 // Repo de GitHub donde se guardan las fotos de productos (en public/productos/).
 // El token NO va acá: se guarda en Propiedades del script como GITHUB_TOKEN.
@@ -132,6 +132,8 @@ var TABLES = {
       ["total", "Total"],
       ["pago", "Pago"],
       ["notas", "Notas"],
+      ["items", "Items"], // JSON [{n, v, q}] → productos del catálogo a los que se suma stock
+      ["sumado", "Stock sumado"],
     ],
     idField: "id",
   },
@@ -430,7 +432,28 @@ function sheetFor(tab) {
     writeHeader(sh, tab);
   }
   if (!sh) throw new Error("No existe la pestaña: " + tab);
+  // Columnas nuevas del esquema en una pestaña vieja: se agregan sus títulos.
+  if (TABLES[tab]) {
+    var cols = TABLES[tab].columns, lc = sh.getLastColumn();
+    if (lc < cols.length) {
+      sh.getRange(1, lc + 1, 1, cols.length - lc).setValues([cols.slice(lc).map(function (c) { return c[1]; })]);
+    }
+  }
   return sh;
+}
+
+// Compras: suma (+1) o resta (-1) al stock los productos del catálogo de la compra.
+function moverStockCompra(itemsJson, signo) {
+  var items = [];
+  try { items = JSON.parse(itemsJson || "[]"); } catch (e) {}
+  var hubo = false;
+  for (var i = 0; i < items.length; i++) {
+    var q = Math.floor(Number(items[i].q) || 0);
+    if (!items[i].n || q <= 0) continue;
+    ajustarProducto(items[i].n, q, items[i].v, null, signo);
+    hubo = true;
+  }
+  return hubo;
 }
 function keysOf(tab) {
   return TABLES[tab].columns.map(function (c) {
@@ -496,6 +519,10 @@ function addRow(tab, obj) {
       obj.descontado = "sí";
     }
   }
+  // Compras: lo comprado se suma al stock de cada producto del catálogo.
+  if (tab === "Compras" && obj.items) {
+    if (moverStockCompra(obj.items, +1)) obj.sumado = "sí";
+  }
   var line = keys.map(function (k) {
     return sanitize(k, obj[k]);
   });
@@ -507,7 +534,21 @@ function updateRow(tab, id, obj) {
   var n = findRowById(tab, id);
   if (n < 0) throw new Error("No se encontró: " + id);
   if (tab === "Pedidos" && obj.hasOwnProperty("items")) ajustarStockPorEdicion(n, obj);
+  if (tab === "Compras" && obj.hasOwnProperty("items")) ajustarStockCompraPorEdicion(n, obj);
   return updateRowByNumber(tab, n, obj);
+}
+
+// Editar los productos de una compra que ya sumó stock: resta lo viejo y suma
+// lo nuevo. Las compras viejas (sin "Stock sumado") no tocan el stock.
+function ajustarStockCompraPorEdicion(n, obj) {
+  var keys = keysOf("Compras");
+  var row = sheetFor("Compras").getRange(n, 1, 1, keys.length).getValues()[0];
+  if (low(row[keys.indexOf("sumado")]) !== "sí") { delete obj.items; return; }
+  var viejo = String(row[keys.indexOf("items")] || "[]");
+  var nuevo = String(obj.items || "[]");
+  if (viejo === nuevo) return;
+  moverStockCompra(viejo, -1);
+  moverStockCompra(nuevo, +1);
 }
 
 // Al editar los productos de un pedido: repone lo que tenía (si ya se había
@@ -549,6 +590,12 @@ function deleteRow(tab, id) {
   // Si es un pedido con el pago aprobado (stock ya descontado), repone el
   // stock de cada producto antes de borrarlo.
   if (tab === "Pedidos") reponerStockPedido(n);
+  if (tab === "Compras") {
+    // Borrar una compra que sumó stock lo vuelve a restar.
+    var kC = keysOf("Compras");
+    var rowC = sheetFor("Compras").getRange(n, 1, 1, kC.length).getValues()[0];
+    if (low(rowC[kC.indexOf("sumado")]) === "sí") moverStockCompra(String(rowC[kC.indexOf("items")] || "[]"), -1);
+  }
   guardarEnPapelera(tab, n);
   sheetFor(tab).deleteRow(n);
   return { deleted: id };

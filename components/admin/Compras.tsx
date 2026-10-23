@@ -61,6 +61,39 @@ export function resumenCompra(r: Row): string {
   return it.length ? `${it.length} productos · ${u} unidades` : String(r.detalle || "").split("\n")[0];
 }
 
+const norm = (t: string) =>
+  t
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/(\d)([a-z])/g, "$1 $2")
+    .replace(/([a-z])(\d)/g, "$1 $2")
+    .replace(/[^a-z0-9 ]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 || /\d/.test(w));
+
+type OpcionStock = { value: string; label: string; tokens: string[]; variante: string };
+
+/**
+ * Producto del catálogo más parecido a "marca + producto" (o "" si no hay uno claro).
+ * Suma 1 por cada palabra en común, resta un poco por las que sobran, y la variante
+ * (sabor/color) tiene que aparecer en la línea de la compra.
+ */
+function sugerir(marca: string, producto: string, opciones: OpcionStock[]): string {
+  const t = new Set(norm(`${marca} ${producto}`));
+  if (t.size < 2) return "";
+  let mejor = "", max = 0, empate = false;
+  for (const o of opciones) {
+    let sc = 0;
+    for (const w of Array.from(new Set(o.tokens))) sc += t.has(w) ? 1 : -0.3;
+    if (o.variante && norm(o.variante).every((w) => t.has(w))) sc += 2;
+    else if (o.variante) sc -= 1;
+    if (sc > max + 1e-9) { max = sc; mejor = o.value; empate = false; }
+    else if (Math.abs(sc - max) < 1e-9) empate = true;
+  }
+  return max >= 2.5 && !empate ? mejor : "";
+}
+
 const fechaCorta = (f?: string) => {
   const m = String(f ?? "").match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m ? `${m[3]}/${m[2]}/${m[1]}` : String(f ?? "");
@@ -116,6 +149,9 @@ export function CompraDetail({ row, onClose, onEdit }: { row: Row; onClose: () =
           <div><p className="text-[11px] font-bold uppercase tracking-wide text-muted">Proveedor</p><p className="font-semibold text-ink">{row.proveedor || "—"}</p></div>
           {row.pago && <div><p className="text-[11px] font-bold uppercase tracking-wide text-muted">Forma de pago</p><p className="font-semibold text-ink">{row.pago}</p></div>}
           <div><p className="text-[11px] font-bold uppercase tracking-wide text-muted">Unidades</p><p className="font-semibold text-ink">{unidades}</p></div>
+          {row.sumado === "sí" && (
+            <p className="col-span-2 rounded-lg bg-green-50 px-3 py-2 text-xs font-semibold text-green-700">✓ Estas unidades se sumaron al stock de la tienda</p>
+          )}
         </div>
 
         <div className="overflow-hidden rounded-xl border border-line bg-white">
@@ -164,12 +200,31 @@ export function CompraSheet({ initial, saving, onClose, onSave }: {
   const [proveedor, setProveedor] = useState(initial?.proveedor ?? "");
   const [pago, setPago] = useState(initial?.pago ?? "");
   const [notas, setNotas] = useState(initial?.notas ?? "");
-  const [items, setItems] = useState<{ cantidad: string; marca: string; producto: string; precio: string }[]>(() => {
+  // Suma al stock solo en compras nuevas o en las que ya sumaron (las viejas no).
+  const sumaStock = !initial?.id || initial.sumado === "sí";
+  const [items, setItems] = useState<{ cantidad: string; marca: string; producto: string; precio: string; cat?: string }[]>(() => {
     const it = itemsDeCompra(initial?.detalle);
+    let mapa: { n: string; v?: string; i: number }[] = [];
+    try { mapa = JSON.parse(initial?.items || "[]"); } catch { /* sin datos */ }
     return it.length
-      ? it.map((i) => ({ cantidad: String(i.cantidad || ""), marca: i.marca, producto: i.producto, precio: i.precio ? precioTexto(i.precio) : "" }))
+      ? it.map((i, k) => {
+          const m = mapa.find((x) => x.i === k);
+          return { cantidad: String(i.cantidad || ""), marca: i.marca, producto: i.producto, precio: i.precio ? precioTexto(i.precio) : "", cat: initial?.items ? (m ? `${m.n}||${m.v || ""}` : "") : undefined };
+        })
       : [{ cantidad: "1", marca: "", producto: "", precio: "" }];
   });
+  const opciones: OpcionStock[] = useMemo(
+    () =>
+      products
+        .filter((p) => !p.combo?.length)
+        .flatMap((p) => {
+          const marca = brandName(p.brand);
+          const base = (v: string) => ({ value: `${p.name}||${v}`, label: [marca, p.name, v].filter(Boolean).join(" · "), tokens: norm(`${marca} ${p.name} ${v}`), variante: v });
+          return p.flavors?.length ? p.flavors.map(base) : [base("")];
+        }),
+    [products],
+  );
+  const catDe = (it: { marca: string; producto: string; cat?: string }) => (it.cat !== undefined ? it.cat : sugerir(it.marca, it.producto, opciones));
   const marcas = useMemo(() => Array.from(new Set([...MARCAS_CONOCIDAS, ...products.map((p) => brandName(p.brand)).filter(Boolean)])), [products]);
   const total = items.reduce((a, i) => a + (Number(i.cantidad) || 0) * num(i.precio), 0);
   const unidades = items.reduce((a, i) => a + (Number(i.cantidad) || 0), 0);
@@ -178,9 +233,14 @@ export function CompraSheet({ initial, saving, onClose, onSave }: {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (saving || !proveedor.trim()) return;
-    const lista: ItemCompra[] = items
-      .filter((i) => i.producto.trim())
-      .map((i) => ({ cantidad: Number(i.cantidad) || 0, marca: i.marca, producto: i.producto, precio: num(i.precio) }));
+    const conProducto = items.filter((i) => i.producto.trim());
+    const lista: ItemCompra[] = conProducto.map((i) => ({ cantidad: Number(i.cantidad) || 0, marca: i.marca, producto: i.producto, precio: num(i.precio) }));
+    const stock = conProducto
+      .map((it, k) => {
+        const [n, v] = catDe(it).split("||");
+        return n && Number(it.cantidad) > 0 ? { n, ...(v ? { v } : {}), q: Number(it.cantidad), i: k } : null;
+      })
+      .filter(Boolean);
     onSave({
       ...(initial?.id ? { id: initial.id } : {}),
       fecha,
@@ -189,6 +249,7 @@ export function CompraSheet({ initial, saving, onClose, onSave }: {
       detalle: detalleDeCompra(lista),
       total: String(Math.round(total * 100) / 100),
       notas,
+      ...(sumaStock ? { items: JSON.stringify(stock) } : {}),
     });
   };
 
@@ -220,6 +281,15 @@ export function CompraSheet({ initial, saving, onClose, onSave }: {
                   <input inputMode="decimal" value={it.precio} onChange={(e) => set(k, "precio", e.target.value)} placeholder="Precio c/u" aria-label="Precio por unidad" className="input h-10 text-sm" />
                   <span className="w-24 text-right text-sm font-semibold text-ink">{pesos((Number(it.cantidad) || 0) * num(it.precio))}</span>
                 </div>
+                {sumaStock && (
+                  <label className="mt-2 block">
+                    <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-muted">Sumar al stock de</span>
+                    <select value={catDe(it)} onChange={(e) => set(k, "cat", e.target.value)} className={`input h-10 text-sm ${catDe(it) ? "border-green-300 bg-green-50" : ""}`}>
+                      <option value="">No sumar al stock</option>
+                      {opciones.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  </label>
+                )}
               </li>
             ))}
           </ul>
@@ -228,6 +298,9 @@ export function CompraSheet({ initial, saving, onClose, onSave }: {
           </button>
         </div>
 
+        {!sumaStock && (
+          <p className="rounded-lg bg-page-soft px-3 py-2 text-xs text-muted">Esta compra se cargó antes de que las compras sumaran stock: editarla no cambia el stock.</p>
+        )}
         <label className="block"><span className="mb-1 block text-xs font-semibold text-ink">Forma de pago</span>
           <select value={pago} onChange={(e) => setPago(e.target.value)} className="input h-11 text-base">
             <option value="">Elegí una opción…</option>
