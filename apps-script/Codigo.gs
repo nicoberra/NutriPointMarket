@@ -18,7 +18,7 @@
  * ============================================================================ */
 
 var SHEET_ID = "12paAzW6OcSgYv4u6L7QVI4tpvrEx1yqnujW0OjcieMc";
-var API_VERSION = "v9"; // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
+var API_VERSION = "v10"; // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
 
 // Repo de GitHub donde se guardan las fotos de productos (en public/productos/).
 // El token NO va acá: se guarda en Propiedades del script como GITHUB_TOKEN.
@@ -442,6 +442,37 @@ function sheetFor(tab) {
   return sh;
 }
 
+// Categoría probable de un producto nuevo según su nombre (de las que existen).
+function categoriaSugerida(texto) {
+  var t = low(texto);
+  var claves = [["prote", "whey"], ["creatin"], ["pancake"], ["shaker", "vaso"], ["barra", "barrita"], ["tape", "kinesio"], ["combo"]];
+  var cats = listTable("Categorias").map(function (c) { return String(c.nombre || ""); });
+  for (var i = 0; i < claves.length; i++) {
+    var hit = claves[i].some(function (k) { return t.indexOf(k) !== -1; });
+    if (!hit) continue;
+    for (var j = 0; j < cats.length; j++) {
+      var lc = low(cats[j]);
+      if (claves[i].some(function (k) { return lc.indexOf(k.slice(0, 5)) !== -1; })) return cats[j];
+    }
+  }
+  return "";
+}
+
+function crearProductoDeCompra(it) {
+  addRow("Productos", {
+    nombre: String(it.n).trim().slice(0, 120),
+    marca: String(it.marca || "").trim().slice(0, 60),
+    categoria: categoriaSugerida(it.n),
+    precio: 0,
+    stock: "no",
+    destacado: "no",
+    cantidad: 0,
+    costo: Number(it.costo) > 0 ? Math.round(Number(it.costo) * 100) / 100 : "",
+    costoMoneda: Number(it.costo) > 0 ? "ARS" : "",
+    descripcion: "",
+  });
+}
+
 // Compras: suma (+1) o resta (-1) al stock los productos del catálogo de la compra.
 function moverStockCompra(itemsJson, signo) {
   var items = [];
@@ -450,6 +481,9 @@ function moverStockCompra(itemsJson, signo) {
   for (var i = 0; i < items.length; i++) {
     var q = Math.floor(Number(items[i].q) || 0);
     if (!items[i].n || q <= 0) continue;
+    // Producto que no está en la tienda: se crea (sin foto ni precio, así no se
+    // ve en la web hasta que lo completes en el CRM).
+    if (items[i].nuevo && signo > 0 && findRowById("Productos", items[i].n) < 0) crearProductoDeCompra(items[i]);
     ajustarProducto(items[i].n, q, items[i].v, null, signo);
     hubo = true;
   }

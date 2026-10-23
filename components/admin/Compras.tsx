@@ -74,6 +74,9 @@ const norm = (t: string) =>
 
 type OpcionStock = { value: string; label: string; tokens: string[]; variante: string };
 
+/** Valor del selector para crear el producto en la tienda. */
+const NUEVO = "__nuevo__";
+
 /**
  * Producto del catálogo más parecido a "marca + producto" (o "" si no hay uno claro).
  * Suma 1 por cada palabra en común, resta un poco por las que sobran, y la variante
@@ -224,7 +227,9 @@ export function CompraSheet({ initial, saving, onClose, onSave }: {
         }),
     [products],
   );
-  const catDe = (it: { marca: string; producto: string; cat?: string }) => (it.cat !== undefined ? it.cat : sugerir(it.marca, it.producto, opciones));
+  // Si no coincide con ningún producto de la tienda, por defecto se crea uno nuevo.
+  const catDe = (it: { marca: string; producto: string; cat?: string }) =>
+    it.cat !== undefined ? it.cat : sugerir(it.marca, it.producto, opciones) || (it.producto.trim() ? NUEVO : "");
   const marcas = useMemo(() => Array.from(new Set([...MARCAS_CONOCIDAS, ...products.map((p) => brandName(p.brand)).filter(Boolean)])), [products]);
   const total = items.reduce((a, i) => a + (Number(i.cantidad) || 0) * num(i.precio), 0);
   const unidades = items.reduce((a, i) => a + (Number(i.cantidad) || 0), 0);
@@ -237,8 +242,11 @@ export function CompraSheet({ initial, saving, onClose, onSave }: {
     const lista: ItemCompra[] = conProducto.map((i) => ({ cantidad: Number(i.cantidad) || 0, marca: i.marca, producto: i.producto, precio: num(i.precio) }));
     const stock = conProducto
       .map((it, k) => {
+        const q = Number(it.cantidad);
+        if (!(q > 0)) return null;
+        if (catDe(it) === NUEVO) return { nuevo: true, n: it.producto.trim(), marca: it.marca.trim(), q, costo: num(it.precio), i: k };
         const [n, v] = catDe(it).split("||");
-        return n && Number(it.cantidad) > 0 ? { n, ...(v ? { v } : {}), q: Number(it.cantidad), i: k } : null;
+        return n ? { n, ...(v ? { v } : {}), q, i: k } : null;
       })
       .filter(Boolean);
     onSave({
@@ -284,10 +292,12 @@ export function CompraSheet({ initial, saving, onClose, onSave }: {
                 {sumaStock && (
                   <label className="mt-2 block">
                     <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-muted">Sumar al stock de</span>
-                    <select value={catDe(it)} onChange={(e) => set(k, "cat", e.target.value)} className={`input h-10 text-sm ${catDe(it) ? "border-green-300 bg-green-50" : ""}`}>
+                    <select value={catDe(it)} onChange={(e) => set(k, "cat", e.target.value)} className={`input h-10 text-sm ${catDe(it) === NUEVO ? "border-amber-300 bg-amber-50" : catDe(it) ? "border-green-300 bg-green-50" : ""}`}>
                       <option value="">No sumar al stock</option>
+                      {it.producto.trim() && <option value={NUEVO}>➕ Producto nuevo: {it.producto.trim()}</option>}
                       {opciones.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
+                    {catDe(it) === NUEVO && <span className="mt-1 block text-[11px] text-muted">Se crea en Productos (sin foto ni precio, no se ve en la tienda hasta que lo completes).</span>}
                   </label>
                 )}
               </li>
