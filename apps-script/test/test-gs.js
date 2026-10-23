@@ -12,6 +12,7 @@ function makeSheet(name, rows) {
     getLastRow: () => sh.rows.length,
     getMaxRows: () => Math.max(1000, sh.rows.length),
     getMaxColumns: () => 26,
+    getLastColumn: () => Math.max(0, ...sh.rows.map((r) => r.length)),
     appendRow: (r) => { sh.rows.push(r.slice()); },
     deleteRow: (n) => { sh.rows.splice(n - 1, 1); },
     setFrozenRows: () => {}, autoResizeColumns: () => {},
@@ -136,7 +137,7 @@ const items = (arr) => JSON.stringify(arr);
 
 /* --------------------------------- Pruebas -------------------------------- */
 console.log("Versión y lecturas");
-check("version v8", call({ action: "version" }).version === "v8");
+check("version v9", call({ action: "version" }).version === "v9");
 const l1 = call({ action: "productos_list" });
 check("productos_list público sin costos", l1.ok && l1.data.length === 5 && !("costo" in l1.data[0]));
 const hitsAntes = cacheHits;
@@ -320,6 +321,24 @@ ctx.addRow("Compras", { fecha: "2026-10-20", proveedor: "Distribuidora Sur", det
 check("CRM: primera compra crea la pestaña Compras con títulos", !!book.sheets.Compras && book.sheets.Compras.rows[0][2] === "Proveedor");
 const lc = ctx.listTable("Compras");
 check("  ...y se lista con id, proveedor y total", lc.length === 1 && /^id\d+/.test(lc[0].id) && lc[0].proveedor === "Distribuidora Sur" && String(lc[0].total) === "250000", lc);
+
+console.log("Compras que suman stock");
+const kPc = ctx.keysOf("Productos");
+const prodRow = (n) => book.sheets.Productos.rows.find((r) => String(r[0]).toLowerCase() === n.toLowerCase());
+const cant = (n) => Number(prodRow(n)[kPc.indexOf("cantidad")]) || 0;
+const varQ = (n, v) => { const m = String(prodRow(n)[kPc.indexOf("variantes")]).match(new RegExp(v + ":(\\d+)")); return m ? Number(m[1]) : null; };
+const W = "WHEY PROTEIN TRUE MADE 1kg", CR = "CREATINA MONOHIDRATO  300 gr";
+const w0 = cant(W), wv0 = varQ(W, "Vainilla"), c0 = cant(CR);
+ctx.addRow("Compras", { id: "idCS1", proveedor: "El Nogal", detalle: "4 x ENA · Whey · $1 c/u", total: "4", items: JSON.stringify([{ n: W, v: "Vainilla", q: 4 }, { n: CR, q: 3 }]) });
+const fC = () => book.sheets.Compras.rows.find((r) => r[0] === "idCS1");
+check("compra nueva: suma al total, a la variante y marca 'Stock sumado'", cant(W) === w0 + 4 && varQ(W, "Vainilla") === wv0 + 4 && cant(CR) === c0 + 3 && fC()[ctx.keysOf("Compras").indexOf("sumado")] === "sí", [cant(W), w0, varQ(W, "Vainilla"), wv0, cant(CR), c0]);
+ctx.updateRow("Compras", "idCS1", { items: JSON.stringify([{ n: CR, q: 1 }]) });
+check("editar la compra: resta lo viejo y suma lo nuevo", cant(W) === w0 && varQ(W, "Vainilla") === wv0 && cant(CR) === c0 + 1, [cant(W), cant(CR)]);
+ctx.deleteRow("Compras", "idCS1");
+check("borrar la compra: devuelve el stock", cant(W) === w0 && cant(CR) === c0, [cant(W), cant(CR)]);
+const cAntes = cant(CR);
+ctx.updateRow("Compras", lc[0].id, { items: JSON.stringify([{ n: CR, q: 5 }]) });
+check("compra vieja (sin 'Stock sumado'): editarla no toca el stock", cant(CR) === cAntes);
 
 console.log("Copias automáticas");
 const mq = ctx.quitarBackupsAutomaticos();

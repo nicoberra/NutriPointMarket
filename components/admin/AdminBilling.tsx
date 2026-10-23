@@ -38,6 +38,8 @@ const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "o
 
 export function AdminBilling() {
   const [sales, setSales] = useState<Sale[]>([]);
+  // Compras de mercadería (pestaña "Compras"): lo gastado, para ver el resultado real.
+  const [compras, setCompras] = useState<{ amount: number; date: Date }[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorCarga, setErrorCarga] = useState(false);
   const [intento, setIntento] = useState(0);
@@ -67,6 +69,35 @@ export function AdminBilling() {
       .finally(() => setLoading(false));
     return unsub;
   }, [intento]);
+
+  useEffect(() => {
+    const calc = (rows: Record<string, unknown>[]) =>
+      setCompras(
+        rows
+          .map((r) => ({ amount: parseAmount(r.total), date: parseDate(r.fecha) }))
+          .filter((c): c is { amount: number; date: Date } => c.amount > 0 && !!c.date),
+      );
+    const cached = peekTable<Record<string, unknown>>("Compras");
+    if (cached) calc(cached);
+    const unsub = subscribeTable("Compras", calc);
+    ensureTable<Record<string, unknown>>("Compras").catch(() => {});
+    return unsub;
+  }, [intento]);
+
+  const gastos = useMemo(() => {
+    const now = new Date();
+    const monthKey = now.getFullYear() * 12 + now.getMonth();
+    let mes = 0, anio = 0;
+    const porMes = new Map<string, number>();
+    for (const c of compras) {
+      const mk = c.date.getFullYear() * 12 + c.date.getMonth();
+      if (mk === monthKey) mes += c.amount;
+      if (c.date.getFullYear() === now.getFullYear()) anio += c.amount;
+      const k = `${c.date.getFullYear()}-${c.date.getMonth()}`;
+      porMes.set(k, (porMes.get(k) ?? 0) + c.amount);
+    }
+    return { mes, anio, porMes };
+  }, [compras]);
 
   const stats = useMemo(() => {
     const now = new Date();
@@ -168,6 +199,19 @@ export function AdminBilling() {
         </div>
       </section>
 
+      {/* Compras de mercadería y resultado (lo que entró menos lo que se gastó en mercadería) */}
+      {compras.length > 0 && (
+        <section>
+          <h3 className="mb-2 text-sm font-bold text-ink">
+            🛒 Compras y resultado <span className="font-normal text-muted">(facturado − compras de mercadería)</span>
+          </h3>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <ResultCard label="Este mes" rev={stats.month.rev} gasto={gastos.mes} />
+            <ResultCard label="Este año" rev={stats.year.rev} gasto={gastos.anio} />
+          </div>
+        </section>
+      )}
+
       {/* Beneficio */}
       <section>
         <h3 className="mb-2 text-sm font-bold text-ink">
@@ -217,6 +261,7 @@ export function AdminBilling() {
           sub: `${m.cnt} ${m.cnt === 1 ? "venta" : "ventas"}`,
           rev: m.rev,
           prof: m.prof,
+          compras: gastos.porMes.get(`${m.y}-${m.m}`),
         }))}
       />
 
@@ -301,6 +346,23 @@ function BigCard({ label, rev, cnt }: { label: string; rev: number; cnt: number 
   );
 }
 
+function ResultCard({ label, rev, gasto }: { label: string; rev: number; gasto: number }) {
+  const res = rev - gasto;
+  return (
+    <div className="rounded-2xl border border-line bg-white p-5">
+      <p className="text-sm font-semibold text-ink">{label}</p>
+      <dl className="mt-2 space-y-1 text-sm">
+        <div className="flex justify-between"><dt className="text-muted">Facturado</dt><dd className="font-semibold text-primary">{formatPrice(rev)}</dd></div>
+        <div className="flex justify-between"><dt className="text-muted">Compras de mercadería</dt><dd className="font-semibold text-sale">− {formatPrice(gasto)}</dd></div>
+        <div className="flex justify-between border-t border-line pt-2">
+          <dt className="font-bold text-ink">Resultado</dt>
+          <dd className={`font-display text-xl font-black ${res >= 0 ? "text-green-600" : "text-sale"}`}>{res < 0 ? "− " : ""}{formatPrice(Math.abs(res))}</dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
+
 function ProfitCard({ label, value, sub }: { label: string; value: number; sub: string }) {
   return (
     <div className="flex items-start justify-between rounded-2xl border border-green-200 bg-green-50 p-5">
@@ -330,7 +392,7 @@ function Breakdown({
   rows,
 }: {
   title: string;
-  rows: { label: string; sub: string; rev: number; prof: number }[];
+  rows: { label: string; sub: string; rev: number; prof: number; compras?: number }[];
 }) {
   if (rows.length === 0) return null;
   return (
@@ -353,6 +415,9 @@ function Breakdown({
                 <p className="text-sm font-semibold text-green-600">
                   ↗ {formatPrice(r.prof)}
                 </p>
+              )}
+              {!!r.compras && (
+                <p className="text-xs font-semibold text-sale">🛒 − {formatPrice(r.compras)} en compras</p>
               )}
             </div>
           </li>
