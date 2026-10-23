@@ -137,7 +137,7 @@ const items = (arr) => JSON.stringify(arr);
 
 /* --------------------------------- Pruebas -------------------------------- */
 console.log("Versión y lecturas");
-check("version v9", call({ action: "version" }).version === "v9");
+check("version v10", call({ action: "version" }).version === "v10");
 const l1 = call({ action: "productos_list" });
 check("productos_list público sin costos", l1.ok && l1.data.length === 5 && !("costo" in l1.data[0]));
 const hitsAntes = cacheHits;
@@ -339,6 +339,17 @@ check("borrar la compra: devuelve el stock", cant(W) === w0 && cant(CR) === c0, 
 const cAntes = cant(CR);
 ctx.updateRow("Compras", lc[0].id, { items: JSON.stringify([{ n: CR, q: 5 }]) });
 check("compra vieja (sin 'Stock sumado'): editarla no toca el stock", cant(CR) === cAntes);
+
+console.log("Compras con productos nuevos");
+const nProd0 = book.sheets.Productos.rows.length;
+ctx.addRow("Compras", { id: "idCN1", proveedor: "El Nogal", detalle: "4 x Gold · Proteína Nueva Chocolate · $50.000 c/u", total: "200000", items: JSON.stringify([{ nuevo: true, n: "Proteína Nueva Chocolate", marca: "Gold Nutrition", q: 4, costo: 50000 }]) });
+const pn = prodRow("Proteína Nueva Chocolate");
+check("producto nuevo: se crea con marca, costo y las unidades compradas", !!pn && book.sheets.Productos.rows.length === nProd0 + 1 && pn[kPc.indexOf("marca")] === "Gold Nutrition" && Number(pn[kPc.indexOf("costo")]) === 50000 && cant("Proteína Nueva Chocolate") === 4, pn);
+check("  ...sin precio (no aparece en la web hasta completarlo)", Number(pn[kPc.indexOf("precio")]) === 0);
+ctx.addRow("Compras", { id: "idCN2", proveedor: "El Nogal", detalle: "2 x Gold · Proteína Nueva Chocolate · $50.000 c/u", total: "100000", items: JSON.stringify([{ nuevo: true, n: "Proteína Nueva Chocolate", marca: "Gold Nutrition", q: 2, costo: 50000 }]) });
+check("segunda compra del mismo producto: no lo duplica, suma stock", book.sheets.Productos.rows.length === nProd0 + 1 && cant("Proteína Nueva Chocolate") === 6);
+ctx.deleteRow("Compras", "idCN2");
+check("borrar esa compra: resta su stock (el producto queda)", cant("Proteína Nueva Chocolate") === 4 && !!prodRow("Proteína Nueva Chocolate"));
 
 console.log("Copias automáticas");
 const mq = ctx.quitarBackupsAutomaticos();
