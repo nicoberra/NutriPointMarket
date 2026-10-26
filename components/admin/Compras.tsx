@@ -297,13 +297,13 @@ export function CompraSheet({ initial, saving, onClose, onSave }: {
     const fin = (estado: Lectura["estado"], detalle: string) => setLecturas((l) => l.map((x) => (x.id === id ? { ...x, estado, detalle } : x)));
     try {
       const catalogo = opciones.map((o) => `"${o.value}" · ${o.label}`);
-      const r = await leerCompra(entrada, catalogo);
+      const r = await leerCompra(entrada, catalogo, marcas);
       if (r.archivo) setArchivos((a) => (a.some((x) => x.id === r.archivo!.id) ? a : [...a, r.archivo!]));
       if (r.ok === false) throw new Error(r.error || "No se pudo leer");
       if (r.analisis) {
         aplicar(r.analisis, nombre);
         const n = r.analisis.items.length;
-        fin("listo", n ? `${n} ${n === 1 ? "producto" : "productos"}` : "No encontré productos");
+        fin("listo", n ? `${n} ${n === 1 ? "producto" : "productos"} · ${r.gratis ? "leído gratis" : "leído con IA"}` : "No encontré productos");
       } else {
         fin("error", r.errorLectura ? `Quedó guardado, pero no se pudo leer: ${r.errorLectura}` : "No se pudo leer");
       }

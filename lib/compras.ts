@@ -1,5 +1,6 @@
 import { api, getCrmToken, resizeImageToBase64 } from "@/lib/api";
 import { SHEETS_API_URL } from "@/lib/config";
+import { leerArchivoGratis, leerTextoEscrito } from "@/lib/leerGratis";
 
 /**
  * Lectura de compras con IA: el CRM manda una foto, un archivo o un texto al
@@ -132,25 +133,20 @@ async function preparar(file: File): Promise<Envio> {
 
 const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/**
- * Manda una foto/archivo (se guarda en Drive) o un texto escrito, y devuelve lo
- * que leyó la IA. `catalogo`: renglones con los productos de la tienda.
- */
-export async function leerCompra(entrada: { file?: File; texto?: string }, catalogo: string[]): Promise<ResultadoCompra> {
-  const envio: Envio = entrada.file ? await preparar(entrada.file) : { nombre: "", tipo: "text/plain", texto: entrada.texto ?? "" };
-  if (!envio.data && !envio.texto?.trim()) throw new Error("No hay nada para leer.");
+/** Manda al backend (POST no-cors) y espera el resultado con el id de trabajo. */
+async function enviar(envio: Envio, analizar: boolean, catalogo: string[]): Promise<ResultadoCompra> {
   const job = `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
   const subida = fetch(SHEETS_API_URL, {
     method: "POST",
     mode: "no-cors",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action: "compra_archivo", job, analizar: true, catalogo, token: getCrmToken(), ...envio }),
+    body: JSON.stringify({ action: "compra_archivo", job, analizar, catalogo: analizar ? catalogo : [], token: getCrmToken(), ...envio }),
   }).catch(() => undefined);
   // La lectura puede tardar (fotos largas): se consulta hasta 3 minutos.
   const limite = Date.now() + 180000;
   let terminoSubida = false;
   subida.then(() => (terminoSubida = true));
-  await Promise.race([subida, espera(4000)]);
+  await Promise.race([subida, espera(analizar ? 4000 : 1500)]);
   while (Date.now() < limite) {
     const r = (await api("compra_archivo_estado", { job }, 20000).catch(() => null)) as (ResultadoCompra & { pendiente?: boolean }) | null;
     if (r && r.ok === false && r.error === "auth") throw new Error("Se cerró la sesión del CRM: volvé a entrar.");
@@ -158,4 +154,30 @@ export async function leerCompra(entrada: { file?: File; texto?: string }, catal
     await espera(terminoSubida ? 1500 : 2500);
   }
   throw new Error("Tardó demasiado en leerse. Probá de nuevo o subilo en partes.");
+}
+
+/**
+ * Lee una foto/archivo (se guarda en Drive) o un texto escrito. Primero prueba
+ * gratis (PDF con texto, Excel, CSV o texto simple); solo si no encuentra
+ * productos usa la IA. `catalogo`: renglones con los productos de la tienda.
+ */
+export async function leerCompra(
+  entrada: { file?: File; texto?: string },
+  catalogo: string[],
+  marcas: string[] = [],
+): Promise<ResultadoCompra & { gratis?: boolean }> {
+  const envio: Envio = entrada.file ? await preparar(entrada.file) : { nombre: "", tipo: "text/plain", texto: entrada.texto ?? "" };
+  if (!envio.data && !envio.texto?.trim()) throw new Error("No hay nada para leer.");
+  let gratis: AnalisisCompra | null = null;
+  try {
+    gratis = entrada.file ? await leerArchivoGratis(entrada.file, envio.texto, marcas) : leerTextoEscrito(envio.texto ?? "", marcas);
+  } catch {
+    gratis = null; // si falla el lector gratis, se usa la IA
+  }
+  if (gratis) {
+    // Igual se guarda el archivo en Drive, pero sin pasar por la IA.
+    const r = envio.data ? await enviar(envio, false, catalogo) : { ok: true };
+    return { ...r, ok: true, analisis: gratis, gratis: true };
+  }
+  return enviar(envio, true, catalogo);
 }
