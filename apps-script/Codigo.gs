@@ -18,7 +18,7 @@
  * ============================================================================ */
 
 var SHEET_ID = "12paAzW6OcSgYv4u6L7QVI4tpvrEx1yqnujW0OjcieMc";
-var API_VERSION = "v11"; // v11: las compras leen fotos, archivos y texto con Claude // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
+var API_VERSION = "v12"; // v12: lectura de compras con Claude Haiku 5.5 (el más barato) // v11: las compras leen fotos, archivos y texto con Claude // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
 
 // Repo de GitHub donde se guardan las fotos de productos (en public/productos/).
 // El token NO va acá: se guarda en Propiedades del script como GITHUB_TOKEN.
@@ -1087,7 +1087,7 @@ function saveProducto(obj) {
 // Las fotos, PDFs y planillas de las compras se guardan en Drive (privado) y se
 // leen con Claude, que devuelve los productos con cantidades y precios. La clave
 // va en Propiedades del script (ANTHROPIC_API_KEY), nunca en la web.
-var CLAUDE_MODEL = "claude-opus-5-5";
+var CLAUDE_MODEL = "claude-haiku-5-5"; // el más barato: alcanza para leer facturas y listas
 var CARPETA_COMPRAS = "Compras Suple Market";
 var COMPRA_ARCHIVO_MAX_B64 = 20000000; // ~15 MB de archivo
 var COMPRA_TEXTO_MAX = 200000;
@@ -1213,7 +1213,6 @@ function leerCompraConClaude(tipo, b64, texto, catalogo, nombre) {
   var body = {
     model: CLAUDE_MODEL,
     max_tokens: 16000,
-    fallbacks: "default",
     output_config: { effort: "low", format: { type: "json_schema", schema: SCHEMA_COMPRA } },
     system: PROMPT_COMPRA,
     messages: [{
@@ -1224,7 +1223,7 @@ function leerCompraConClaude(tipo, b64, texto, catalogo, nombre) {
   var r = UrlFetchApp.fetch("https://api.anthropic.com/v1/messages", {
     method: "post",
     contentType: "application/json",
-    headers: { "x-api-key": key, "anthropic-version": "2026-10-21", "anthropic-beta": "server-side-fallback-2026-07-01" },
+    headers: { "x-api-key": key, "anthropic-version": "2026-10-21" },
     payload: JSON.stringify(body),
     muteHttpExceptions: true,
   });

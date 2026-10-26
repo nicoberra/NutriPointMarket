@@ -137,7 +137,7 @@ const items = (arr) => JSON.stringify(arr);
 
 /* --------------------------------- Pruebas -------------------------------- */
 console.log("Versión y lecturas");
-check("version v11", call({ action: "version" }).version === "v11");
+check("version v12", call({ action: "version" }).version === "v12");
 const l1 = call({ action: "productos_list" });
 check("productos_list público sin costos", l1.ok && l1.data.length === 5 && !("costo" in l1.data[0]));
 const hitsAntes = cacheHits;
@@ -387,7 +387,7 @@ console.log("Compras: leer fotos, archivos y texto con Claude");
   check("foto leída: proveedor, productos, cantidades y precios", r.ok && a.proveedor === "El Nogal" && a.items.length === 2 && a.items[0].cantidad === 3 && a.items[0].precioUnitario === 15121.8 && a.items[0].catalogo === "CREATINA MONOHIDRATO  300 gr||", a);
   check("  ...descarta renglones vacíos y números inválidos; fecha inválida queda vacía", a.items[1].cantidad === 0 && a.items[1].precioUnitario === 0 && a.fecha === "");
   const req = claudeReq.body, h = claudeReq.opt.headers;
-  check("pedido a Claude: modelo, versión de API, clave por header y salida con esquema", req.model === "claude-opus-5-5" && h["anthropic-version"] === "2026-10-21" && h["x-api-key"] === "sk-ant-prueba" && req.output_config.format.type === "json_schema" && req.fallbacks === "default");
+  check("pedido a Claude: modelo, versión de API, clave por header y salida con esquema", req.model === "claude-haiku-5-5" && h["anthropic-version"] === "2026-10-21" && h["x-api-key"] === "sk-ant-prueba" && req.output_config.format.type === "json_schema" && !("fallbacks" in req) && !h["anthropic-beta"]);
   check("  ...la foto va como imagen y el catálogo en el mensaje", req.messages[0].content[0].type === "image" && req.messages[0].content[0].source.media_type === "image/jpeg" && /CREATINA MONOHIDRATO/.test(req.messages[0].content[1].text));
   check("  ...sin temperature/top_p (la versión 2026-10-21 los rechaza)", !("temperature" in req) && !("top_p" in req) && !("top_k" in req));
 
