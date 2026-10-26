@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import { useProducts } from "@/context/ProductsContext";
 import { brandName } from "@/data/brands";
-import { CloseIcon, PlusIcon, TrashIcon } from "@/components/Icons";
+import { CheckIcon, CloseIcon, MinusIcon, PlusIcon, TrashIcon } from "@/components/Icons";
+import { ACEPTA_ARCHIVOS, leerCompra, type AnalisisCompra, type ArchivoCompra } from "@/lib/compras";
 
 /**
  * Compras de mercadería a proveedores. Cada producto se guarda como un renglón
@@ -58,7 +59,8 @@ export function detalleDeCompra(items: ItemCompra[]): string {
 export function resumenCompra(r: Row): string {
   const it = itemsDeCompra(r.detalle);
   const u = it.reduce((a, i) => a + i.cantidad, 0);
-  return it.length ? `${it.length} productos · ${u} unidades` : String(r.detalle || "").split("\n")[0];
+  const adj = archivosDeCompra(r).length;
+  return (it.length ? `${it.length} productos · ${u} unidades` : String(r.detalle || "").split("\n")[0]) + (adj ? ` · 📎 ${adj}` : "");
 }
 
 const norm = (t: string) =>
@@ -180,6 +182,8 @@ export function CompraDetail({ row, onClose, onEdit }: { row: Row; onClose: () =
           </div>
         </div>
 
+        {archivosDeCompra(row).length > 0 && <Adjuntos archivos={archivosDeCompra(row)} />}
+
         {row.notas && (
           <div className="rounded-xl border border-line bg-white p-3">
             <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-muted">Notas</p>
@@ -193,6 +197,22 @@ export function CompraDetail({ row, onClose, onEdit }: { row: Row; onClose: () =
 
 /* ------------------------------ Formulario -------------------------------- */
 
+type ItemForm = { cantidad: string; marca: string; producto: string; precio: string; cat?: string; ia?: boolean };
+type Entrada = { file?: File; texto?: string };
+type Lectura = { id: number; nombre: string; estado: "leyendo" | "listo" | "error"; detalle?: string; preview?: string; entrada: Entrada };
+
+const PAGOS = ["Efectivo", "Transferencia", "Mercado Pago", "Otro"];
+const vacio = (): ItemForm => ({ cantidad: "1", marca: "", producto: "", precio: "" });
+
+export function archivosDeCompra(r?: Row): ArchivoCompra[] {
+  try {
+    const a = JSON.parse(r?.archivos || "[]");
+    return Array.isArray(a) ? a.filter((x) => x && x.url) : [];
+  } catch {
+    return [];
+  }
+}
+
 export function CompraSheet({ initial, saving, onClose, onSave }: {
   initial?: Row; saving: boolean; onClose: () => void; onSave: (r: Row) => void;
 }) {
@@ -200,12 +220,18 @@ export function CompraSheet({ initial, saving, onClose, onSave }: {
   const hoy = new Date();
   const p2 = (n: number) => String(n).padStart(2, "0");
   const [fecha, setFecha] = useState(String(initial?.fecha ?? "").slice(0, 10) || `${hoy.getFullYear()}-${p2(hoy.getMonth() + 1)}-${p2(hoy.getDate())}`);
+  const [fechaTocada, setFechaTocada] = useState(!!initial?.fecha);
   const [proveedor, setProveedor] = useState(initial?.proveedor ?? "");
   const [pago, setPago] = useState(initial?.pago ?? "");
   const [notas, setNotas] = useState(initial?.notas ?? "");
+  const [archivos, setArchivos] = useState<ArchivoCompra[]>(() => archivosDeCompra(initial));
+  const [lecturas, setLecturas] = useState<Lectura[]>([]);
+  const [escribir, setEscribir] = useState(false);
+  const [texto, setTexto] = useState("");
+  const [aviso, setAviso] = useState<{ n: number; fuente: string; dudas: string; total: number } | null>(null);
   // Suma al stock solo en compras nuevas o en las que ya sumaron (las viejas no).
   const sumaStock = !initial?.id || initial.sumado === "sí";
-  const [items, setItems] = useState<{ cantidad: string; marca: string; producto: string; precio: string; cat?: string }[]>(() => {
+  const [items, setItems] = useState<ItemForm[]>(() => {
     const it = itemsDeCompra(initial?.detalle);
     let mapa: { n: string; v?: string; i: number }[] = [];
     try { mapa = JSON.parse(initial?.items || "[]"); } catch { /* sin datos */ }
@@ -214,7 +240,7 @@ export function CompraSheet({ initial, saving, onClose, onSave }: {
           const m = mapa.find((x) => x.i === k);
           return { cantidad: String(i.cantidad || ""), marca: i.marca, producto: i.producto, precio: i.precio ? precioTexto(i.precio) : "", cat: initial?.items ? (m ? `${m.n}||${m.v || ""}` : "") : undefined };
         })
-      : [{ cantidad: "1", marca: "", producto: "", precio: "" }];
+      : [vacio()];
   });
   const opciones: OpcionStock[] = useMemo(
     () =>
@@ -233,14 +259,75 @@ export function CompraSheet({ initial, saving, onClose, onSave }: {
   const marcas = useMemo(() => Array.from(new Set([...MARCAS_CONOCIDAS, ...products.map((p) => brandName(p.brand)).filter(Boolean)])), [products]);
   const total = items.reduce((a, i) => a + (Number(i.cantidad) || 0) * num(i.precio), 0);
   const unidades = items.reduce((a, i) => a + (Number(i.cantidad) || 0), 0);
-  const set = (k: number, campo: string, v: string) => setItems((prev) => prev.map((it, i) => (i === k ? { ...it, [campo]: v } : it)));
+  const conProducto = items.filter((i) => i.producto.trim()).length;
+  const leyendo = lecturas.some((l) => l.estado === "leyendo");
+  const set = (k: number, campo: keyof ItemForm, v: string) =>
+    setItems((prev) => prev.map((it, i) => (i === k ? { ...it, [campo]: v, ia: false } : it)));
+  const sumar = (k: number, d: number) => set(k, "cantidad", String(Math.max(0, (Number(items[k].cantidad) || 0) + d)));
+
+  // Lo que la IA leyó se agrega a la lista (o la reemplaza si estaba vacía).
+  const aplicar = (a: AnalisisCompra, fuente: string) => {
+    const valores = new Map(opciones.map((o) => [o.value.toLowerCase(), o.value]));
+    const nuevos: ItemForm[] = a.items.map((i) => {
+      const yaTiene = i.variante && norm(i.producto).join(" ").includes(norm(i.variante).join(" "));
+      return {
+        cantidad: String(i.cantidad || ""),
+        marca: i.marca,
+        producto: i.variante && !yaTiene ? `${i.producto} ${i.variante}` : i.producto,
+        precio: i.precioUnitario ? precioTexto(i.precioUnitario) : "",
+        cat: (i.catalogo && valores.get(i.catalogo.toLowerCase())) || undefined,
+        ia: true,
+      };
+    });
+    setItems((prev) => {
+      const soloVacio = prev.every((x) => !x.producto.trim() && !x.precio.trim());
+      return soloVacio ? (nuevos.length ? nuevos : prev) : [...prev, ...nuevos];
+    });
+    if (a.proveedor) setProveedor((p) => (p.trim() ? p : a.proveedor));
+    if (a.fecha && !fechaTocada) setFecha(a.fecha);
+    if (a.notas) setNotas((n) => (n.trim() ? `${n}\n${a.notas}` : a.notas));
+    setAviso({ n: nuevos.length, fuente, dudas: a.dudas, total: a.total });
+  };
+
+  const procesar = async (entrada: Entrada, nombre: string, reintento?: number) => {
+    const id = reintento ?? Date.now() + Math.random();
+    const preview = entrada.file?.type.startsWith("image/") ? URL.createObjectURL(entrada.file) : undefined;
+    const fila: Lectura = { id, nombre, estado: "leyendo", preview, entrada };
+    setLecturas((l) => (reintento ? l.map((x) => (x.id === id ? { ...x, ...fila, preview: x.preview } : x)) : [...l, fila]));
+    const fin = (estado: Lectura["estado"], detalle: string) => setLecturas((l) => l.map((x) => (x.id === id ? { ...x, estado, detalle } : x)));
+    try {
+      const catalogo = opciones.map((o) => `"${o.value}" · ${o.label}`);
+      const r = await leerCompra(entrada, catalogo);
+      if (r.archivo) setArchivos((a) => (a.some((x) => x.id === r.archivo!.id) ? a : [...a, r.archivo!]));
+      if (r.ok === false) throw new Error(r.error || "No se pudo leer");
+      if (r.analisis) {
+        aplicar(r.analisis, nombre);
+        const n = r.analisis.items.length;
+        fin("listo", n ? `${n} ${n === 1 ? "producto" : "productos"}` : "No encontré productos");
+      } else {
+        fin("error", r.errorLectura ? `Quedó guardado, pero no se pudo leer: ${r.errorLectura}` : "No se pudo leer");
+      }
+    } catch (e) {
+      fin("error", e instanceof Error ? e.message : "No se pudo leer");
+    }
+  };
+
+  const elegirArchivos = (lista: FileList | null) => {
+    Array.from(lista ?? []).forEach((f) => procesar({ file: f }, f.name || "Foto"));
+  };
+  const leerTexto = () => {
+    if (!texto.trim()) return;
+    procesar({ texto }, "Compra escrita");
+    setTexto("");
+    setEscribir(false);
+  };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (saving || !proveedor.trim()) return;
-    const conProducto = items.filter((i) => i.producto.trim());
-    const lista: ItemCompra[] = conProducto.map((i) => ({ cantidad: Number(i.cantidad) || 0, marca: i.marca, producto: i.producto, precio: num(i.precio) }));
-    const stock = conProducto
+    if (saving || leyendo || !proveedor.trim()) return;
+    const conProd = items.filter((i) => i.producto.trim());
+    const lista: ItemCompra[] = conProd.map((i) => ({ cantidad: Number(i.cantidad) || 0, marca: i.marca, producto: i.producto, precio: num(i.precio) }));
+    const stock = conProd
       .map((it, k) => {
         const q = Number(it.cantidad);
         if (!(q > 0)) return null;
@@ -257,77 +344,217 @@ export function CompraSheet({ initial, saving, onClose, onSave }: {
       detalle: detalleDeCompra(lista),
       total: String(Math.round(total * 100) / 100),
       notas,
+      archivos: archivos.length ? JSON.stringify(archivos) : "",
       ...(sumaStock ? { items: JSON.stringify(stock) } : {}),
     });
   };
 
+  const diferencia = aviso && aviso.total > 0 && Math.abs(aviso.total - total) > Math.max(1, aviso.total * 0.01);
+
   return (
     <Hoja titulo={initial?.id ? "Editar compra" : "Nueva compra"} onClose={onClose} as="form" onSubmit={submit}>
-      <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <label className="block"><span className="mb-1 block text-xs font-semibold text-ink">Fecha</span>
-            <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="input h-11 text-base" /></label>
-          <label className="block"><span className="mb-1 block text-xs font-semibold text-ink">Proveedor <span className="text-sale">*</span></span>
-            <input value={proveedor} onChange={(e) => setProveedor(e.target.value)} required placeholder="Ej: El Nogal" className="input h-11 text-base" /></label>
-        </div>
+      <div className="space-y-4">
+        {/* Carga automática con IA */}
+        <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-[#4a52f0] p-4 text-white shadow-card">
+          <span aria-hidden className="pointer-events-none absolute -right-10 -top-12 h-36 w-36 rounded-full bg-accent/25 blur-2xl" />
+          <p className="relative text-[11px] font-bold uppercase tracking-[0.16em] text-accent">✨ Carga automática</p>
+          <h4 className="relative mt-1 font-display text-lg font-bold leading-snug">Subí la factura, sacale una foto o escribí la compra</h4>
+          <p className="relative mt-1 text-xs leading-relaxed text-white/75">Leo los productos, las cantidades y los precios y los cargo abajo. Después revisás y guardás.</p>
+          <div className="relative mt-3 grid grid-cols-3 gap-2">
+            <label className="flex cursor-pointer flex-col items-center gap-1 rounded-xl bg-white/10 px-2 py-3 text-xs font-bold ring-1 ring-white/20 transition hover:bg-white/20 active:scale-[0.97] motion-reduce:active:scale-100">
+              <span className="text-xl" aria-hidden>📷</span> Foto
+              <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => { elegirArchivos(e.target.files); e.target.value = ""; }} />
+            </label>
+            <label className="flex cursor-pointer flex-col items-center gap-1 rounded-xl bg-white/10 px-2 py-3 text-xs font-bold ring-1 ring-white/20 transition hover:bg-white/20 active:scale-[0.97] motion-reduce:active:scale-100">
+              <span className="text-xl" aria-hidden>📎</span> Archivo
+              <input type="file" accept={ACEPTA_ARCHIVOS} multiple className="sr-only" onChange={(e) => { elegirArchivos(e.target.files); e.target.value = ""; }} />
+            </label>
+            <button type="button" onClick={() => setEscribir((v) => !v)} aria-expanded={escribir}
+              className={`flex flex-col items-center gap-1 rounded-xl px-2 py-3 text-xs font-bold ring-1 transition active:scale-[0.97] motion-reduce:active:scale-100 ${escribir ? "bg-accent text-ink ring-accent" : "bg-white/10 ring-white/20 hover:bg-white/20"}`}>
+              <span className="text-xl" aria-hidden>✍️</span> Escribir
+            </button>
+          </div>
+          <p className="relative mt-2 text-center text-[11px] text-white/60">Fotos, PDF, Excel, Word o CSV · los archivos quedan guardados en tu Drive</p>
 
-        <div>
-          <p className="mb-1 text-xs font-semibold text-ink">Productos</p>
+          {escribir && (
+            <div className="relative mt-3 animate-fade-in motion-reduce:animate-none">
+              <textarea value={texto} onChange={(e) => setTexto(e.target.value)} rows={4} autoFocus aria-label="Escribí la compra"
+                placeholder={"Ej: El Nogal, 3 creatinas ENA 300 g a $15.121,80 c/u, 2 whey Star vainilla 1 kg a $28.500, pagué por transferencia"}
+                className="w-full rounded-xl border-0 bg-white px-3 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent" />
+              <button type="button" onClick={leerTexto} disabled={!texto.trim()}
+                className="mt-2 w-full rounded-xl bg-accent py-2.5 text-sm font-black text-ink transition hover:brightness-105 active:scale-[0.98] disabled:opacity-50 motion-reduce:active:scale-100">
+                Cargar estos productos
+              </button>
+            </div>
+          )}
+
+          {lecturas.length > 0 && (
+            <ul className="relative mt-3 space-y-1.5">
+              {lecturas.map((l) => (
+                <li key={l.id} className="flex items-center gap-3 rounded-xl bg-white/10 px-2.5 py-2 ring-1 ring-white/15">
+                  {l.preview ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={l.preview} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
+                  ) : (
+                    <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white/15 text-base">{l.entrada.texto ? "✍️" : "📄"}</span>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-bold">{l.nombre}</p>
+                    <p className={`text-[11px] ${l.estado === "error" ? "text-amber-200" : "text-white/70"}`} aria-live="polite">
+                      {l.estado === "leyendo" ? "Leyendo… puede tardar unos segundos" : l.detalle}
+                    </p>
+                  </div>
+                  {l.estado === "leyendo" && <span aria-hidden className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-white/30 border-t-accent motion-reduce:animate-none" />}
+                  {l.estado === "listo" && <span aria-hidden className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-accent text-ink"><CheckIcon className="h-4 w-4" /></span>}
+                  {l.estado === "error" && (
+                    <button type="button" onClick={() => procesar(l.entrada, l.nombre, l.id)} className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-primary">
+                      Reintentar
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {aviso && (
+          <div className="animate-fade-in space-y-1.5 rounded-xl border border-green-200 bg-green-50 px-3 py-2.5 text-sm text-green-800 motion-reduce:animate-none" role="status">
+            <p className="font-semibold">✓ Cargué {aviso.n} {aviso.n === 1 ? "producto" : "productos"} de “{aviso.fuente}”. Revisalos antes de guardar.</p>
+            {diferencia && (
+              <p className="rounded-lg bg-amber-50 px-2 py-1.5 text-xs font-semibold text-amber-800">
+                El total del comprobante es {pesos(aviso.total)} y la suma da {pesos(total)}: revisá cantidades y precios.
+              </p>
+            )}
+            {aviso.dudas && <p className="text-xs text-green-900/80">Para revisar: {aviso.dudas}</p>}
+          </div>
+        )}
+
+        {/* Datos de la compra */}
+        <section className="grid grid-cols-2 gap-3 rounded-2xl border border-line bg-white p-3">
+          <label className="block"><span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-muted">Fecha</span>
+            <input type="date" value={fecha} onChange={(e) => { setFecha(e.target.value); setFechaTocada(true); }} className="input h-11 text-base" /></label>
+          <label className="block"><span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-muted">Proveedor <span className="text-sale">*</span></span>
+            <input value={proveedor} onChange={(e) => setProveedor(e.target.value)} required placeholder="Ej: El Nogal" className="input h-11 text-base" /></label>
+        </section>
+
+        {/* Productos */}
+        <section>
+          <div className="mb-2 flex items-end justify-between gap-2">
+            <h4 className="font-display text-base font-bold text-ink">Productos</h4>
+            <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary">{conProducto} {conProducto === 1 ? "producto" : "productos"} · {unidades} u.</span>
+          </div>
           <datalist id="marcas-compra">{marcas.map((m) => <option key={m} value={m} />)}</datalist>
-          <ul className="space-y-2">
-            {items.map((it, k) => (
-              <li key={k} className="rounded-xl border border-line bg-white p-2.5">
-                <div className="grid grid-cols-[1fr_auto] gap-2">
-                  <input list="marcas-compra" value={it.marca} onChange={(e) => set(k, "marca", e.target.value)} placeholder="Marca" aria-label="Marca" className="input h-10 text-sm" />
-                  <button type="button" onClick={() => setItems((p) => (p.length > 1 ? p.filter((_, i) => i !== k) : p))} aria-label="Quitar producto" className="grid h-10 w-10 place-items-center rounded-full text-sale hover:bg-sale/10">
-                    <TrashIcon className="h-5 w-5" />
-                  </button>
-                </div>
-                <input value={it.producto} onChange={(e) => set(k, "producto", e.target.value)} placeholder="Producto (ej: Whey Protein 2 lb Vainilla)" aria-label="Producto" className="input mt-2 h-10 text-sm" />
-                <div className="mt-2 grid grid-cols-[90px_1fr_auto] items-center gap-2">
-                  <input inputMode="numeric" value={it.cantidad} onChange={(e) => set(k, "cantidad", e.target.value.replace(/\D/g, ""))} placeholder="Unid." aria-label="Unidades" className="input h-10 text-sm" />
-                  <input inputMode="decimal" value={it.precio} onChange={(e) => set(k, "precio", e.target.value)} placeholder="Precio c/u" aria-label="Precio por unidad" className="input h-10 text-sm" />
-                  <span className="w-24 text-right text-sm font-semibold text-ink">{pesos((Number(it.cantidad) || 0) * num(it.precio))}</span>
-                </div>
-                {sumaStock && (
-                  <label className="mt-2 block">
-                    <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-muted">Sumar al stock de</span>
-                    <select value={catDe(it)} onChange={(e) => set(k, "cat", e.target.value)} className={`input h-10 text-sm ${catDe(it) === NUEVO ? "border-amber-300 bg-amber-50" : catDe(it) ? "border-green-300 bg-green-50" : ""}`}>
-                      <option value="">No sumar al stock</option>
-                      {it.producto.trim() && <option value={NUEVO}>➕ Producto nuevo: {it.producto.trim()}</option>}
-                      {opciones.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
-                    {catDe(it) === NUEVO && <span className="mt-1 block text-[11px] text-muted">Se crea en Productos (sin foto ni precio, no se ve en la tienda hasta que lo completes).</span>}
-                  </label>
-                )}
-              </li>
-            ))}
+          <ul className="space-y-2.5">
+            {items.map((it, k) => {
+              const cat = catDe(it);
+              return (
+                <li key={k} className={`rounded-2xl border bg-white p-3 shadow-sm transition-colors ${it.ia ? "border-accent ring-2 ring-accent/40" : "border-line"}`}>
+                  <div className="flex items-center gap-2">
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-xs font-black text-white">{k + 1}</span>
+                    <input list="marcas-compra" value={it.marca} onChange={(e) => set(k, "marca", e.target.value)} placeholder="Marca" aria-label="Marca"
+                      className="h-9 min-w-0 flex-1 rounded-lg border border-transparent bg-page-soft px-3 text-xs font-bold uppercase tracking-wide text-primary placeholder:font-semibold placeholder:normal-case placeholder:tracking-normal placeholder:text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30" />
+                    <button type="button" onClick={() => setItems((p) => (p.length > 1 ? p.filter((_, i) => i !== k) : [vacio()]))} aria-label="Quitar producto"
+                      className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-sale transition hover:bg-sale/10">
+                      <TrashIcon className="h-[18px] w-[18px]" />
+                    </button>
+                  </div>
+                  <input value={it.producto} onChange={(e) => set(k, "producto", e.target.value)} placeholder="Producto (ej: Whey Protein 2 lb Vainilla)" aria-label="Producto"
+                    className="input mt-2 h-11 text-[15px] font-semibold" />
+                  <div className="mt-2 grid grid-cols-[auto_1fr] items-center gap-2">
+                    <div className="flex h-11 items-center rounded-full border border-line bg-white">
+                      <button type="button" onClick={() => sumar(k, -1)} aria-label="Una unidad menos" className="grid h-11 w-10 place-items-center text-primary"><MinusIcon className="h-4 w-4" /></button>
+                      <input inputMode="numeric" value={it.cantidad} onChange={(e) => set(k, "cantidad", e.target.value.replace(/\D/g, ""))} aria-label="Unidades"
+                        className="h-11 w-10 bg-transparent text-center text-base font-bold text-ink focus:outline-none" />
+                      <button type="button" onClick={() => sumar(k, 1)} aria-label="Una unidad más" className="grid h-11 w-10 place-items-center text-primary"><PlusIcon className="h-4 w-4" /></button>
+                    </div>
+                    <label className="relative block">
+                      <span aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-muted">$</span>
+                      <input inputMode="decimal" value={it.precio} onChange={(e) => set(k, "precio", e.target.value)} placeholder="Precio c/u" aria-label="Precio por unidad"
+                        className="input h-11 pl-7 text-base" />
+                    </label>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-2 border-t border-line/70 pt-2">
+                    <span className="text-xs text-muted">Subtotal</span>
+                    <span className="font-display text-base font-black text-ink">{pesos((Number(it.cantidad) || 0) * num(it.precio))}</span>
+                  </div>
+                  {sumaStock && (
+                    <label className="mt-1.5 block">
+                      <span className="sr-only">Sumar al stock de</span>
+                      <select value={cat} onChange={(e) => set(k, "cat", e.target.value)}
+                        className={`h-10 w-full rounded-full border px-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-accent/40 ${cat === NUEVO ? "border-amber-300 bg-amber-50 text-amber-900" : cat ? "border-green-300 bg-green-50 text-green-800" : "border-line bg-page-soft text-muted"}`}>
+                        <option value="">No sumar al stock</option>
+                        {it.producto.trim() && <option value={NUEVO}>➕ Producto nuevo: {it.producto.trim()}</option>}
+                        {opciones.map((o) => <option key={o.value} value={o.value}>✓ Suma stock a: {o.label}</option>)}
+                      </select>
+                      {cat === NUEVO && <span className="mt-1 block px-1 text-[11px] text-muted">Se crea en Productos (sin foto ni precio, no se ve en la tienda hasta que lo completes).</span>}
+                    </label>
+                  )}
+                </li>
+              );
+            })}
           </ul>
-          <button type="button" onClick={() => setItems((p) => [...p, { cantidad: "1", marca: "", producto: "", precio: "" }])} className="mt-2 inline-flex items-center gap-1 text-sm font-bold text-primary">
+          <button type="button" onClick={() => setItems((p) => [...p, vacio()])}
+            className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-primary/25 py-3 text-sm font-bold text-primary transition hover:border-primary/50 hover:bg-white">
             <PlusIcon className="h-4 w-4" /> Agregar producto
           </button>
-        </div>
+        </section>
 
         {!sumaStock && (
           <p className="rounded-lg bg-page-soft px-3 py-2 text-xs text-muted">Esta compra se cargó antes de que las compras sumaran stock: editarla no cambia el stock.</p>
         )}
-        <label className="block"><span className="mb-1 block text-xs font-semibold text-ink">Forma de pago</span>
-          <select value={pago} onChange={(e) => setPago(e.target.value)} className="input h-11 text-base">
-            <option value="">Elegí una opción…</option>
-            {["Efectivo", "Transferencia", "Mercado Pago", "Otro"].map((o) => <option key={o}>{o}</option>)}
-          </select></label>
-        <label className="block"><span className="mb-1 block text-xs font-semibold text-ink">Notas</span>
-          <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={2} className="input text-base" /></label>
 
-        <div className="flex items-center justify-between rounded-xl bg-accent-soft px-4 py-3">
-          <span className="text-sm font-semibold text-ink">{unidades} unidades · Total</span>
-          <span className="font-display text-xl font-black text-primary">{pesos(total)}</span>
-        </div>
-        <div className="grid grid-cols-2 gap-3 pt-1">
-          <button type="button" onClick={onClose} className="btn btn-outline btn-md">Cancelar</button>
-          <button type="submit" disabled={saving || !proveedor.trim()} className="btn btn-primary btn-md">{saving ? "Guardando…" : "Guardar compra"}</button>
+        <fieldset>
+          <legend className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-muted">Forma de pago</legend>
+          <div className="flex flex-wrap gap-2">
+            {PAGOS.map((o) => (
+              <button key={o} type="button" onClick={() => setPago((p) => (p === o ? "" : o))} aria-pressed={pago === o}
+                className={`rounded-full px-3.5 py-2 text-sm font-semibold transition active:scale-[0.97] motion-reduce:active:scale-100 ${pago === o ? "bg-primary text-white shadow-soft" : "border border-line bg-white text-ink hover:border-primary/40"}`}>
+                {o}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+
+        <label className="block"><span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-muted">Notas</span>
+          <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={2} className="input py-2.5 text-base" /></label>
+
+        {archivos.length > 0 && <Adjuntos archivos={archivos} onQuitar={(id) => setArchivos((a) => a.filter((x) => x.id !== id))} />}
+
+        <div className="sticky -bottom-5 -mx-5 border-t border-line bg-page/95 px-5 pb-5 pt-3 backdrop-blur">
+          <div className="mb-3 flex items-center justify-between rounded-xl bg-accent-soft px-4 py-2.5">
+            <span className="text-sm font-semibold text-ink">{unidades} {unidades === 1 ? "unidad" : "unidades"} · Total</span>
+            <span className="font-display text-xl font-black text-primary">{pesos(total)}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <button type="button" onClick={onClose} className="btn btn-outline btn-md">Cancelar</button>
+            <button type="submit" disabled={saving || leyendo || !proveedor.trim()} className="btn btn-primary btn-md">
+              {saving ? "Guardando…" : leyendo ? "Leyendo…" : "Guardar compra"}
+            </button>
+          </div>
         </div>
       </div>
     </Hoja>
+  );
+}
+
+/** Lista de fotos y archivos guardados en Drive (se abren con tu cuenta de Google). */
+function Adjuntos({ archivos, onQuitar }: { archivos: ArchivoCompra[]; onQuitar?: (id: string) => void }) {
+  return (
+    <div className="rounded-xl border border-line bg-white p-3">
+      <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muted">📎 Fotos y archivos</p>
+      <ul className="space-y-1.5">
+        {archivos.map((a) => (
+          <li key={a.id} className="flex items-center gap-2 text-sm">
+            <span aria-hidden>{a.tipo.startsWith("image/") ? "🖼️" : a.tipo === "application/pdf" ? "📕" : "📄"}</span>
+            <a href={a.url} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate font-semibold text-primary underline-offset-2 hover:underline">{a.nombre}</a>
+            {onQuitar && (
+              <button type="button" onClick={() => onQuitar(a.id)} aria-label={`Quitar ${a.nombre} de la compra`} className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-page-soft hover:text-sale">
+                <CloseIcon className="h-4 w-4" />
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
