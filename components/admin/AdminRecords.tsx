@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useConfirm } from "./useConfirm";
 import { OrderSheet } from "./OrderSheet";
 import { CompraDetail, CompraSheet } from "./Compras";
-import { addRow, updateRow, deleteRow, aprobarPedido, localAsset, lastApiError } from "@/lib/api";
+import { addRow, updateRow, deleteRow, aprobarPedido, sumarCompraAlStock, localAsset, lastApiError } from "@/lib/api";
 import { peekTable, fetchTable, ensureTable, subscribeTable, patchTable } from "@/lib/tableCache";
 import { useProducts } from "@/context/ProductsContext";
 import { formatPrice } from "@/lib/format";
@@ -334,6 +334,32 @@ export function AdminRecords({
       tardo.current = true;
     }
     recargar(loadPedidos);
+  };
+
+  // Compra pendiente: se suma al stock recién cuando el dueño revisó que esté bien.
+  const sumarCompra = async (row: Row) => {
+    let unidades = 0;
+    try { unidades = (JSON.parse(row.items || "[]") as { q?: number }[]).reduce((a, i) => a + (Number(i.q) || 0), 0); } catch { /* sin datos */ }
+    if (
+      !(await confirm({
+        title: "¿Sumar esta compra al stock?",
+        message: `Se suman ${unidades} unidades al stock de la tienda. Hacelo cuando ya revisaste que esté todo bien.`,
+        confirmLabel: "Sumar al stock",
+      }))
+    )
+      return;
+    try {
+      const ok = await sumarCompraAlStock(row.id);
+      onToast(ok ? "Stock sumado ✓" : "No se pudo sumar" + detalleError());
+      if (ok) {
+        patchTable("Compras", (rows) => rows.map((r) => (r.id === row.id ? { ...r, sumado: "sí" } : r)));
+        setDetailRow((d) => (d && d.id === row.id ? { ...d, sumado: "sí" } : d));
+      }
+    } catch {
+      onToast("Tardó demasiado: verificá si se sumó");
+      tardo.current = true;
+    }
+    recargar();
   };
 
   const eliminar = async (row: Row) => {
@@ -708,7 +734,7 @@ export function AdminRecords({
         />
       )}
       {detailRow && config.tab === "Compras" && (
-        <CompraDetail row={detailRow} onClose={() => setDetailRow(null)} onEdit={() => { setEditRow(detailRow); setDetailRow(null); }} />
+        <CompraDetail row={detailRow} onClose={() => setDetailRow(null)} onEdit={() => { setEditRow(detailRow); setDetailRow(null); }} onSumar={() => sumarCompra(detailRow)} />
       )}
       {detailRow && !editOrder && config.tab !== "Compras" && (
         <DetailSheet row={detailRow} onClose={() => setDetailRow(null)} onEdit={() => setEditOrder(detailRow)} />

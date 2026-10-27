@@ -18,7 +18,7 @@
  * ============================================================================ */
 
 var SHEET_ID = "12paAzW6OcSgYv4u6L7QVI4tpvrEx1yqnujW0OjcieMc";
-var API_VERSION = "v10"; // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
+var API_VERSION = "v13"; // v13: compras pendientes (se revisan y se suman al stock después) // v12: lectura de compras con Claude Haiku 5.5 (el más barato) // v11: las compras leen fotos, archivos y texto con Claude // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
 
 // Repo de GitHub donde se guardan las fotos de productos (en public/productos/).
 // El token NO va acá: se guarda en Propiedades del script como GITHUB_TOKEN.
@@ -133,7 +133,8 @@ var TABLES = {
       ["pago", "Pago"],
       ["notas", "Notas"],
       ["items", "Items"], // JSON [{n, v, q}] → productos del catálogo a los que se suma stock
-      ["sumado", "Stock sumado"],
+      ["sumado", "Stock sumado"], // "sí" = sumó al stock · "no" = pendiente de sumar · vacío = compra vieja
+      ["archivos", "Archivos"], // JSON [{id, nombre, tipo, url}] → fotos y archivos guardados en Drive
     ],
     idField: "id",
   },
@@ -295,6 +296,7 @@ function limitar(tipo, id) {
 var ACCIONES_ESCRITURA = {
   productos_save: 1, add: 1, update: 1, delete: 1, categoria_rename: 1, producto_rename: 1,
   subir_imagen: 1, borrar_imagen: 1, subir_comprobante: 1, mp_webhook: 1, aprobar_pedido: 1, registrar: 1,
+  compra_sumar_stock: 1,
 };
 
 function conBloqueo(fn) {
@@ -365,6 +367,15 @@ function ejecutar(action, p, e, esAdmin) {
         break;
       case "subir_comprobante":
         out = subirComprobante(p);
+        break;
+      case "compra_archivo":
+        out = compraArchivo(p);
+        break;
+      case "compra_archivo_estado":
+        out = compraArchivoEstado(p);
+        break;
+      case "compra_sumar_stock":
+        out = { ok: true, data: compraSumarStock(p.id) };
         break;
       case "mp_crear_pref":
         out = mpCrearPreferencia(p);
@@ -553,9 +564,11 @@ function addRow(tab, obj) {
       obj.descontado = "sí";
     }
   }
-  // Compras: lo comprado se suma al stock de cada producto del catálogo.
+  // Compras: lo comprado se suma al stock de cada producto del catálogo, salvo
+  // que se guarde pendiente (sumar: "no") para revisarla y sumarla después.
   if (tab === "Compras" && obj.items) {
-    if (moverStockCompra(obj.items, +1)) obj.sumado = "sí";
+    if (obj.sumar === "no") obj.sumado = "no";
+    else if (moverStockCompra(obj.items, +1)) obj.sumado = "sí";
   }
   var line = keys.map(function (k) {
     return sanitize(k, obj[k]);
@@ -569,15 +582,38 @@ function updateRow(tab, id, obj) {
   if (n < 0) throw new Error("No se encontró: " + id);
   if (tab === "Pedidos" && obj.hasOwnProperty("items")) ajustarStockPorEdicion(n, obj);
   if (tab === "Compras" && obj.hasOwnProperty("items")) ajustarStockCompraPorEdicion(n, obj);
-  return updateRowByNumber(tab, n, obj);
+  var res = updateRowByNumber(tab, n, obj);
+  // Compra pendiente que se guarda con "sumar al stock": se suma una sola vez.
+  if (tab === "Compras" && obj.sumar === "sí") compraSumarStock(id);
+  return res;
+}
+
+// Suma al stock una compra pendiente (sumado "no"). Si ya se sumó no hace nada,
+// así un doble clic o un reintento nunca suma dos veces.
+function compraSumarStock(id) {
+  var n = findRowById("Compras", id);
+  if (n < 0) throw new Error("No se encontró la compra");
+  var keys = keysOf("Compras");
+  var sh = sheetFor("Compras");
+  var row = sh.getRange(n, 1, 1, keys.length).getValues()[0];
+  var iS = keys.indexOf("sumado");
+  if (low(row[iS]) === "sí") return { sumada: true, yaEstaba: true };
+  var items = String(row[keys.indexOf("items")] || "");
+  if (!items || items === "[]") throw new Error("Esta compra no tiene productos asociados al stock.");
+  moverStockCompra(items, +1);
+  sh.getRange(n, iS + 1).setValue("sí");
+  return { sumada: true };
 }
 
 // Editar los productos de una compra que ya sumó stock: resta lo viejo y suma
-// lo nuevo. Las compras viejas (sin "Stock sumado") no tocan el stock.
+// lo nuevo. Una pendiente solo guarda los productos (todavía no tocó el stock) y
+// las compras viejas (sin "Stock sumado") no tocan el stock.
 function ajustarStockCompraPorEdicion(n, obj) {
   var keys = keysOf("Compras");
   var row = sheetFor("Compras").getRange(n, 1, 1, keys.length).getValues()[0];
-  if (low(row[keys.indexOf("sumado")]) !== "sí") { delete obj.items; return; }
+  var estado = low(row[keys.indexOf("sumado")]);
+  if (estado === "no") return;
+  if (estado !== "sí") { delete obj.items; return; }
   var viejo = String(row[keys.indexOf("items")] || "[]");
   var nuevo = String(obj.items || "[]");
   if (viejo === nuevo) return;
@@ -1074,6 +1110,185 @@ function saveProducto(obj) {
 }
 
 /* ------------------------------ Imágenes --------------------------------- */
+
+/* =================== COMPRAS: ARCHIVOS Y LECTURA CON CLAUDE =============== */
+
+// Las fotos, PDFs y planillas de las compras se guardan en Drive (privado) y se
+// leen con Claude, que devuelve los productos con cantidades y precios. La clave
+// va en Propiedades del script (ANTHROPIC_API_KEY), nunca en la web.
+var CLAUDE_MODEL = "claude-haiku-5-5"; // el más barato: alcanza para leer facturas y listas
+var CARPETA_COMPRAS = "Compras Suple Market";
+var COMPRA_ARCHIVO_MAX_B64 = 20000000; // ~15 MB de archivo
+var COMPRA_TEXTO_MAX = 200000;
+
+var PROMPT_COMPRA = [
+  "Leés compras de mercadería de Suple Market, una tienda de suplementos deportivos de Argentina.",
+  "Te llega una factura, remito, presupuesto, lista de precios o un mensaje escrito por el dueño con lo que compró a un proveedor.",
+  "Devolvé un renglón por cada producto comprado:",
+  "- marca: la marca del producto (ej: ENA, Star Nutrition, Granger). Vacío si no figura.",
+  "- producto: el nombre limpio con presentación y tamaño, sin la marca (ej: \"Creatina Micronizada 300 g\").",
+  "- variante: sabor o color si figura (ej: Vainilla); vacío si no tiene.",
+  "- cantidad: unidades compradas. Si dice cajas o bultos y aclara cuántas unidades trae cada uno, pasalo a unidades y aclaralo en notas.",
+  "- precioUnitario: lo que se paga por unidad en pesos. Los números argentinos usan punto de miles y coma decimal (\"15.121,80\" = 15121.8).",
+  "  Si los precios figuran sin IVA y el IVA se suma al final, o hay un descuento general, repartilo proporcionalmente para dar el precio final por unidad y contalo en notas.",
+  "  Si solo figura el subtotal del renglón, dividilo por la cantidad. Si no hay precio, poné 0.",
+  "- catalogo: si el producto es uno de la lista del catálogo de la tienda, copiá exactamente su valor (lo que está entre comillas, incluye \"||\" y la variante). Si no estás seguro o no está, dejalo vacío.",
+  "proveedor: quién vende (el emisor), nunca Suple Market. fecha: la del comprobante en formato AAAA-MM-DD, o vacío. total: el total del comprobante, o 0 si no figura.",
+  "No inventes productos ni precios: si algo no se lee bien, poné lo que se entienda y explicalo en dudas.",
+  "Si no es una compra de mercadería, devolvé items vacío y explicalo en dudas.",
+].join("\n");
+
+var SCHEMA_COMPRA = {
+  type: "object",
+  properties: {
+    proveedor: { type: "string" },
+    fecha: { type: "string" },
+    total: { type: "number" },
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          marca: { type: "string" },
+          producto: { type: "string" },
+          variante: { type: "string" },
+          cantidad: { type: "number" },
+          precioUnitario: { type: "number" },
+          catalogo: { type: "string" },
+        },
+        required: ["marca", "producto", "variante", "cantidad", "precioUnitario", "catalogo"],
+        additionalProperties: false,
+      },
+    },
+    notas: { type: "string" },
+    dudas: { type: "string" },
+  },
+  required: ["proveedor", "fecha", "total", "items", "notas", "dudas"],
+  additionalProperties: false,
+};
+
+// Llega por POST (no-cors: el CRM no ve la respuesta), así que el resultado se
+// guarda en caché con el id de trabajo y el CRM lo consulta con compra_archivo_estado.
+function compraArchivo(p) {
+  var job = idTrabajo(p.job);
+  if (!job) return { ok: false, error: "Falta el id de trabajo" };
+  var res;
+  try {
+    res = procesarArchivoCompra(p);
+  } catch (err) {
+    registrarError("compra_archivo", err, { nombre: p.nombre, tipo: p.tipo });
+    res = { ok: false, error: String(err && err.message ? err.message : err) };
+  }
+  var txt = JSON.stringify(res);
+  if (txt.length > 95000) txt = JSON.stringify({ ok: false, archivo: res.archivo, error: "El comprobante tiene demasiados productos: subilo en partes." });
+  CacheService.getScriptCache().put("cjob_" + job, txt, 21600);
+  return res;
+}
+
+function compraArchivoEstado(p) {
+  var job = idTrabajo(p.job);
+  var v = job && CacheService.getScriptCache().get("cjob_" + job);
+  return v ? JSON.parse(v) : { ok: true, pendiente: true };
+}
+
+function idTrabajo(v) {
+  return String(v || "").replace(/[^\w-]/g, "").slice(0, 60);
+}
+
+function procesarArchivoCompra(p) {
+  var nombre = String(p.nombre || "").replace(/[\\\/:*?"<>|]/g, " ").trim().slice(0, 120);
+  var tipo = String(p.tipo || "application/octet-stream").slice(0, 100);
+  var data = String(p.data || "");
+  var texto = String(p.texto || "").slice(0, COMPRA_TEXTO_MAX);
+  if (!data && !texto.trim()) throw new Error("No llegó ningún archivo ni texto");
+  if (data.length > COMPRA_ARCHIVO_MAX_B64) throw new Error("El archivo es muy pesado (máximo 15 MB)");
+  var out = { ok: true };
+  if (data) out.archivo = guardarArchivoCompra(Utilities.base64Decode(data), tipo, nombre || "archivo");
+  if (p.analizar !== false && p.analizar !== "no") {
+    // Si la lectura falla, el archivo igual queda guardado y adjunto a la compra.
+    try {
+      out.analisis = leerCompraConClaude(texto ? "" : tipo, data, texto, p.catalogo, nombre);
+    } catch (err) {
+      if (!out.archivo) throw err;
+      registrarError("compra_archivo", err, { nombre: nombre, tipo: tipo });
+      out.errorLectura = String(err && err.message ? err.message : err);
+    }
+  }
+  return out;
+}
+
+function guardarArchivoCompra(bytes, tipo, nombre) {
+  var it = DriveApp.getFoldersByName(CARPETA_COMPRAS);
+  var carpeta = it.hasNext() ? it.next() : DriveApp.createFolder(CARPETA_COMPRAS);
+  var stamp = Utilities.formatDate(new Date(), "America/Argentina/Buenos_Aires", "yyyy-MM-dd HH.mm");
+  var f = carpeta.createFile(Utilities.newBlob(bytes, tipo, stamp + " - " + nombre));
+  return { id: f.getId(), nombre: nombre, tipo: tipo, url: f.getUrl() };
+}
+
+function leerCompraConClaude(tipo, b64, texto, catalogo, nombre) {
+  var key = PropertiesService.getScriptProperties().getProperty("ANTHROPIC_API_KEY");
+  if (!key) throw new Error("Falta la clave de Claude: cargá ANTHROPIC_API_KEY en Propiedades del script.");
+  var bloque;
+  if (texto) {
+    bloque = { type: "text", text: (nombre ? "Contenido de \"" + nombre + "\":\n\n" : "Compra escrita por el dueño:\n\n") + texto };
+  } else if (tipo === "application/pdf") {
+    bloque = { type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } };
+  } else if (/^image\/(jpeg|png|gif|webp)$/.test(tipo)) {
+    bloque = { type: "image", source: { type: "base64", media_type: tipo, data: b64 } };
+  } else {
+    throw new Error("Ese tipo de archivo no se puede leer. Subí una foto, un PDF, un Excel, un Word o un CSV.");
+  }
+  var cat = (Array.isArray(catalogo) ? catalogo : []).slice(0, 800).map(function (c) { return String(c).slice(0, 200); });
+  var body = {
+    model: CLAUDE_MODEL,
+    max_tokens: 16000,
+    output_config: { effort: "low", format: { type: "json_schema", schema: SCHEMA_COMPRA } },
+    system: PROMPT_COMPRA,
+    messages: [{
+      role: "user",
+      content: [bloque, { type: "text", text: "Catálogo de la tienda:\n" + (cat.join("\n") || "(vacío)") + "\n\nDevolvé los productos de esta compra." }],
+    }],
+  };
+  var r = UrlFetchApp.fetch("https://api.anthropic.com/v1/messages", {
+    method: "post",
+    contentType: "application/json",
+    headers: { "x-api-key": key, "anthropic-version": "2026-10-21" },
+    payload: JSON.stringify(body),
+    muteHttpExceptions: true,
+  });
+  var code = r.getResponseCode();
+  var j = {};
+  try { j = JSON.parse(r.getContentText()); } catch (e) {}
+  if (code !== 200) {
+    var msg = j.error && j.error.message ? j.error.message : "error " + code;
+    if (code === 401) msg = "la clave de Claude no es válida";
+    else if (code === 429 || code >= 500) msg = "Claude está ocupado, probá de nuevo en un minuto";
+    throw new Error("No se pudo leer: " + msg);
+  }
+  if (j.stop_reason === "refusal") throw new Error("No se pudo leer este archivo.");
+  if (j.stop_reason === "max_tokens") throw new Error("El comprobante es muy largo: subilo en partes (una foto por página).");
+  var txt = (j.content || []).filter(function (b) { return b.type === "text"; }).map(function (b) { return b.text; }).join("");
+  var a;
+  try { a = JSON.parse(txt); } catch (e) { throw new Error("No se pudo entender la respuesta de Claude."); }
+  return limpiarAnalisisCompra(a);
+}
+
+// Normaliza lo que devuelve Claude (tipos, largos y números válidos).
+function limpiarAnalisisCompra(a) {
+  var s = function (v, n) { return String(v == null ? "" : v).trim().slice(0, n || 200); };
+  var n = function (v) { var x = Number(v); return isFinite(x) && x > 0 ? Math.round(x * 100) / 100 : 0; };
+  var fecha = s(a && a.fecha, 10);
+  return {
+    proveedor: s(a && a.proveedor, 80),
+    fecha: /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : "",
+    total: n(a && a.total),
+    items: ((a && a.items) || []).slice(0, 200).map(function (i) {
+      return { marca: s(i.marca, 60), producto: s(i.producto, 140), variante: s(i.variante, 60), cantidad: Math.round(n(i.cantidad)), precioUnitario: n(i.precioUnitario), catalogo: s(i.catalogo, 200) };
+    }).filter(function (i) { return i.producto; }),
+    notas: s(a && a.notas, 600),
+    dudas: s(a && a.dudas, 600),
+  };
+}
 
 // Sube una imagen (base64) al repo de GitHub en public/productos/ y guarda el
 // link en la columna "imagen" del producto. El token va en Propiedades del

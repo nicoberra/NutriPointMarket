@@ -137,7 +137,7 @@ const items = (arr) => JSON.stringify(arr);
 
 /* --------------------------------- Pruebas -------------------------------- */
 console.log("Versión y lecturas");
-check("version v10", call({ action: "version" }).version === "v10");
+check("version v13", call({ action: "version" }).version === "v13");
 const l1 = call({ action: "productos_list" });
 check("productos_list público sin costos", l1.ok && l1.data.length === 5 && !("costo" in l1.data[0]));
 const hitsAntes = cacheHits;
@@ -350,6 +350,95 @@ ctx.addRow("Compras", { id: "idCN2", proveedor: "El Nogal", detalle: "2 x Gold �
 check("segunda compra del mismo producto: no lo duplica, suma stock", book.sheets.Productos.rows.length === nProd0 + 1 && cant("Proteína Nueva Chocolate") === 6);
 ctx.deleteRow("Compras", "idCN2");
 check("borrar esa compra: resta su stock (el producto queda)", cant("Proteína Nueva Chocolate") === 4 && !!prodRow("Proteína Nueva Chocolate"));
+
+console.log("Compras: leer fotos, archivos y texto con Claude");
+{
+  const drive = [];
+  let claude = null, claudeReq = null;
+  ctx.Utilities.base64Decode = (b) => Array.from(Buffer.from(b, "base64"));
+  ctx.Utilities.newBlob = (bytes, tipo, nombre) => ({ bytes, tipo, nombre });
+  ctx.DriveApp.getFoldersByName = () => ({ hasNext: () => false });
+  ctx.DriveApp.createFolder = () => ({ createFile: (blob) => { drive.push(blob); return { getId: () => "F" + drive.length, getUrl: () => "https://drive.google.com/file/d/F" + drive.length }; } });
+  const fetchOrig = ctx.UrlFetchApp.fetch;
+  ctx.UrlFetchApp.fetch = (url, opt) => {
+    if (url.indexOf("api.anthropic.com") === -1) return fetchOrig(url, opt);
+    claudeReq = { url, opt, body: JSON.parse(opt.payload) };
+    return { getResponseCode: () => claude.code, getContentText: () => JSON.stringify(claude.json) };
+  };
+  const foto = { job: "jobA", nombre: "factura.jpg", tipo: "image/jpeg", data: Buffer.from("imagen-falsa").toString("base64"), catalogo: ['"CREATINA MONOHIDRATO  300 gr||" · marca: ENA'] };
+
+  let r = ctx.compraArchivo(foto);
+  check("sin clave de Claude: el archivo se guarda igual y avisa qué falta", r.ok && r.archivo.id === "F1" && /ANTHROPIC_API_KEY/.test(r.errorLectura) && drive.length === 1 && !claudeReq, r);
+  check("  ...el resultado queda para que el CRM lo consulte", ctx.compraArchivoEstado({ job: "jobA" }).archivo.id === "F1");
+  check("trabajo desconocido → pendiente", ctx.compraArchivoEstado({ job: "otro" }).pendiente === true);
+
+  props.ANTHROPIC_API_KEY = "sk-ant-prueba";
+  claude = { code: 200, json: { stop_reason: "end_turn", content: [
+    { type: "thinking", thinking: "" },
+    { type: "text", text: JSON.stringify({ proveedor: " El Nogal ", fecha: "22/10/2026", total: 45365.4, notas: "", dudas: "",
+      items: [
+        { marca: "ENA", producto: "Creatina Monohidrato 300 g", variante: "", cantidad: 3, precioUnitario: 15121.8, catalogo: "CREATINA MONOHIDRATO  300 gr||" },
+        { marca: "", producto: "", variante: "", cantidad: 1, precioUnitario: 1, catalogo: "" },
+        { marca: "Star", producto: "Whey", variante: "Vainilla", cantidad: -2, precioUnitario: "x", catalogo: "" },
+      ] }) },
+  ] } };
+  r = ctx.compraArchivo(Object.assign({}, foto, { job: "jobB" }));
+  const a = r.analisis || {};
+  check("foto leída: proveedor, productos, cantidades y precios", r.ok && a.proveedor === "El Nogal" && a.items.length === 2 && a.items[0].cantidad === 3 && a.items[0].precioUnitario === 15121.8 && a.items[0].catalogo === "CREATINA MONOHIDRATO  300 gr||", a);
+  check("  ...descarta renglones vacíos y números inválidos; fecha inválida queda vacía", a.items[1].cantidad === 0 && a.items[1].precioUnitario === 0 && a.fecha === "");
+  const req = claudeReq.body, h = claudeReq.opt.headers;
+  check("pedido a Claude: modelo, versión de API, clave por header y salida con esquema", req.model === "claude-haiku-5-5" && h["anthropic-version"] === "2026-10-21" && h["x-api-key"] === "sk-ant-prueba" && req.output_config.format.type === "json_schema" && !("fallbacks" in req) && !h["anthropic-beta"]);
+  check("  ...la foto va como imagen y el catálogo en el mensaje", req.messages[0].content[0].type === "image" && req.messages[0].content[0].source.media_type === "image/jpeg" && /CREATINA MONOHIDRATO/.test(req.messages[0].content[1].text));
+  check("  ...sin temperature/top_p (la versión 2026-10-21 los rechaza)", !("temperature" in req) && !("top_p" in req) && !("top_k" in req));
+
+  const nDrive = drive.length;
+  r = ctx.compraArchivo({ job: "jobC", texto: "El Nogal: 3 creatinas ENA 300 g a 15.121,80", catalogo: [] });
+  check("compra escrita a mano: se lee sin guardar nada en Drive", r.ok && !r.archivo && drive.length === nDrive && claudeReq.body.messages[0].content[0].type === "text" && /3 creatinas/.test(claudeReq.body.messages[0].content[0].text));
+
+  r = ctx.compraArchivo({ job: "jobD", nombre: "lista.xlsx", tipo: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data: Buffer.from("zip").toString("base64"), texto: "Producto | Cant | Precio\nCreatina | 3 | 15121,80" });
+  check("Excel: se guarda el original y se lee el texto extraído", r.ok && r.archivo && claudeReq.body.messages[0].content[0].type === "text" && /lista\.xlsx/.test(claudeReq.body.messages[0].content[0].text));
+
+  r = ctx.compraArchivo({ job: "jobE", nombre: "x.zip", tipo: "application/zip", data: Buffer.from("zip").toString("base64") });
+  check("tipo que no se puede leer: se guarda y avisa", r.ok && r.archivo && /no se puede leer/.test(r.errorLectura));
+
+  claude = { code: 401, json: { error: { message: "invalid x-api-key" } } };
+  r = ctx.compraArchivo(Object.assign({}, foto, { job: "jobF" }));
+  check("clave inválida: mensaje claro", /no es válida/.test(r.errorLectura));
+  claude = { code: 200, json: { stop_reason: "max_tokens", content: [] } };
+  r = ctx.compraArchivo({ job: "jobG", texto: "mucho" });
+  check("respuesta cortada (texto solo): error claro", r.ok === false && /muy largo/.test(r.error));
+  check("sin archivo ni texto: error", ctx.compraArchivo({ job: "jobH" }).ok === false);
+  check("sin token: no se puede leer ni consultar", call({ action: "compra_archivo_estado", job: "jobB" }).error === "auth" && call({ action: "compra_archivo", job: "z" }, { texto: "x" }).error === "auth");
+  delete props.ANTHROPIC_API_KEY;
+  ctx.UrlFetchApp.fetch = fetchOrig;
+}
+
+console.log("Compras pendientes (se revisan y se suman después)");
+{
+  const sumado = (id) => { const k = ctx.keysOf("Compras"); return book.sheets.Compras.rows.find((r) => r[0] === id)[k.indexOf("sumado")]; };
+  const itemsDe = (id) => { const k = ctx.keysOf("Compras"); return book.sheets.Compras.rows.find((r) => r[0] === id)[k.indexOf("items")]; };
+  const c0 = cant("CREATINA MONOHIDRATO  300 gr");
+  ctx.addRow("Compras", { id: "idPend1", proveedor: "El Nogal", detalle: "2 x Star · Creatina", total: "40000", sumar: "no", items: JSON.stringify([{ n: "CREATINA MONOHIDRATO  300 gr", q: 2, i: 0 }]) });
+  check("guardada sin sumar: queda pendiente y el stock no cambia", sumado("idPend1") === "no" && cant("CREATINA MONOHIDRATO  300 gr") === c0 && /CREATINA/.test(itemsDe("idPend1")));
+  ctx.updateRow("Compras", "idPend1", { proveedor: "El Nogal", items: JSON.stringify([{ n: "CREATINA MONOHIDRATO  300 gr", q: 3, i: 0 }]) });
+  check("  ...editarla cambia los productos sin tocar el stock", cant("CREATINA MONOHIDRATO  300 gr") === c0 && /"q":3/.test(itemsDe("idPend1")) && sumado("idPend1") === "no");
+  let r = call({ action: "compra_sumar_stock", id: "idPend1" });
+  check("sin token no se puede sumar", r.error === "auth" && cant("CREATINA MONOHIDRATO  300 gr") === c0);
+  ctx.compraSumarStock("idPend1");
+  check("sumar al stock: suma las unidades y queda marcada", cant("CREATINA MONOHIDRATO  300 gr") === c0 + 3 && sumado("idPend1") === "sí");
+  const otra = ctx.compraSumarStock("idPend1");
+  check("  ...sumar de nuevo (doble clic) no vuelve a sumar", otra.yaEstaba === true && cant("CREATINA MONOHIDRATO  300 gr") === c0 + 3);
+  ctx.addRow("Compras", { id: "idPend2", proveedor: "X", detalle: "1 x Star · Creatina", total: "1", sumar: "no", items: JSON.stringify([{ n: "CREATINA MONOHIDRATO  300 gr", q: 1, i: 0 }]) });
+  ctx.updateRow("Compras", "idPend2", { proveedor: "X", sumar: "sí", items: JSON.stringify([{ n: "CREATINA MONOHIDRATO  300 gr", q: 4, i: 0 }]) });
+  check("editar una pendiente con 'sumar al stock': suma lo editado una sola vez", cant("CREATINA MONOHIDRATO  300 gr") === c0 + 7 && sumado("idPend2") === "sí");
+  ctx.addRow("Compras", { id: "idPend3", proveedor: "X", detalle: "1 x Star · Creatina", total: "1", items: JSON.stringify([{ n: "CREATINA MONOHIDRATO  300 gr", q: 1, i: 0 }]) });
+  check("sin indicar nada (CRM viejo): suma al guardar como antes", cant("CREATINA MONOHIDRATO  300 gr") === c0 + 8 && sumado("idPend3") === "sí");
+  ctx.addRow("Compras", { id: "idPend4", proveedor: "X", detalle: "1 x Algo", total: "1", sumar: "no", items: "[]" });
+  let err = ""; try { ctx.compraSumarStock("idPend4"); } catch (e) { err = e.message; }
+  check("pendiente sin productos asociados: avisa y no suma", /no tiene productos/.test(err));
+  ctx.deleteRow("Compras", "idPend1"); ctx.deleteRow("Compras", "idPend2"); ctx.deleteRow("Compras", "idPend3"); ctx.deleteRow("Compras", "idPend4");
+  check("borrar las compras sumadas resta lo sumado (vuelve al stock inicial)", cant("CREATINA MONOHIDRATO  300 gr") === c0);
+}
 
 console.log("Copias automáticas");
 const mq = ctx.quitarBackupsAutomaticos();
