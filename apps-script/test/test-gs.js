@@ -137,7 +137,7 @@ const items = (arr) => JSON.stringify(arr);
 
 /* --------------------------------- Pruebas -------------------------------- */
 console.log("Versión y lecturas");
-check("version v12", call({ action: "version" }).version === "v12");
+check("version v13", call({ action: "version" }).version === "v13");
 const l1 = call({ action: "productos_list" });
 check("productos_list público sin costos", l1.ok && l1.data.length === 5 && !("costo" in l1.data[0]));
 const hitsAntes = cacheHits;
@@ -411,6 +411,33 @@ console.log("Compras: leer fotos, archivos y texto con Claude");
   check("sin token: no se puede leer ni consultar", call({ action: "compra_archivo_estado", job: "jobB" }).error === "auth" && call({ action: "compra_archivo", job: "z" }, { texto: "x" }).error === "auth");
   delete props.ANTHROPIC_API_KEY;
   ctx.UrlFetchApp.fetch = fetchOrig;
+}
+
+console.log("Compras pendientes (se revisan y se suman después)");
+{
+  const sumado = (id) => { const k = ctx.keysOf("Compras"); return book.sheets.Compras.rows.find((r) => r[0] === id)[k.indexOf("sumado")]; };
+  const itemsDe = (id) => { const k = ctx.keysOf("Compras"); return book.sheets.Compras.rows.find((r) => r[0] === id)[k.indexOf("items")]; };
+  const c0 = cant("CREATINA MONOHIDRATO  300 gr");
+  ctx.addRow("Compras", { id: "idPend1", proveedor: "El Nogal", detalle: "2 x Star · Creatina", total: "40000", sumar: "no", items: JSON.stringify([{ n: "CREATINA MONOHIDRATO  300 gr", q: 2, i: 0 }]) });
+  check("guardada sin sumar: queda pendiente y el stock no cambia", sumado("idPend1") === "no" && cant("CREATINA MONOHIDRATO  300 gr") === c0 && /CREATINA/.test(itemsDe("idPend1")));
+  ctx.updateRow("Compras", "idPend1", { proveedor: "El Nogal", items: JSON.stringify([{ n: "CREATINA MONOHIDRATO  300 gr", q: 3, i: 0 }]) });
+  check("  ...editarla cambia los productos sin tocar el stock", cant("CREATINA MONOHIDRATO  300 gr") === c0 && /"q":3/.test(itemsDe("idPend1")) && sumado("idPend1") === "no");
+  let r = call({ action: "compra_sumar_stock", id: "idPend1" });
+  check("sin token no se puede sumar", r.error === "auth" && cant("CREATINA MONOHIDRATO  300 gr") === c0);
+  ctx.compraSumarStock("idPend1");
+  check("sumar al stock: suma las unidades y queda marcada", cant("CREATINA MONOHIDRATO  300 gr") === c0 + 3 && sumado("idPend1") === "sí");
+  const otra = ctx.compraSumarStock("idPend1");
+  check("  ...sumar de nuevo (doble clic) no vuelve a sumar", otra.yaEstaba === true && cant("CREATINA MONOHIDRATO  300 gr") === c0 + 3);
+  ctx.addRow("Compras", { id: "idPend2", proveedor: "X", detalle: "1 x Star · Creatina", total: "1", sumar: "no", items: JSON.stringify([{ n: "CREATINA MONOHIDRATO  300 gr", q: 1, i: 0 }]) });
+  ctx.updateRow("Compras", "idPend2", { proveedor: "X", sumar: "sí", items: JSON.stringify([{ n: "CREATINA MONOHIDRATO  300 gr", q: 4, i: 0 }]) });
+  check("editar una pendiente con 'sumar al stock': suma lo editado una sola vez", cant("CREATINA MONOHIDRATO  300 gr") === c0 + 7 && sumado("idPend2") === "sí");
+  ctx.addRow("Compras", { id: "idPend3", proveedor: "X", detalle: "1 x Star · Creatina", total: "1", items: JSON.stringify([{ n: "CREATINA MONOHIDRATO  300 gr", q: 1, i: 0 }]) });
+  check("sin indicar nada (CRM viejo): suma al guardar como antes", cant("CREATINA MONOHIDRATO  300 gr") === c0 + 8 && sumado("idPend3") === "sí");
+  ctx.addRow("Compras", { id: "idPend4", proveedor: "X", detalle: "1 x Algo", total: "1", sumar: "no", items: "[]" });
+  let err = ""; try { ctx.compraSumarStock("idPend4"); } catch (e) { err = e.message; }
+  check("pendiente sin productos asociados: avisa y no suma", /no tiene productos/.test(err));
+  ctx.deleteRow("Compras", "idPend1"); ctx.deleteRow("Compras", "idPend2"); ctx.deleteRow("Compras", "idPend3"); ctx.deleteRow("Compras", "idPend4");
+  check("borrar las compras sumadas resta lo sumado (vuelve al stock inicial)", cant("CREATINA MONOHIDRATO  300 gr") === c0);
 }
 
 console.log("Copias automáticas");

@@ -60,7 +60,11 @@ export function resumenCompra(r: Row): string {
   const it = itemsDeCompra(r.detalle);
   const u = it.reduce((a, i) => a + i.cantidad, 0);
   const adj = archivosDeCompra(r).length;
-  return (it.length ? `${it.length} productos · ${u} unidades` : String(r.detalle || "").split("\n")[0]) + (adj ? ` · 📎 ${adj}` : "");
+  return (
+    (it.length ? `${it.length} productos · ${u} unidades` : String(r.detalle || "").split("\n")[0]) +
+    (adj ? ` · 📎 ${adj}` : "") +
+    (r.sumado === "no" ? " · ⏳ sin sumar" : "")
+  );
 }
 
 const norm = (t: string) =>
@@ -133,7 +137,7 @@ function Hoja({ titulo, onClose, acciones, children, as = "div", onSubmit }: {
 
 /* ------------------------------ Detalle ---------------------------------- */
 
-export function CompraDetail({ row, onClose, onEdit }: { row: Row; onClose: () => void; onEdit: () => void }) {
+export function CompraDetail({ row, onClose, onEdit, onSumar }: { row: Row; onClose: () => void; onEdit: () => void; onSumar?: () => void }) {
   const items = itemsDeCompra(row.detalle);
   const unidades = items.reduce((a, i) => a + i.cantidad, 0);
   const calculado = items.reduce((a, i) => a + i.cantidad * i.precio, 0);
@@ -156,6 +160,17 @@ export function CompraDetail({ row, onClose, onEdit }: { row: Row; onClose: () =
           <div><p className="text-[11px] font-bold uppercase tracking-wide text-muted">Unidades</p><p className="font-semibold text-ink">{unidades}</p></div>
           {row.sumado === "sí" && (
             <p className="col-span-2 rounded-lg bg-green-50 px-3 py-2 text-xs font-semibold text-green-700">✓ Estas unidades se sumaron al stock de la tienda</p>
+          )}
+          {row.sumado === "no" && (
+            <div className="col-span-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <p className="text-xs font-semibold text-amber-900">⏳ Pendiente: estas unidades todavía no se sumaron al stock.</p>
+              <p className="mt-0.5 text-[11px] text-amber-800">Revisá que esté todo bien (cantidades y productos) y después sumala.</p>
+              {onSumar && (
+                <button type="button" onClick={onSumar} className="btn btn-primary btn-md mt-2.5 w-full">
+                  Sumar al stock
+                </button>
+              )}
+            </div>
           )}
         </div>
 
@@ -229,8 +244,11 @@ export function CompraSheet({ initial, saving, onClose, onSave }: {
   const [escribir, setEscribir] = useState(false);
   const [texto, setTexto] = useState("");
   const [aviso, setAviso] = useState<{ n: number; fuente: string; dudas: string; total: number } | null>(null);
-  // Suma al stock solo en compras nuevas o en las que ya sumaron (las viejas no).
-  const sumaStock = !initial?.id || initial.sumado === "sí";
+  // Suma al stock solo en compras nuevas, pendientes o que ya sumaron (las viejas no).
+  const pendiente = initial?.sumado === "no";
+  const elegirSuma = !initial?.id || pendiente;
+  const sumaStock = elegirSuma || initial?.sumado === "sí";
+  const [sumarAhora, setSumarAhora] = useState(false);
   const [items, setItems] = useState<ItemForm[]>(() => {
     const it = itemsDeCompra(initial?.detalle);
     let mapa: { n: string; v?: string; i: number }[] = [];
@@ -346,6 +364,8 @@ export function CompraSheet({ initial, saving, onClose, onSave }: {
       notas,
       archivos: archivos.length ? JSON.stringify(archivos) : "",
       ...(sumaStock ? { items: JSON.stringify(stock) } : {}),
+      // Nueva o pendiente: se suma ahora solo si se marcó; si no, queda pendiente.
+      ...(elegirSuma ? { sumar: sumarAhora ? "sí" : "no" } : {}),
     });
   };
 
@@ -519,6 +539,20 @@ export function CompraSheet({ initial, saving, onClose, onSave }: {
           <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={2} className="input py-2.5 text-base" /></label>
 
         {archivos.length > 0 && <Adjuntos archivos={archivos} onQuitar={(id) => setArchivos((a) => a.filter((x) => x.id !== id))} />}
+
+        {elegirSuma && (
+          <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${sumarAhora ? "border-amber-300 bg-amber-50" : "border-line bg-white"}`}>
+            <input type="checkbox" checked={sumarAhora} onChange={(e) => setSumarAhora(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-[rgb(var(--color-primary))]" />
+            <span className="text-sm">
+              <span className="block font-semibold text-ink">Sumar al stock al guardar</span>
+              <span className="block text-xs text-muted">
+                {sumarAhora
+                  ? "Las unidades se suman al stock de la tienda apenas guardes."
+                  : "Queda pendiente: revisala tranquilo y después la sumás desde el detalle con «Sumar al stock»."}
+              </span>
+            </span>
+          </label>
+        )}
 
         <div className="sticky -bottom-5 -mx-5 border-t border-line bg-page/95 px-5 pb-5 pt-3 backdrop-blur">
           <div className="mb-3 flex items-center justify-between rounded-xl bg-accent-soft px-4 py-2.5">

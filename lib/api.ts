@@ -638,6 +638,12 @@ export interface OrderInput {
 }
 
 /** Aprueba el pago de un pedido en el CRM: descuenta el stock y lo marca pagado. */
+/** Suma al stock una compra pendiente (el backend no la suma dos veces). */
+export async function sumarCompraAlStock(id: string): Promise<boolean> {
+  const r = await api("compra_sumar_stock", { id }, 30000);
+  return r.ok !== false;
+}
+
 export async function aprobarPedido(id: string): Promise<boolean> {
   const r = await api("aprobar_pedido", { id }, 15000);
   return r.ok !== false;

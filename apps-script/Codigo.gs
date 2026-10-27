@@ -18,7 +18,7 @@
  * ============================================================================ */
 
 var SHEET_ID = "12paAzW6OcSgYv4u6L7QVI4tpvrEx1yqnujW0OjcieMc";
-var API_VERSION = "v12"; // v12: lectura de compras con Claude Haiku 5.5 (el más barato) // v11: las compras leen fotos, archivos y texto con Claude // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
+var API_VERSION = "v13"; // v13: compras pendientes (se revisan y se suman al stock después) // v12: lectura de compras con Claude Haiku 5.5 (el más barato) // v11: las compras leen fotos, archivos y texto con Claude // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
 
 // Repo de GitHub donde se guardan las fotos de productos (en public/productos/).
 // El token NO va acá: se guarda en Propiedades del script como GITHUB_TOKEN.
@@ -133,7 +133,7 @@ var TABLES = {
       ["pago", "Pago"],
       ["notas", "Notas"],
       ["items", "Items"], // JSON [{n, v, q}] → productos del catálogo a los que se suma stock
-      ["sumado", "Stock sumado"],
+      ["sumado", "Stock sumado"], // "sí" = sumó al stock · "no" = pendiente de sumar · vacío = compra vieja
       ["archivos", "Archivos"], // JSON [{id, nombre, tipo, url}] → fotos y archivos guardados en Drive
     ],
     idField: "id",
@@ -296,6 +296,7 @@ function limitar(tipo, id) {
 var ACCIONES_ESCRITURA = {
   productos_save: 1, add: 1, update: 1, delete: 1, categoria_rename: 1, producto_rename: 1,
   subir_imagen: 1, borrar_imagen: 1, subir_comprobante: 1, mp_webhook: 1, aprobar_pedido: 1, registrar: 1,
+  compra_sumar_stock: 1,
 };
 
 function conBloqueo(fn) {
@@ -372,6 +373,9 @@ function ejecutar(action, p, e, esAdmin) {
         break;
       case "compra_archivo_estado":
         out = compraArchivoEstado(p);
+        break;
+      case "compra_sumar_stock":
+        out = { ok: true, data: compraSumarStock(p.id) };
         break;
       case "mp_crear_pref":
         out = mpCrearPreferencia(p);
@@ -560,9 +564,11 @@ function addRow(tab, obj) {
       obj.descontado = "sí";
     }
   }
-  // Compras: lo comprado se suma al stock de cada producto del catálogo.
+  // Compras: lo comprado se suma al stock de cada producto del catálogo, salvo
+  // que se guarde pendiente (sumar: "no") para revisarla y sumarla después.
   if (tab === "Compras" && obj.items) {
-    if (moverStockCompra(obj.items, +1)) obj.sumado = "sí";
+    if (obj.sumar === "no") obj.sumado = "no";
+    else if (moverStockCompra(obj.items, +1)) obj.sumado = "sí";
   }
   var line = keys.map(function (k) {
     return sanitize(k, obj[k]);
@@ -576,15 +582,38 @@ function updateRow(tab, id, obj) {
   if (n < 0) throw new Error("No se encontró: " + id);
   if (tab === "Pedidos" && obj.hasOwnProperty("items")) ajustarStockPorEdicion(n, obj);
   if (tab === "Compras" && obj.hasOwnProperty("items")) ajustarStockCompraPorEdicion(n, obj);
-  return updateRowByNumber(tab, n, obj);
+  var res = updateRowByNumber(tab, n, obj);
+  // Compra pendiente que se guarda con "sumar al stock": se suma una sola vez.
+  if (tab === "Compras" && obj.sumar === "sí") compraSumarStock(id);
+  return res;
+}
+
+// Suma al stock una compra pendiente (sumado "no"). Si ya se sumó no hace nada,
+// así un doble clic o un reintento nunca suma dos veces.
+function compraSumarStock(id) {
+  var n = findRowById("Compras", id);
+  if (n < 0) throw new Error("No se encontró la compra");
+  var keys = keysOf("Compras");
+  var sh = sheetFor("Compras");
+  var row = sh.getRange(n, 1, 1, keys.length).getValues()[0];
+  var iS = keys.indexOf("sumado");
+  if (low(row[iS]) === "sí") return { sumada: true, yaEstaba: true };
+  var items = String(row[keys.indexOf("items")] || "");
+  if (!items || items === "[]") throw new Error("Esta compra no tiene productos asociados al stock.");
+  moverStockCompra(items, +1);
+  sh.getRange(n, iS + 1).setValue("sí");
+  return { sumada: true };
 }
 
 // Editar los productos de una compra que ya sumó stock: resta lo viejo y suma
-// lo nuevo. Las compras viejas (sin "Stock sumado") no tocan el stock.
+// lo nuevo. Una pendiente solo guarda los productos (todavía no tocó el stock) y
+// las compras viejas (sin "Stock sumado") no tocan el stock.
 function ajustarStockCompraPorEdicion(n, obj) {
   var keys = keysOf("Compras");
   var row = sheetFor("Compras").getRange(n, 1, 1, keys.length).getValues()[0];
-  if (low(row[keys.indexOf("sumado")]) !== "sí") { delete obj.items; return; }
+  var estado = low(row[keys.indexOf("sumado")]);
+  if (estado === "no") return;
+  if (estado !== "sí") { delete obj.items; return; }
   var viejo = String(row[keys.indexOf("items")] || "[]");
   var nuevo = String(obj.items || "[]");
   if (viejo === nuevo) return;
