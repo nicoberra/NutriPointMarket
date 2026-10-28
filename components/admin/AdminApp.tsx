@@ -8,6 +8,7 @@ import { useProducts } from "@/context/ProductsContext";
 import { AdminRecords, type RecordsConfig } from "./AdminRecords";
 import { AdminDashboard } from "./AdminDashboard";
 import { AdminBilling } from "./AdminBilling";
+import { ValorMercaderia } from "./ValorMercaderia";
 import { resumenCompra } from "./Compras";
 import { PullToRefresh } from "./PullToRefresh";
 import { prefetchTables, clearTables } from "@/lib/tableCache";
@@ -324,7 +325,12 @@ export function AdminApp() {
           {section === "pedidos" && (
             <AdminRecords config={PEDIDOS_CFG} onToast={setToast} />
           )}
-          {section === "compras" && <AdminRecords config={COMPRAS_CFG} onToast={setToast} />}
+          {section === "compras" && (
+            <div className="space-y-4">
+              <ValorMercaderia />
+              <AdminRecords config={COMPRAS_CFG} onToast={setToast} />
+            </div>
+          )}
           </div>
         </main>
       </div>
