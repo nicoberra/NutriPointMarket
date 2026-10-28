@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useConfirm } from "./useConfirm";
 import { OrderSheet } from "./OrderSheet";
+import { MoneyInput } from "./MoneyInput";
 import { CompraDetail, CompraSheet } from "./Compras";
 import { addRow, updateRow, deleteRow, aprobarPedido, sumarCompraAlStock, localAsset, lastApiError } from "@/lib/api";
 import { peekTable, fetchTable, ensureTable, subscribeTable, patchTable } from "@/lib/tableCache";
@@ -1019,10 +1020,18 @@ function AddSheet({
                     </option>
                   ))}
                 </select>
+              ) : f.type === "number" ? (
+                // Los campos numéricos de estas planillas son plata (monto, costo, total).
+                <MoneyInput
+                  value={String(form[f.key] ?? "").trim() === "" ? "" : Number(form[f.key]) || 0}
+                  onChange={(n) => setForm((s) => ({ ...s, [f.key]: n === "" ? "" : String(n) }))}
+                  decimales={2}
+                  aria-label={f.label}
+                  className="input h-11 w-full text-base"
+                />
               ) : (
                 <input
                   type={f.type ?? "text"}
-                  inputMode={f.type === "number" ? "numeric" : undefined}
                   required={f.required}
                   value={form[f.key] ?? ""}
                   onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}

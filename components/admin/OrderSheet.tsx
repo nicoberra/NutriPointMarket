@@ -8,6 +8,7 @@ import { brandName } from "@/data/brands";
 import { CloseIcon, PlusIcon, TrashIcon } from "@/components/Icons";
 import { useDollar, costToPesos } from "./AdminProducts";
 import { vendePorCaja } from "@/lib/stock";
+import { MoneyInput } from "./MoneyInput";
 import { listPrice } from "@/lib/config";
 
 type Row = Record<string, string>;
@@ -341,14 +342,12 @@ export function OrderSheet({
           {/* Envío */}
           <div className="grid grid-cols-[120px_1fr] gap-2">
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold text-ink">Envío ($)</span>
-              <input
-                value={montoEnvio}
-                onChange={(e) => setMontoEnvio(e.target.value)}
-                type="number"
-                inputMode="numeric"
+              <span className="mb-1 block text-xs font-semibold text-ink">Envío</span>
+              <MoneyInput
+                value={montoEnvio === "" ? "" : Number(montoEnvio) || ""}
+                onChange={(n) => setMontoEnvio(n === "" ? "" : String(n))}
                 placeholder="0"
-                className="input h-11 text-base"
+                className="input h-11 w-full text-base"
               />
             </label>
             <label className="block">
