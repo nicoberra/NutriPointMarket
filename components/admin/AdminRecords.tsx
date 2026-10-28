@@ -40,6 +40,8 @@ export interface RecordsConfig {
   secondary: (r: Record<string, string>) => string;
   /** Monto destacado al principio de la línea secundaria (ej. lo gastado en Compras, en naranja) */
   monto?: (r: Record<string, string>) => string;
+  /** Parte de la línea secundaria que va en negrita (con un grupo de captura, ej. /(\d+ unidades)/) */
+  destacar?: RegExp;
   /** Muestra estado Pendiente/Entregado con toggle (para Pedidos) */
   estado?: boolean;
   /** Muestra botón "Aprobar pago" que descuenta stock (para Pedidos) */
@@ -554,7 +556,11 @@ export function AdminRecords({
                       {config.secondary(r) && " · "}
                     </>
                   )}
-                  {config.secondary(r)}
+                  {config.destacar
+                    ? config.secondary(r)
+                        .split(config.destacar)
+                        .map((parte, k) => (k % 2 ? <b key={k} className="font-bold text-ink">{parte}</b> : parte))
+                    : config.secondary(r)}
                 </p>
                 {isClientes &&
                   (() => {

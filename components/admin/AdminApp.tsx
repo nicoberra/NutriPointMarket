@@ -103,6 +103,7 @@ const COMPRAS_CFG: RecordsConfig = {
   // Lo gastado va en naranja, adelante del resumen.
   monto: (r) => (r.total ? `$${Number(r.total).toLocaleString("es-AR")}` : ""),
   secondary: (r) => resumenCompra(r),
+  destacar: /(\d+ unidades?)/,
   deletable: true,
   detail: true,
 };
@@ -111,6 +112,23 @@ export function AdminApp() {
   const [ready, setReady] = useState(false);
   const [authed, setAuthed] = useState(false);
   const { refresh: refreshProducts } = useProducts();
+
+  // En el CRM no se hace zoom sin querer: Ctrl + ruedita, pellizco del touchpad
+  // (llega como ruedita con Ctrl) y Ctrl +/−. Ctrl + 0 sigue andando para volver al 100%.
+  useEffect(() => {
+    const rueda = (e: WheelEvent) => {
+      if (e.ctrlKey) e.preventDefault();
+    };
+    const teclas = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && ["+", "-", "=", "_", "Add", "Subtract"].includes(e.key)) e.preventDefault();
+    };
+    window.addEventListener("wheel", rueda, { passive: false });
+    window.addEventListener("keydown", teclas);
+    return () => {
+      window.removeEventListener("wheel", rueda);
+      window.removeEventListener("keydown", teclas);
+    };
+  }, []);
   const [section, setSection] = useState<Section>("dashboard");
   const [toast, setToast] = useState<string | null>(null);
 
@@ -272,7 +290,7 @@ export function AdminApp() {
       </aside>
 
       {/* Columna principal */}
-      <div className="flex min-h-screen flex-1 flex-col lg:pl-52">
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col lg:pl-52">
         {/* Top bar */}
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-primary px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] text-white lg:bg-white lg:px-8 lg:py-5">
           <div>
@@ -313,7 +331,7 @@ export function AdminApp() {
         </header>
 
         {/* Contenido */}
-        <main className="w-full flex-1 p-4 pb-24 lg:p-8 lg:pb-10 2xl:px-12">
+        <main className="w-full min-w-0 flex-1 p-4 pb-24 lg:p-8 lg:pb-10 2xl:px-12">
           <div key={section} className="animate-section-in motion-reduce:animate-none">
           {section === "dashboard" && (
             <AdminDashboard onGo={(s) => setSection(s)} />
