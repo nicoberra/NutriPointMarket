@@ -201,7 +201,7 @@ export function AdminBilling() {
       </section>
 
       {/* Plata en mercadería: stock actual × costo */}
-      <ValorMercaderia />
+      <ValorMercaderia conGanancia />
 
       {/* Compras de mercadería y resultado (lo que entró menos lo que se gastó en mercadería) */}
       {compras.length > 0 && (

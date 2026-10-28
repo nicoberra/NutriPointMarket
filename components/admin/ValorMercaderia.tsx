@@ -26,7 +26,7 @@ function monto(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-export function ValorMercaderia() {
+export function ValorMercaderia({ conGanancia = false }: { conGanancia?: boolean }) {
   const { products, loading } = useProducts();
   const dollar = useDollar();
   // Compras cargadas pero todavía sin sumar al stock (no entran en el valor).
@@ -51,7 +51,10 @@ export function ValorMercaderia() {
 
   const m = useMemo(() => {
     let total = 0, uds = 0, prods = 0, enDolares = false;
+    // Si se vende todo al precio con transferencia (el del CRM): solo productos con costo y precio.
+    let venta = 0, costoVendible = 0;
     const sinCosto: string[] = [];
+    const sinPrecio: string[] = [];
     for (const p of products) {
       if (p.combo?.length) continue;
       const u = unidades(p);
@@ -64,9 +67,15 @@ export function ValorMercaderia() {
         continue;
       }
       if (p.costCurrency === "USD") enDolares = true;
-      total += costToPesos(costo, p.costCurrency ?? "ARS", dollar) * u;
+      const valor = costToPesos(costo, p.costCurrency ?? "ARS", dollar) * u;
+      total += valor;
+      const precio = p.basePrice ?? 0;
+      if (precio > 0) {
+        venta += precio * u;
+        costoVendible += valor;
+      } else sinPrecio.push(p.name);
     }
-    return { total, uds, prods, enDolares, sinCosto };
+    return { total, uds, prods, enDolares, sinCosto, sinPrecio, venta, ganancia: venta - costoVendible };
   }, [products, dollar]);
 
   // El costo llega con el token unos segundos después de pintar: hasta que haya
@@ -90,6 +99,27 @@ export function ValorMercaderia() {
           </p>
         </div>
       </div>
+
+      {conGanancia && !esperando && m.venta > 0 && (
+        <dl className="mt-3 grid grid-cols-1 gap-2 border-t border-line pt-3 text-sm sm:grid-cols-2">
+          <div className="rounded-xl bg-page-soft px-3 py-2">
+            <dt className="text-xs text-muted">Si vendés todo (precio con transferencia)</dt>
+            <dd className="font-display text-xl font-black text-ink">{formatPrice(Math.round(m.venta))}</dd>
+          </div>
+          <div className="rounded-xl border border-green-200 bg-green-50 px-3 py-2">
+            <dt className="text-xs text-muted">Ganancia (venta − costo)</dt>
+            <dd className={`font-display text-xl font-black ${m.ganancia >= 0 ? "text-green-600" : "text-sale"}`}>
+              {m.ganancia < 0 ? "− " : "↗ "}
+              {formatPrice(Math.round(Math.abs(m.ganancia)))}
+            </dd>
+          </div>
+          {m.sinPrecio.length > 0 && (
+            <p className="text-xs text-muted sm:col-span-2">
+              Sin precio cargado (no entran en la ganancia): {m.sinPrecio.join(" · ")}
+            </p>
+          )}
+        </dl>
+      )}
 
       {m.sinCosto.length > 0 && (
         <details className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">

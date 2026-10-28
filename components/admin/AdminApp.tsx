@@ -100,8 +100,9 @@ const COMPRAS_CFG: RecordsConfig = {
     const m = String(r.fecha || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
     return [r.proveedor || "Compra", m ? `${m[3]}/${m[2]}/${m[1]}` : ""].filter(Boolean).join(" · ");
   },
-  secondary: (r) =>
-    [r.total ? `$${Number(r.total).toLocaleString("es-AR")}` : "", resumenCompra(r)].filter(Boolean).join(" · "),
+  // Lo gastado va en naranja, adelante del resumen.
+  monto: (r) => (r.total ? `$${Number(r.total).toLocaleString("es-AR")}` : ""),
+  secondary: (r) => resumenCompra(r),
   deletable: true,
   detail: true,
 };

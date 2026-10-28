@@ -48,6 +48,24 @@ export function itemsDeCompra(detalle: string | undefined): ItemCompra[] {
     });
 }
 
+/** Unidades por caja según el nombre: "(caja x 10)", "x 12 u", "10U". 0 si no es una caja. */
+export function unidadesPorCaja(producto: string): number {
+  const m = producto.match(/caja\s*(?:x|de)\s*(\d+)/i) || producto.match(/\b(\d+)\s*u(?:nid(?:ades)?)?\b/i);
+  const n = m ? Number(m[1]) : 0;
+  return n > 1 ? n : 0;
+}
+
+/** "Caja $19.189,50 · $1.918,95 c/u (x 10)" para los productos que vienen en caja. */
+function PrecioPorCaja({ producto, precio }: { producto: string; precio: number }) {
+  const n = unidadesPorCaja(producto);
+  if (!n || !precio) return null;
+  return (
+    <p className="text-xs font-semibold text-orange-600">
+      Caja x {n}: {pesos(precio / n)} cada una
+    </p>
+  );
+}
+
 export function detalleDeCompra(items: ItemCompra[]): string {
   return items
     .filter((i) => i.producto.trim())
@@ -60,11 +78,13 @@ export function resumenCompra(r: Row): string {
   const it = itemsDeCompra(r.detalle);
   const u = it.reduce((a, i) => a + i.cantidad, 0);
   const adj = archivosDeCompra(r).length;
-  return (
-    (it.length ? `${it.length} productos · ${u} unidades` : String(r.detalle || "").split("\n")[0]) +
-    (adj ? ` · 📎 ${adj}` : "") +
-    (r.sumado === "no" ? " · ⏳ sin sumar" : "")
-  );
+  return [
+    it.length ? `${it.length} productos · ${u} unidades` : String(r.detalle || "").split("\n")[0],
+    adj ? `📎 ${adj}` : "",
+    r.sumado === "no" ? "⏳ sin sumar" : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 const norm = (t: string) =>
@@ -184,7 +204,12 @@ export function CompraDetail({ row, onClose, onEdit, onSumar }: { row: Row; onCl
                 <div className="min-w-0">
                   {i.marca && <p className="text-[11px] font-bold uppercase tracking-wide text-primary">{i.marca}</p>}
                   <p className="font-medium leading-snug text-ink">{i.producto}</p>
-                  {i.precio > 0 && <p className="text-xs text-muted">{pesos(i.precio)} c/u</p>}
+                  {i.precio > 0 && (
+                    <p className="text-xs text-muted">
+                      {pesos(i.precio)} {unidadesPorCaja(i.producto) ? "la caja" : "c/u"}
+                    </p>
+                  )}
+                  <PrecioPorCaja producto={i.producto} precio={i.precio} />
                 </div>
                 <span className="text-right font-semibold text-ink">{i.cantidad || "—"}</span>
                 <span className="w-24 text-right font-semibold text-ink">{i.precio ? pesos(i.cantidad * i.precio) : "—"}</span>
@@ -347,9 +372,12 @@ export function CompraSheet({ initial, saving, onClose, onSave }: {
     const lista: ItemCompra[] = conProd.map((i) => ({ cantidad: Number(i.cantidad) || 0, marca: i.marca, producto: i.producto, precio: num(i.precio) }));
     const stock = conProd
       .map((it, k) => {
-        const q = Number(it.cantidad);
+        // Si viene en caja ("caja x 10"), al stock entran las unidades sueltas y el costo es por unidad.
+        const porCaja = unidadesPorCaja(it.producto) || 1;
+        const q = Number(it.cantidad) * porCaja;
         if (!(q > 0)) return null;
-        if (catDe(it) === NUEVO) return { nuevo: true, n: it.producto.trim(), marca: it.marca.trim(), q, costo: num(it.precio), i: k };
+        if (catDe(it) === NUEVO)
+          return { nuevo: true, n: it.producto.trim(), marca: it.marca.trim(), q, costo: Math.round((num(it.precio) / porCaja) * 100) / 100, i: k };
         const [n, v] = catDe(it).split("||");
         return n ? { n, ...(v ? { v } : {}), q, i: k } : null;
       })
@@ -497,6 +525,7 @@ export function CompraSheet({ initial, saving, onClose, onSave }: {
                     <span className="text-xs text-muted">Subtotal</span>
                     <span className="font-display text-base font-black text-ink">{pesos((Number(it.cantidad) || 0) * num(it.precio))}</span>
                   </div>
+                  <PrecioPorCaja producto={it.producto} precio={num(it.precio)} />
                   {sumaStock && (
                     <label className="mt-1.5 block">
                       <span className="sr-only">Sumar al stock de</span>
