@@ -43,6 +43,8 @@ type Changes = Partial<{
   costoMoneda: "USD" | "ARS";
   cantidad: number;
   variantes: string;
+  porCaja: number;
+  precioCaja: number;
 }>;
 
 export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
@@ -96,6 +98,9 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
       infoNutricional: p.nutrition ?? "",
       ingredientes: p.ingredients ?? "",
       combo: p.combo && p.combo.length ? JSON.stringify(p.combo) : "",
+      // 1 = no viene en caja ("" deja el valor que tenga la planilla).
+      porCaja: ch.porCaja ?? (p.unitsPerBox || ""),
+      precioCaja: ch.precioCaja ?? (p.boxBasePrice || ""),
     };
     try {
       const ok = await saveProduct(row);
@@ -372,6 +377,18 @@ function ProductRow({
     setCosto(product.cost || "");
     setMoneda(product.costCurrency ?? "ARS");
   }, [product.cost, product.costCurrency]);
+  // Caja: unidades que trae y precio de la caja. El costo guardado es siempre por
+  // unidad; el "costo de la caja" se muestra y se edita como costo × unidades.
+  const [porCaja, setPorCaja] = useState<number | "">(product.unitsPerBox || "");
+  const [precioCaja, setPrecioCaja] = useState<number | "">(product.boxBasePrice || "");
+  useEffect(() => {
+    setPorCaja(product.unitsPerBox || "");
+    setPrecioCaja(product.boxBasePrice || "");
+  }, [product.unitsPerBox, product.boxBasePrice]);
+  const nCaja = porCaja !== "" && porCaja > 1 ? porCaja : 0;
+  // Lo que se tipea en "Costo de la caja" mientras se edita (así se pueden escribir decimales).
+  const [cajaTxt, setCajaTxt] = useState<string | null>(null);
+  const redondear2 = (n: number) => Math.round(n * 100) / 100;
   // El precio del snapshot/caché puede estar viejo: cuando llega el dato
   // real de la planilla, los campos se actualizan (si no, el CRM mostraba un
   // precio desfasado y al tocar un campo lo guardaba).
@@ -748,6 +765,101 @@ function ProductRow({
             )}
           </div>
         )}
+
+        {/* Viene en caja: costo de la caja ↔ costo por unidad, y precio de la caja */}
+        <div className="mt-3 border-t border-line/70 pt-3">
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-ink">
+              Unidades por caja <span className="font-normal text-muted">(vacío = no viene en caja)</span>
+            </span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              value={porCaja}
+              onChange={(e) => setPorCaja(e.target.value ? Math.max(0, Math.floor(Number(e.target.value))) : "")}
+              onBlur={() => onSave(product, { porCaja: nCaja || 1 })}
+              aria-label="Unidades por caja"
+              className="input h-10 w-20 text-center text-base"
+            />
+          </label>
+          {nCaja > 0 && (
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold text-ink">Costo de la caja</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={cajaTxt ?? (costo === "" ? "" : redondear2(Number(costo) * nCaja))}
+                  onChange={(e) => {
+                    setCajaTxt(e.target.value);
+                    setCosto(e.target.value ? redondear2(Number(e.target.value) / nCaja) : "");
+                  }}
+                  onBlur={() => {
+                    setCajaTxt(null);
+                    saveCosto();
+                  }}
+                  className="input h-10 text-base"
+                />
+              </label>
+              <div className="rounded-lg border border-line bg-white px-3 py-1.5">
+                <span className="block text-xs font-semibold text-ink">Costo de cada una</span>
+                <span className="font-display text-base font-black text-primary">
+                  {costoNum > 0
+                    ? `$ ${redondear2(costoPesos).toLocaleString("es-AR", { maximumFractionDigits: 2 })}`
+                    : "—"}
+                </span>
+              </div>
+              {/* Precios de venta (con transferencia): la caja y cada una por separado */}
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold text-ink">Precio de la caja</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={precioCaja}
+                  placeholder="No se vende por caja"
+                  onChange={(e) => setPrecioCaja(e.target.value ? Number(e.target.value) : "")}
+                  onBlur={() => onSave(product, { precioCaja: precioCaja === "" ? 0 : precioCaja })}
+                  className="input h-10 text-base placeholder:text-xs"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold text-ink">Precio de cada una</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={precioNormal}
+                  onChange={(e) => setPrecioNormal(Number(e.target.value))}
+                  onBlur={savePrices}
+                  className="input h-10 text-base"
+                />
+              </label>
+              <p className="col-span-2 text-[11px] text-muted">
+                Precios con transferencia. Vacío el de la caja = solo se vende por unidad.
+              </p>
+              {precioCaja !== "" && precioCaja > 0 && (
+                <div className="col-span-2 space-y-1 rounded-lg border border-line bg-white px-3 py-2 text-xs text-muted">
+                  <p>
+                    En la web: <b className="text-ink">{formatPrice(listPrice(precioCaja))}</b> la caja ·{" "}
+                    <b className="text-ink">{formatPrice(listPrice(precioFinal))}</b> cada una
+                  </p>
+                  {costoPesos > 0 && (
+                    <p className="flex flex-wrap gap-1.5">
+                      <span className="rounded-full bg-green-100 px-2 py-0.5 font-bold text-green-700">
+                        Ganancia por caja {formatPrice(Math.round(precioCaja - costoPesos * nCaja))}
+                      </span>
+                      {precioFinal > 0 && (
+                        <span className="rounded-full bg-green-100 px-2 py-0.5 font-bold text-green-700">
+                          Las {nCaja} sueltas: ganancia {formatPrice(Math.round((precioFinal - costoPesos) * nCaja))}
+                        </span>
+                      )}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
       )}
 

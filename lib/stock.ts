@@ -1,4 +1,30 @@
 import type { Product, CartItem } from "./types";
+import { listPrice } from "./config";
+
+/** ¿Se vende también por caja cerrada? (tiene unidades por caja y precio de la caja). */
+export function vendePorCaja(p: Product): boolean {
+  return !p.combo?.length && (p.unitsPerBox ?? 0) > 1 && (p.boxBasePrice ?? 0) > 0;
+}
+
+/** El mismo producto con el precio de la caja (así el carrito y el checkout suman bien). */
+export function comoCaja(p: Product): Product {
+  const base = p.boxBasePrice ?? 0;
+  return { ...p, price: listPrice(base), basePrice: base, oldPrice: undefined, baseOldPrice: undefined, discount: 0 };
+}
+
+/**
+ * Cajas cerradas disponibles: unidades ÷ unidades por caja, para abajo. Si se
+ * vendió una unidad suelta, esa caja quedó abierta y ya no cuenta.
+ * Sin seguimiento de stock → 99.
+ */
+export function cajasDisponibles(p: Product, flavor?: string): number {
+  const porCaja = p.unitsPerBox ?? 0;
+  if (porCaja < 2) return 0;
+  const v = p.variants?.find((x) => x.name === flavor);
+  const unidades = v ? v.qty : (p.stockQty ?? 0) > 0 ? (p.stockQty as number) : null;
+  if (unidades == null) return p.inStock === false ? 0 : 99;
+  return Math.floor(Math.max(0, unidades) / porCaja);
+}
 
 /**
  * Máximo que se puede comprar de un producto (según la variante elegida):
@@ -66,6 +92,7 @@ export function comboStockMax(
 /** Máximo comprable de un ítem del carrito (combo con elección o producto normal). */
 export function itemMax(item: CartItem, all: Product[]): number {
   if (item.comboChoices) return Math.max(1, comboStockMax(item.product, all, item.comboChoices));
+  if (item.box) return Math.max(1, cajasDisponibles(item.product, item.flavor));
   return stockMax(item.product, item.flavor);
 }
 

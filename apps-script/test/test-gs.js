@@ -137,7 +137,7 @@ const items = (arr) => JSON.stringify(arr);
 
 /* --------------------------------- Pruebas -------------------------------- */
 console.log("Versión y lecturas");
-check("version v14", call({ action: "version" }).version === "v14");
+check("version v15", call({ action: "version" }).version === "v15");
 const l1 = call({ action: "productos_list" });
 check("productos_list público sin costos", l1.ok && l1.data.length === 5 && !("costo" in l1.data[0]));
 const hitsAntes = cacheHits;
@@ -453,6 +453,31 @@ console.log("Varias categorías por producto");
   check("  ...sin repetirla si ya estaba en la nueva", catDe("Combo Test") === "Snacks proteicos", catDe("Combo Test"));
   check("  ...y no toca categorías que solo empiezan igual", catDe("Chipa Test").indexOf("Pancakes PROTEICOS") > 0);
   ["Chipa Test", "Cookie Test", "Combo Test"].forEach((n) => ctx.deleteRow("Productos", n));
+}
+
+console.log("Venta por caja o por unidad");
+{
+  ctx.addRow("Productos", { nombre: "Barra Test", categoria: "Snacks", precio: 2400, stock: "sí", cantidad: 25, variantes: "Choco:15, Mani:10", porCaja: 10, precioCaja: 20000 });
+  ctx.addRow("Productos", { nombre: "Barra Sin Caja", categoria: "Snacks", precio: 1000, stock: "sí", cantidad: 30, porCaja: 10 });
+  const v = () => String(prod("Barra Test").variantes);
+  const lista = call({ action: "productos_list" }).data.find((x) => x.nombre === "Barra Test");
+  check("productos_list trae unidades por caja y precio de la caja", lista && lista.porCaja === 10 && lista.precioCaja === 20000, lista);
+  let rc = addPedido({ id: "ped1794400000001", cliente: "Caja", monto: 2400, pago: "Efectivo", items: items([{ n: "Barra Test", v: "Choco", q: 1, caja: true }]) });
+  check("caja cobrada al precio de una barrita → rechazo", rc.ok === false && /precios se actualizaron/.test(rc.error), rc);
+  rc = addPedido({ id: "ped1794400000002", cliente: "Caja", monto: 20000, pago: "Efectivo", items: items([{ n: "Barra Test", v: "Choco", q: 1, caja: true }]) });
+  check("caja → precio de la caja y descuenta sus 10 unidades", rc.ok && /Choco:5/.test(v()) && prod("Barra Test").cantidad === 15, [rc, prod("Barra Test")]);
+  rc = addPedido({ id: "ped1794400000003", cliente: "Caja", monto: 20000, pago: "Efectivo", items: items([{ n: "Barra Test", v: "Choco", q: 1, caja: true }]) });
+  check("caja abierta (quedan 5) → no se puede vender otra caja", rc.ok === false && /Solo quedan|Sin stock/.test(rc.error), rc);
+  rc = addPedido({ id: "ped1794400000004", cliente: "Suelta", monto: 2400, pago: "Efectivo", items: items([{ n: "Barra Test", v: "Choco", q: 1 }]) });
+  check("  ...pero sí por unidad (precio de la barrita, descuenta 1)", rc.ok && /Choco:4/.test(v()), [rc, v()]);
+  rc = addPedido({ id: "ped1794400000005", cliente: "MP", monto: precioWeb(20000), pago: "Mercado Pago", items: items([{ n: "Barra Test", v: "Mani", q: 1, caja: true }]) });
+  check("caja por Mercado Pago → precio publicado de la caja", rc.ok && /Mani:0/.test(v()), [rc, v()]);
+  rc = addPedido({ id: "ped1794400000006", cliente: "X", monto: 1000, pago: "Efectivo", items: items([{ n: "Barra Sin Caja", q: 1, caja: true }]) });
+  check("producto sin precio de caja → no se vende por caja", rc.ok === false && /no se vende por caja/.test(rc.error), rc);
+  ctx.deleteRow("Pedidos", "ped1794400000002");
+  check("borrar el pedido de la caja repone las 10 unidades", /Choco:14/.test(v()), v());
+  ctx.deleteRow("Productos", "Barra Test");
+  ctx.deleteRow("Productos", "Barra Sin Caja");
 }
 
 console.log("Copias automáticas");
