@@ -108,7 +108,8 @@ export function ProductsProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<ProductsContextValue>(() => {
     // En la tienda, los combos muestran también las fotos de sus productos.
-    const list = isAdmin ? products : conFotosDeCombos(products).filter((p) => !!p.image);
+    // Sin precio cargado tampoco se muestra (no se puede comprar a $0).
+    const list = isAdmin ? products : conFotosDeCombos(products).filter((p) => !!p.image && p.price > 0);
     const bySlug = new Map(list.map((p) => [p.slug, p]));
 
     // Marcas derivadas de los productos cargados (para filtros y /marcas).

@@ -21,7 +21,7 @@ import { categoryHref } from "@/lib/seo";
  */
 
 const SPEED = 0.6; // px por frame
-const CARD_W = 160; // ancho de cada tarjeta (coincide con la clase w-40)
+const CARD_W = 208; // ancho de cada tarjeta en compu (coincide con la clase sm:w-52)
 
 export function CategoryCarousel() {
   const { categories } = useCategories();
@@ -232,25 +232,25 @@ export function CategoryCarousel() {
                 key={`${c.slug}-${i}`}
                 href={categoryHref(c.slug)}
                 draggable={false}
-                className="group/slide flex w-40 shrink-0 flex-col items-center gap-3 px-2 text-center transition-transform duration-300 ease-enter hover:-translate-y-1 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+                className="group/slide flex w-44 shrink-0 flex-col items-center gap-3 px-2 text-center sm:w-52 transition-transform duration-300 ease-enter hover:-translate-y-1 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
               >
-                <div className="grid h-[130px] w-[130px] place-items-center overflow-hidden rounded-2xl bg-page-soft ring-1 ring-line transition-shadow group-hover/slide:ring-accent">
+                <div className="grid h-[156px] w-[156px] place-items-center overflow-hidden rounded-2xl sm:h-[188px] sm:w-[188px] bg-page-soft ring-1 ring-line transition-shadow group-hover/slide:ring-accent">
                   {c.image ? (
                     <SmartImg
                       src={c.image}
                       alt=""
-                      sizes="130px"
+                      sizes="(min-width: 640px) 188px, 156px"
                       decoding="async"
                       className="h-full w-full object-cover transition-transform duration-500 ease-enter group-hover/slide:scale-110 motion-reduce:transition-none"
                     />
                   ) : (
                     <ProductVisual
                       shape={c.shape}
-                      className="h-28 w-28 transition-transform duration-500 group-hover/slide:scale-110"
+                      className="h-32 w-32 transition-transform sm:h-40 sm:w-40 duration-500 group-hover/slide:scale-110"
                     />
                   )}
                 </div>
-                <span className="text-sm font-bold uppercase text-ink group-hover/slide:text-primary">
+                <span className="text-sm font-bold uppercase text-ink sm:text-base group-hover/slide:text-primary">
                   {c.name}
                 </span>
               </Link>
