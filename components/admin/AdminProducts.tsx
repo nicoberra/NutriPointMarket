@@ -453,7 +453,18 @@ function ProductRow({
   };
 
   return (
-    <div {...zonaFotos()} className={`relative rounded-xl border bg-white p-4 transition-colors ${arrastrando === "" ? "border-primary" : "border-line"}`}>
+    <div
+      {...zonaFotos()}
+      // Enter en un campo = guardar: suelta el foco (cada campo guarda al salir) sin moverte de lugar.
+      onKeyDown={(e) => {
+        const el = e.target as HTMLElement;
+        if (e.key === "Enter" && el.tagName === "INPUT" && !e.nativeEvent.isComposing) {
+          e.preventDefault();
+          el.blur();
+        }
+      }}
+      className={`relative rounded-xl border bg-white p-4 transition-colors ${arrastrando === "" ? "border-primary" : "border-line"}`}
+    >
       {arrastrando === "" && (
         <div aria-hidden className="pointer-events-none absolute inset-0 z-10 grid animate-fade-in place-items-center rounded-xl border-2 border-dashed border-primary bg-primary/10 text-sm font-bold text-primary motion-reduce:animate-none">
           Soltá para agregar las fotos
