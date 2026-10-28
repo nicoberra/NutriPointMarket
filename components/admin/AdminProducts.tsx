@@ -111,6 +111,18 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
   const refreshLater = (...delays: number[]) =>
     delays.forEach((ms) => setTimeout(() => refresh().catch(() => {}), ms));
 
+  useEffect(() => {
+    const evitar = (e: DragEvent) => {
+      if (Array.from(e.dataTransfer?.types ?? []).includes("Files")) e.preventDefault();
+    };
+    window.addEventListener("dragover", evitar);
+    window.addEventListener("drop", evitar);
+    return () => {
+      window.removeEventListener("dragover", evitar);
+      window.removeEventListener("drop", evitar);
+    };
+  }, []);
+
   const handleUpload = async (p: Product, file: File, variante?: string) => {
     onToast("Subiendo foto… ⏳");
     try {
@@ -308,6 +320,37 @@ function ProductRow({
   onDelete: (p: Product) => void;
 }) {
   const [uploading, setUploading] = useState(false);
+  // Fotos arrastradas desde la compu: "" = galería del producto, texto = esa variante.
+  const [arrastrando, setArrastrando] = useState<string | null>(null);
+  const hayArchivos = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes("Files");
+  const subirVarias = async (files: File[], variante?: string) => {
+    const imgs = files.filter((f) => f.type.startsWith("image/"));
+    if (!imgs.length) return;
+    setUploading(true);
+    // De a una: cada foto se guarda en GitHub y en la planilla.
+    for (const f of imgs) await onUpload(product, f, variante);
+    setUploading(false);
+  };
+  const zonaFotos = (variante?: string) => ({
+    onDragOver: (e: React.DragEvent) => {
+      if (!hayArchivos(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = "copy";
+      setArrastrando(variante ?? "");
+    },
+    onDragLeave: (e: React.DragEvent) => {
+      if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+      setArrastrando(null);
+    },
+    onDrop: (e: React.DragEvent) => {
+      if (!hayArchivos(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setArrastrando(null);
+      void subirVarias(Array.from(e.dataTransfer.files), variante);
+    },
+  });
   // "Foto por variante" arranca plegado (muestra 2); tocar el título abre todo.
   const [varsOpen, setVarsOpen] = useState(false);
   const [precioNormal, setPrecioNormal] = useState<number>(
@@ -390,7 +433,12 @@ function ProductRow({
   };
 
   return (
-    <div className="rounded-xl border border-line bg-white p-4">
+    <div {...zonaFotos()} className={`relative rounded-xl border bg-white p-4 transition-colors ${arrastrando === "" ? "border-primary" : "border-line"}`}>
+      {arrastrando === "" && (
+        <div aria-hidden className="pointer-events-none absolute inset-0 z-10 grid animate-fade-in place-items-center rounded-xl border-2 border-dashed border-primary bg-primary/10 text-sm font-bold text-primary motion-reduce:animate-none">
+          Soltá para agregar las fotos
+        </div>
+      )}
       <div className="mb-3 flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[11px] font-bold uppercase text-muted">
@@ -454,23 +502,25 @@ function ProductRow({
               </button>
             </div>
           ))}
-          <label className="grid h-14 w-14 cursor-pointer place-items-center rounded-lg border border-dashed border-line text-[10px] font-semibold text-primary hover:bg-page-soft">
+          <label
+            title="Tocá o arrastrá fotos acá"
+            className="grid h-14 w-14 cursor-pointer place-items-center rounded-lg border border-dashed border-line text-center text-[10px] font-semibold leading-tight text-primary hover:bg-page-soft"
+          >
             {uploading ? "…" : "+ Foto"}
             <input
               type="file"
               accept="image/*"
+              multiple
               className="hidden"
               disabled={uploading}
               onChange={async (e) => {
-                const file = e.target.files?.[0];
+                const files = Array.from(e.target.files ?? []);
                 e.target.value = "";
-                if (!file) return;
-                setUploading(true);
-                await onUpload(product, file);
-                setUploading(false);
+                await subirVarias(files);
               }}
             />
           </label>
+          <span className="hidden text-[10px] text-muted sm:inline">o arrastrá fotos a la tarjeta</span>
         </div>
 
         {view && <PhotoViewer src={view.src} label={view.label} onClose={() => setView(null)} />}
@@ -495,7 +545,16 @@ function ProductRow({
             {(varsOpen ? product.flavors : product.flavors.slice(0, 2)).map((f) => {
               const vimgs = product.variantImages?.[f] ?? [];
               return (
-                <div key={f} className="rounded-lg border border-line p-2">
+                <div
+                  key={f}
+                  {...zonaFotos(f)}
+                  className={`relative rounded-lg border p-2 transition-colors ${arrastrando === f ? "border-primary bg-primary/10" : "border-line"}`}
+                >
+                  {arrastrando === f && (
+                    <div aria-hidden className="pointer-events-none absolute inset-0 grid place-items-center rounded-lg border-2 border-dashed border-primary text-xs font-bold text-primary">
+                      Soltá para la foto de {f}
+                    </div>
+                  )}
                   <div className="mb-1.5 flex items-center justify-between gap-2">
                     <span className="truncate text-xs font-semibold text-ink">{f}</span>
                     <label className="cursor-pointer rounded border border-line px-2 py-1 text-[11px] font-semibold text-primary hover:bg-page-soft">
@@ -503,15 +562,13 @@ function ProductRow({
                       <input
                         type="file"
                         accept="image/*"
+                        multiple
                         className="hidden"
                         disabled={uploading}
                         onChange={async (e) => {
-                          const file = e.target.files?.[0];
+                          const files = Array.from(e.target.files ?? []);
                           e.target.value = "";
-                          if (!file) return;
-                          setUploading(true);
-                          await onUpload(product, file, f);
-                          setUploading(false);
+                          await subirVarias(files, f);
                         }}
                       />
                     </label>
