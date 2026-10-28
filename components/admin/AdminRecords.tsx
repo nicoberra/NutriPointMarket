@@ -38,6 +38,8 @@ export interface RecordsConfig {
   primary: (r: Record<string, string>) => string;
   /** Línea secundaria */
   secondary: (r: Record<string, string>) => string;
+  /** Monto destacado al principio de la línea secundaria (ej. lo gastado en Compras, en naranja) */
+  monto?: (r: Record<string, string>) => string;
   /** Muestra estado Pendiente/Entregado con toggle (para Pedidos) */
   estado?: boolean;
   /** Muestra botón "Aprobar pago" que descuenta stock (para Pedidos) */
@@ -420,7 +422,7 @@ export function AdminRecords({
   const visible =
     config.searchable && query
       ? base.filter((r) =>
-          `${config.primary(r)} ${config.secondary(r)}`.toLowerCase().includes(query),
+          `${config.primary(r)} ${config.monto?.(r) ?? ""} ${config.secondary(r)}`.toLowerCase().includes(query),
         )
       : base;
 
@@ -545,7 +547,15 @@ export function AdminRecords({
                     </span>
                   )}
                 </p>
-                <p className="truncate text-xs text-muted">{config.secondary(r)}</p>
+                <p className="truncate text-xs text-muted">
+                  {config.monto?.(r) && (
+                    <>
+                      <span className="font-bold text-orange-600">{config.monto(r)}</span>
+                      {config.secondary(r) && " · "}
+                    </>
+                  )}
+                  {config.secondary(r)}
+                </p>
                 {isClientes &&
                   (() => {
                     const n = ordersOf(r).length;
