@@ -69,6 +69,30 @@ export function itemMax(item: CartItem, all: Product[]): number {
   return stockMax(item.product, item.flavor);
 }
 
+/** Foto principal de cada producto del combo (sin repetir). */
+export function fotosDeComponentes(product: Product, all: Product[]): string[] {
+  const out: string[] = [];
+  for (const { comp } of comboComponents(product, all)) {
+    const f = comp.image || comp.images?.[0];
+    if (f && !out.includes(f)) out.push(f);
+  }
+  return out;
+}
+
+/**
+ * Tienda: la galería de cada combo suma la foto de cada producto que lo arma,
+ * después de las fotos propias del combo (si no tiene propias, usa esas).
+ */
+export function conFotosDeCombos(products: Product[]): Product[] {
+  return products.map((p) => {
+    if (!p.combo?.length) return p;
+    const extra = fotosDeComponentes(p, products).filter((f) => !p.images.includes(f));
+    if (!extra.length) return p;
+    const images = [...p.images, ...extra];
+    return { ...p, images, image: p.image || images[0] };
+  });
+}
+
 /**
  * Para los combos, calcula cuántos se pueden armar según el stock de cada
  * producto que lo compone (el menor manda). Si un componente no tiene

@@ -9,6 +9,7 @@ import { MarcaCombo } from "./MarcaCombo";
 import { ComboPicker } from "./ComboPicker";
 import type { Product } from "@/lib/types";
 import { useProducts } from "@/context/ProductsContext";
+import { fotosDeComponentes } from "@/lib/stock";
 import { useCategories } from "@/context/CategoriesContext";
 import {
   saveProduct,
@@ -320,6 +321,8 @@ function ProductRow({
   onDelete: (p: Product) => void;
 }) {
   const [uploading, setUploading] = useState(false);
+  const { products: todos } = useProducts();
+  const fotosCombo = product.combo?.length ? fotosDeComponentes(product, todos).filter((f) => !(product.images ?? []).includes(f)) : [];
   // Fotos arrastradas desde la compu: "" = galería del producto, texto = esa variante.
   const [arrastrando, setArrastrando] = useState<string | null>(null);
   const hayArchivos = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes("Files");
@@ -522,6 +525,18 @@ function ProductRow({
           </label>
           <span className="hidden text-[10px] text-muted sm:inline">o arrastrá fotos a la tarjeta</span>
         </div>
+
+        {fotosCombo.length > 0 && (
+          <div className="mt-2">
+            <p className="mb-1 text-[10px] text-muted">También se muestran en la web (fotos de los productos del combo):</p>
+            <div className="flex flex-wrap gap-1.5">
+              {fotosCombo.map((src) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={src} src={src} alt="" className="h-10 w-10 rounded-lg border border-line object-cover opacity-80" />
+              ))}
+            </div>
+          </div>
+        )}
 
         {view && <PhotoViewer src={view.src} label={view.label} onClose={() => setView(null)} />}
 
