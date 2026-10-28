@@ -5,6 +5,7 @@ import { useProducts } from "@/context/ProductsContext";
 import { brandName } from "@/data/brands";
 import { CheckIcon, CloseIcon, MinusIcon, PlusIcon, TrashIcon } from "@/components/Icons";
 import { ACEPTA_ARCHIVOS, leerCompra, type AnalisisCompra, type ArchivoCompra } from "@/lib/compras";
+import { MoneyInput } from "./MoneyInput";
 
 /**
  * Compras de mercadería a proveedores. Cada producto se guarda como un renglón
@@ -515,11 +516,8 @@ export function CompraSheet({ initial, saving, onClose, onSave }: {
                         className="h-11 w-10 bg-transparent text-center text-base font-bold text-ink focus:outline-none" />
                       <button type="button" onClick={() => sumar(k, 1)} aria-label="Una unidad más" className="grid h-11 w-10 place-items-center text-primary"><PlusIcon className="h-4 w-4" /></button>
                     </div>
-                    <label className="relative block">
-                      <span aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-muted">$</span>
-                      <input inputMode="decimal" value={it.precio} onChange={(e) => set(k, "precio", e.target.value)} placeholder="Precio c/u" aria-label="Precio por unidad"
-                        className="input h-11 pl-7 text-base" />
-                    </label>
+                    <MoneyInput value={it.precio.trim() === "" ? "" : num(it.precio)} onChange={(n) => set(k, "precio", n === "" ? "" : String(n))}
+                      decimales={2} placeholder="Precio c/u" aria-label="Precio por unidad" className="input h-11 w-full text-base" />
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-2 border-t border-line/70 pt-2">
                     <span className="text-xs text-muted">Subtotal</span>

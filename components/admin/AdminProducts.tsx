@@ -7,6 +7,7 @@ import { ComboBreakdown } from "./ComboBreakdown";
 import { PhotoViewer } from "./PhotoViewer";
 import { MarcaCombo } from "./MarcaCombo";
 import { ComboPicker } from "./ComboPicker";
+import { MoneyInput, formatoPlata } from "./MoneyInput";
 import type { Product } from "@/lib/types";
 import { useProducts } from "@/context/ProductsContext";
 import { fotosDeComponentes } from "@/lib/stock";
@@ -388,7 +389,7 @@ function ProductRow({
   }, [product.unitsPerBox, product.boxBasePrice]);
   const nCaja = porCaja !== "" && porCaja > 1 ? porCaja : 0;
   // Lo que se tipea en "Costo de la caja" mientras se edita (así se pueden escribir decimales).
-  const [cajaTxt, setCajaTxt] = useState<string | null>(null);
+  const [cajaTxt, setCajaTxt] = useState<number | "" | null>(null);
   const redondear2 = (n: number) => Math.round(n * 100) / 100;
   // El precio del snapshot/caché puede estar viejo: cuando llega el dato
   // real de la planilla, los campos se actualizan (si no, el CRM mostraba un
@@ -663,11 +664,9 @@ function ProductRow({
       <div className="grid grid-cols-[1fr_1.35fr] gap-3">
         <label className="block">
           <span className="mb-1 block text-xs font-semibold text-ink">Precio con transferencia</span>
-          <input
-            type="number"
-            inputMode="numeric"
+          <MoneyInput
             value={precioNormal || ""}
-            onChange={(e) => setPrecioNormal(Number(e.target.value))}
+            onChange={(n) => setPrecioNormal(n === "" ? 0 : n)}
             onBlur={savePrices}
             className="input h-11 text-base"
           />
@@ -675,13 +674,13 @@ function ProductRow({
         <label className="block">
           <span className="mb-1 block text-xs font-semibold text-ink">Descuento <span className="font-normal text-muted">(se resta)</span></span>
           <div className="flex items-stretch gap-1.5">
-            <input
-              type="number"
-              inputMode="numeric"
+            <MoneyInput
               value={descVal}
-              onChange={(e) => setDescVal(e.target.value === "" ? "" : Number(e.target.value))}
+              onChange={setDescVal}
               onBlur={savePrices}
-              className="input h-11 min-w-0 flex-1 px-3 text-base"
+              conSigno={descMode === "$"}
+              wrapClassName="min-w-0 flex-1"
+              className="input h-11 w-full px-3 text-base"
               placeholder="0"
             />
             <div className="flex overflow-hidden rounded-lg border border-line">
@@ -736,12 +735,12 @@ function ProductRow({
         <div className="flex items-end gap-2">
           <label className="block flex-1">
             <span className="mb-1 block text-xs font-semibold text-ink">Costo</span>
-            <input
-              type="number"
-              inputMode="numeric"
+            <MoneyInput
               value={costo}
-              onChange={(e) => setCosto(e.target.value ? Number(e.target.value) : "")}
+              onChange={setCosto}
               onBlur={() => saveCosto()}
+              decimales={2}
+              signo={moneda === "USD" ? "US$" : "$"}
               className="input h-11 text-base"
             />
           </label>
@@ -799,49 +798,43 @@ function ProductRow({
             <div className="mt-2 grid grid-cols-2 gap-2">
               <label className="block">
                 <span className="mb-1 block text-xs font-semibold text-ink">Costo de la caja</span>
-                <input
-                  type="number"
-                  inputMode="decimal"
+                <MoneyInput
                   value={cajaTxt ?? (costo === "" ? "" : redondear2(Number(costo) * nCaja))}
-                  onChange={(e) => {
-                    setCajaTxt(e.target.value);
-                    setCosto(e.target.value ? redondear2(Number(e.target.value) / nCaja) : "");
+                  onChange={(n) => {
+                    setCajaTxt(n);
+                    setCosto(n === "" ? "" : redondear2(n / nCaja));
                   }}
                   onBlur={() => {
                     setCajaTxt(null);
                     saveCosto();
                   }}
+                  decimales={2}
+                  signo={moneda === "USD" ? "US$" : "$"}
                   className="input h-10 text-base"
                 />
               </label>
               <div className="rounded-lg border border-line bg-white px-3 py-1.5">
                 <span className="block text-xs font-semibold text-ink">Costo de cada una</span>
                 <span className="font-display text-base font-black text-primary">
-                  {costoNum > 0
-                    ? `$ ${redondear2(costoPesos).toLocaleString("es-AR", { maximumFractionDigits: 2 })}`
-                    : "—"}
+                  {costoNum > 0 ? `$ ${formatoPlata(redondear2(costoPesos), 2)}` : "—"}
                 </span>
               </div>
               {/* Precios de venta (con transferencia): la caja y cada una por separado */}
               <label className="block">
                 <span className="mb-1 block text-xs font-semibold text-ink">Precio de la caja</span>
-                <input
-                  type="number"
-                  inputMode="numeric"
+                <MoneyInput
                   value={precioCaja}
                   placeholder="No se vende por caja"
-                  onChange={(e) => setPrecioCaja(e.target.value ? Number(e.target.value) : "")}
+                  onChange={setPrecioCaja}
                   onBlur={() => onSave(product, { precioCaja: precioCaja === "" ? 0 : precioCaja })}
                   className="input h-10 text-base placeholder:text-xs"
                 />
               </label>
               <label className="block">
                 <span className="mb-1 block text-xs font-semibold text-ink">Precio de cada una</span>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={precioNormal}
-                  onChange={(e) => setPrecioNormal(Number(e.target.value))}
+                <MoneyInput
+                  value={precioNormal || ""}
+                  onChange={(n) => setPrecioNormal(n === "" ? 0 : n)}
                   onBlur={savePrices}
                   className="input h-10 text-base"
                 />
@@ -1334,22 +1327,20 @@ function ProductSheet({
               </p>
             </Field>
             <Field label="Precio con transferencia (normal)">
-              <input
-                type="number"
-                inputMode="numeric"
+              <MoneyInput
                 value={precioNormal || ""}
-                onChange={(e) => setPrecioNormal(Number(e.target.value))}
+                onChange={(n) => setPrecioNormal(n === "" ? 0 : n)}
                 className="input h-11 text-base"
               />
             </Field>
             <Field label="Descuento (se resta)">
               <div className="flex items-stretch gap-2">
-                <input
-                  type="number"
-                  inputMode="numeric"
+                <MoneyInput
                   value={descVal}
-                  onChange={(e) => setDescVal(e.target.value === "" ? "" : Number(e.target.value))}
-                  className="input h-11 flex-1 text-base"
+                  onChange={setDescVal}
+                  conSigno={descMode === "$"}
+                  wrapClassName="flex-1"
+                  className="input h-11 w-full text-base"
                   placeholder="0"
                 />
                 <div className="flex overflow-hidden rounded-lg border border-line">
@@ -1515,12 +1506,13 @@ function ProductSheet({
               />
             ) : (
               <div className="flex items-stretch gap-2">
-                <input
-                  type="number"
-                  inputMode="numeric"
+                <MoneyInput
                   value={costo}
-                  onChange={(e) => setCosto(e.target.value ? Number(e.target.value) : "")}
-                  className="input h-11 flex-1 text-base"
+                  onChange={setCosto}
+                  decimales={2}
+                  signo={moneda === "USD" ? "US$" : "$"}
+                  wrapClassName="flex-1"
+                  className="input h-11 w-full text-base"
                 />
                 <div className="flex overflow-hidden rounded-lg border border-line">
                   {(["ARS", "USD"] as const).map((m) => (
