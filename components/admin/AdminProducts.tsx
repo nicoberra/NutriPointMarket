@@ -5,6 +5,7 @@ import { useConfirm } from "./useConfirm";
 import { CopyLinkButton } from "./CopyLinkButton";
 import { ComboBreakdown } from "./ComboBreakdown";
 import { PhotoViewer } from "./PhotoViewer";
+import { MarcaCombo } from "./MarcaCombo";
 import type { Product } from "@/lib/types";
 import { useProducts } from "@/context/ProductsContext";
 import { useCategories } from "@/context/CategoriesContext";
@@ -794,6 +795,21 @@ function ProductSheet({
     product?.combo ? product.combo.map((c) => ({ n: c.n, q: String(c.q) })) : [],
   );
   const [marca, setMarca] = useState(product?.brand ?? "");
+  // Marcas que ya existen (de los productos cargados, sin combos ni repetidas por mayúsculas).
+  const marcasExistentes = useMemo(() => {
+    const cuenta = new Map<string, Map<string, number>>();
+    for (const p of allProducts) {
+      const m = p.brand?.trim();
+      if (!m || p.combo?.length || m.includes(" / ")) continue;
+      const k = m.toLowerCase();
+      const formas = cuenta.get(k) ?? new Map<string, number>();
+      formas.set(m, (formas.get(m) ?? 0) + 1);
+      cuenta.set(k, formas);
+    }
+    return Array.from(cuenta.values())
+      .map((f) => Array.from(f.entries()).sort((a, b) => b[1] - a[1])[0][0])
+      .sort((a, b) => a.localeCompare(b, "es"));
+  }, [allProducts]);
   // Puede estar en varias categorías; la primera elegida es la principal.
   const [cats, setCats] = useState<string[]>(() => {
     if (product?.categoryNames?.length) return product.categoryNames;
@@ -1110,12 +1126,7 @@ function ProductSheet({
                   className="input h-11 bg-page-soft text-base text-muted"
                 />
               ) : (
-                <input
-                  value={marca}
-                  onChange={(e) => setMarca(e.target.value)}
-                  className="input h-11 text-base"
-                  placeholder="Ej: ENA"
-                />
+                <MarcaCombo value={marca} onChange={setMarca} marcas={marcasExistentes} />
               )}
             </Field>
             <Field label="Categorías">
