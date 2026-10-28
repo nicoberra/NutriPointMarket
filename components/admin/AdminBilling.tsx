@@ -5,6 +5,7 @@ import { peekTable, ensureTable, subscribeTable } from "@/lib/tableCache";
 import { formatPrice } from "@/lib/format";
 import { ChartIcon } from "@/components/Icons";
 import { EmptyState, ErrorState } from "@/components/Estados";
+import { ValorMercaderia } from "./ValorMercaderia";
 
 /**
  * CRM · Facturación. Lee la pestaña Pedidos y arma el resumen de ventas por
@@ -198,6 +199,9 @@ export function AdminBilling() {
           <BigCard label="Este año" rev={stats.year.rev} cnt={stats.year.cnt} />
         </div>
       </section>
+
+      {/* Plata en mercadería: stock actual × costo */}
+      <ValorMercaderia />
 
       {/* Compras de mercadería y resultado (lo que entró menos lo que se gastó en mercadería) */}
       {compras.length > 0 && (
