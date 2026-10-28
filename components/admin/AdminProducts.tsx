@@ -854,6 +854,8 @@ function ProductSheet({
   const [moneda, setMoneda] = useState<"USD" | "ARS">(product?.costCurrency ?? "ARS");
   const [cantidad, setCantidad] = useState<number | "">(product?.stockQty ?? "");
   const [descripcion, setDescripcion] = useState(product?.description ?? "");
+  // Combo: la descripción se arma sola con sus productos hasta que la edites a mano.
+  const [descTocada, setDescTocada] = useState(!!product?.description);
   const [modoUso, setModoUso] = useState(product?.usage ?? "");
   const [infoNutri, setInfoNutri] = useState(product?.nutrition ?? "");
   const [ingredientes, setIngredientes] = useState(product?.ingredients ?? "");
@@ -901,6 +903,17 @@ function ProductSheet({
       })
       .filter(Boolean)
       .join("\n\n");
+  // Descripción del combo: qué incluye + la descripción de cada producto.
+  const comboDescription = isCombo
+    ? [
+        "Este combo incluye:\n" +
+          comboCostDetail.map((d) => `• ${d.q} × ${d.name}${d.brand ? ` (${d.brand})` : ""}`).join("\n"),
+        ...comboProducts.filter((p) => p.description?.trim()).map((p) => `${p.name}:\n${p.description!.trim()}`),
+      ].join("\n\n")
+    : "";
+  useEffect(() => {
+    if (isCombo && !descTocada) setDescripcion(comboDescription);
+  }, [isCombo, descTocada, comboDescription]);
   const comboUsage = joinInfo((p) => p.usage);
   const comboNutrition = joinInfo((p) => p.nutrition);
   const comboIngredients = joinInfo((p) => p.ingredients);
@@ -1164,10 +1177,23 @@ function ProductSheet({
           <Field label="Descripción (se muestra en la página del producto)">
             <textarea
               value={descripcion}
-              onChange={(e) => setDescripcion(e.target.value)}
-              className="input min-h-24 py-2 text-base"
+              onChange={(e) => {
+                setDescripcion(e.target.value);
+                setDescTocada(true);
+              }}
+              className={`input py-2 text-base ${isCombo ? "min-h-40" : "min-h-24"}`}
               placeholder="Detalle del producto, beneficios…"
             />
+            {isCombo && (
+              <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
+                {descTocada ? "La editaste a mano." : "Se arma sola con los productos del combo; podés editarla."}
+                {descTocada && (
+                  <button type="button" onClick={() => setDescTocada(false)} className="font-bold text-primary hover:underline">
+                    ↺ Volver a armarla según los productos
+                  </button>
+                )}
+              </span>
+            )}
           </Field>
 
           {!isCombo && (
@@ -1203,8 +1229,8 @@ function ProductSheet({
 
           {isCombo && (
             <p className="rounded-lg bg-accent-soft px-3 py-2 text-[11px] text-primary lg:col-span-2">
-              El <b>modo de uso, la info nutricional y los ingredientes</b> del combo se
-              copian solos de los productos que elegiste.
+              La <b>descripción, el modo de uso, la info nutricional y los ingredientes</b> del
+              combo se arman solos con los productos que elegiste.
             </p>
           )}
 
