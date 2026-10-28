@@ -15,6 +15,7 @@ import { fetchProducts } from "@/lib/api";
 import { applyComboStock } from "@/lib/stock";
 import { productSeed } from "@/data/products-seed";
 import { usePathname } from "next/navigation";
+import { estaEnCategoria } from "@/lib/categorias";
 
 /**
  * Base instantánea: snapshot real de la tienda. Se ve completa al entrar aunque
@@ -125,7 +126,7 @@ export function ProductsProvider({ children }: { children: ReactNode }) {
       loading,
       refresh,
       getBySlug: (slug) => bySlug.get(slug),
-      byCategory: (c) => list.filter((p) => p.category === c),
+      byCategory: (c) => list.filter((p) => estaEnCategoria(p, c)),
       featured: list.filter((p) => p.featured),
       bestSellers: list.filter((p) => p.bestSeller),
       onSale: list.filter((p) => p.discount > 0),

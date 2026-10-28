@@ -5,6 +5,8 @@ import { useConfirm } from "./useConfirm";
 import { CopyLinkButton } from "./CopyLinkButton";
 import { ComboBreakdown } from "./ComboBreakdown";
 import { PhotoViewer } from "./PhotoViewer";
+import { MarcaCombo } from "./MarcaCombo";
+import { ComboPicker } from "./ComboPicker";
 import type { Product } from "@/lib/types";
 import { useProducts } from "@/context/ProductsContext";
 import { useCategories } from "@/context/CategoriesContext";
@@ -19,6 +21,7 @@ import {
 import { formatPrice } from "@/lib/format";
 import { listPrice } from "@/lib/config";
 import { categoryMap } from "@/data/categories";
+import { categoriasDe, estaEnCategoria, SEP_CATEGORIAS } from "@/lib/categorias";
 import { SearchIcon, CloseIcon, CheckIcon, PlusIcon, TrashIcon, ChevronDownIcon, PackageIcon } from "@/components/Icons";
 import { AdminCategories } from "./AdminCategories";
 import { EmptyState } from "@/components/Estados";
@@ -49,6 +52,7 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
   const [cat, setCat] = useState<string>("");
   const [editing, setEditing] = useState<Product | null>(null);
   const [adding, setAdding] = useState(false);
+  const [creandoCombo, setCreandoCombo] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showCats, setShowCats] = useState(false);
   const { confirm, dialog } = useConfirm();
@@ -56,7 +60,7 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
     return products.filter((p) => {
-      if (cat && p.category !== cat) return false;
+      if (cat && !estaEnCategoria(p, cat)) return false;
       if (query && !`${p.name} ${p.brand}`.toLowerCase().includes(query)) return false;
       return true;
     });
@@ -68,7 +72,8 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
     const row: ProductInput = {
       nombre: p.name,
       marca: p.brand,
-      categoria: categoryMap[p.category]?.name ?? "",
+      // Conserva TODAS sus categorías con el nombre exacto de la planilla.
+      categoria: p.categoryNames?.length ? p.categoryNames.join(SEP_CATEGORIAS) : categoryMap[p.category]?.name ?? "",
       // La planilla guarda el precio CON transferencia (base), no el publicado.
       precio: ch.precio ?? p.basePrice ?? p.price,
       precioML: "precioML" in ch ? ch.precioML : p.baseOldPrice,
@@ -134,6 +139,7 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
   const handleFullSave = async (row: ProductInput) => {
     setEditing(null);
     setAdding(false);
+    setCreandoCombo(false);
     onToast("Guardando…");
     try {
       const ok = await saveProduct(row);
@@ -166,7 +172,7 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
   const groups =
     cat === ""
       ? categories
-          .map((c) => ({ cat: c, list: filtered.filter((p) => p.category === c.slug) }))
+          .map((c) => ({ cat: c, list: filtered.filter((p) => categoriasDe(p).includes(c.slug)) }))
           .filter((g) => g.list.length > 0)
       : [{ cat: categoryMap[cat], list: filtered }];
 
@@ -179,6 +185,12 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
             className="btn btn-outline btn-md flex-1 sm:flex-none"
           >
             Categorías
+          </button>
+          <button
+            onClick={() => setCreandoCombo(true)}
+            className="btn btn-outline btn-md flex-1 sm:flex-none"
+          >
+            🎁 Combo
           </button>
           <button
             onClick={() => setAdding(true)}
@@ -247,14 +259,16 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
         ))
       )}
 
-      {(editing || adding) && (
+      {(editing || adding || creandoCombo) && (
         <ProductSheet
           product={editing}
+          modoCombo={creandoCombo && !editing}
           saving={saving}
           dollar={dollar}
           onClose={() => {
             setEditing(null);
             setAdding(false);
+            setCreandoCombo(false);
           }}
           onSave={handleFullSave}
         />
@@ -772,12 +786,15 @@ function Chip({
 /** Alta/edición completa de producto (nombre, marca, categoría, variantes). */
 function ProductSheet({
   product,
+  modoCombo = false,
   saving,
   dollar,
   onClose,
   onSave,
 }: {
   product: Product | null;
+  /** Abierto desde "Crear combo": la lista de productos aparece primero y abierta. */
+  modoCombo?: boolean;
   saving: boolean;
   dollar: number;
   onClose: () => void;
@@ -792,11 +809,31 @@ function ProductSheet({
     product?.combo ? product.combo.map((c) => ({ n: c.n, q: String(c.q) })) : [],
   );
   const [marca, setMarca] = useState(product?.brand ?? "");
-  const [categoria, setCategoria] = useState<string>(
-    product
-      ? categoryMap[product.category]?.name ?? categories[0]?.name ?? ""
-      : categories[0]?.name ?? "",
-  );
+  // Marcas que ya existen (de los productos cargados, sin combos ni repetidas por mayúsculas).
+  const marcasExistentes = useMemo(() => {
+    const cuenta = new Map<string, Map<string, number>>();
+    for (const p of allProducts) {
+      const m = p.brand?.trim();
+      if (!m || p.combo?.length || m.includes(" / ")) continue;
+      const k = m.toLowerCase();
+      const formas = cuenta.get(k) ?? new Map<string, number>();
+      formas.set(m, (formas.get(m) ?? 0) + 1);
+      cuenta.set(k, formas);
+    }
+    return Array.from(cuenta.values())
+      .map((f) => Array.from(f.entries()).sort((a, b) => b[1] - a[1])[0][0])
+      .sort((a, b) => a.localeCompare(b, "es"));
+  }, [allProducts]);
+  // Puede estar en varias categorías; la primera elegida es la principal.
+  const [cats, setCats] = useState<string[]>(() => {
+    if (product?.categoryNames?.length) return product.categoryNames;
+    const n = product ? categoryMap[product.category]?.name : undefined;
+    const combos = modoCombo ? categories.find((c) => /combo/i.test(c.name))?.name : undefined;
+    return n ? [n] : combos ? [combos] : categories[0]?.name ? [categories[0].name] : [];
+  });
+  const toggleCat = (n: string) =>
+    setCats((prev) => (prev.some((x) => x.toLowerCase() === n.toLowerCase()) ? prev.filter((x) => x.toLowerCase() !== n.toLowerCase()) : [...prev, n]));
+  const categoria = cats.join(SEP_CATEGORIAS);
   // Precio NORMAL + descuento (en $ o %). El precio final = normal − descuento.
   const [precioNormal, setPrecioNormal] = useState<number>(
     product ? (product.baseOldPrice && product.baseOldPrice > (product.basePrice ?? product.price) ? product.baseOldPrice : (product.basePrice ?? product.price)) : 0,
@@ -934,7 +971,7 @@ function ProductSheet({
       <div className="relative max-h-[95vh] w-full max-w-md animate-section-in overflow-y-auto rounded-t-2xl bg-page p-5 motion-reduce:animate-none sm:rounded-2xl lg:max-w-4xl lg:p-7">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-display text-lg font-bold text-primary">
-            {isEdit ? "Editar producto" : "Agregar producto"}
+            {isEdit ? "Editar producto" : modoCombo ? "Crear combo" : "Agregar producto"}
           </h3>
           <button
             onClick={closeAndSave}
@@ -971,64 +1008,19 @@ function ProductSheet({
           {/* Combo */}
           <div className="lg:col-span-2 rounded-xl border border-dashed border-primary/30 bg-primary/5 p-3">
             <span className="mb-1 block text-xs font-semibold text-ink">
-              Combo (opcional) — elegí los productos que lo arman
+              {modoCombo ? "Productos del combo — tildá los que lo arman" : "Combo (opcional) — elegí los productos que lo arman"}
             </span>
             <p className="mb-2 text-[11px] text-muted">
               Si agregás productos acá, este producto es un <b>combo</b>: al venderse se
               descuenta el stock de cada uno. El stock del combo se calcula solo según lo
               que haya de cada producto.
             </p>
-            <div className="space-y-2">
-              {comboRows.map((row, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <select
-                    value={row.n}
-                    onChange={(e) =>
-                      setComboRows((rs) =>
-                        rs.map((r, j) => (j === i ? { ...r, n: e.target.value } : r)),
-                      )
-                    }
-                    className="input h-11 flex-1 text-base"
-                  >
-                    <option value="">Elegí un producto…</option>
-                    {allProducts
-                      .filter((pr) => pr.name !== nombre && !(pr.combo && pr.combo.length))
-                      .map((pr) => (
-                        <option key={pr.id} value={pr.name}>
-                          {pr.brand ? `${pr.brand} · ${pr.name}` : pr.name}
-                        </option>
-                      ))}
-                  </select>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={row.q}
-                    onChange={(e) =>
-                      setComboRows((rs) =>
-                        rs.map((r, j) => (j === i ? { ...r, q: e.target.value } : r)),
-                      )
-                    }
-                    className="input h-11 w-20 text-base"
-                    placeholder="Cant."
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setComboRows((rs) => rs.filter((_, j) => j !== i))}
-                    aria-label="Quitar"
-                    className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-muted hover:bg-white"
-                  >
-                    <CloseIcon className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => setComboRows((rs) => [...rs, { n: "", q: "1" }])}
-              className="mt-2 text-sm font-semibold text-primary hover:underline"
-            >
-              + Agregar producto al combo
-            </button>
+            <ComboPicker
+              value={comboRows}
+              onChange={setComboRows}
+              productos={allProducts.filter((pr) => pr.name !== nombre && !(pr.combo && pr.combo.length))}
+              abiertoAlInicio={modoCombo}
+            />
 
             {comboCostDetail.length > 0 && (
               <div className="mt-3 overflow-hidden rounded-lg border border-primary/20 bg-white text-xs">
@@ -1104,26 +1096,33 @@ function ProductSheet({
                   className="input h-11 bg-page-soft text-base text-muted"
                 />
               ) : (
-                <input
-                  value={marca}
-                  onChange={(e) => setMarca(e.target.value)}
-                  className="input h-11 text-base"
-                  placeholder="Ej: ENA"
-                />
+                <MarcaCombo value={marca} onChange={setMarca} marcas={marcasExistentes} />
               )}
             </Field>
-            <Field label="Categoría">
-              <select
-                value={categoria}
-                onChange={(e) => setCategoria(e.target.value)}
-                className="input h-11 text-base"
-              >
-                {categories.map((c) => (
-                  <option key={c.slug} value={c.name}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+            <Field label="Categorías">
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Categorías del producto">
+                {categories.map((c) => {
+                  const i = cats.findIndex((x) => x.toLowerCase() === c.name.toLowerCase());
+                  return (
+                    <button
+                      key={c.slug}
+                      type="button"
+                      onClick={() => toggleCat(c.name)}
+                      aria-pressed={i >= 0}
+                      className={`rounded-full px-3 py-1.5 text-sm font-semibold transition active:scale-[0.97] motion-reduce:active:scale-100 ${
+                        i >= 0 ? "bg-primary text-white shadow-soft" : "border border-line bg-white text-ink hover:border-primary/40"
+                      }`}
+                    >
+                      {i >= 0 && "✓ "}
+                      {c.name}
+                      {i === 0 && cats.length > 1 && <span className="ml-1 text-[10px] font-bold uppercase opacity-80">principal</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-1.5 text-xs text-muted">
+                {cats.length ? "Tocá para sumar o sacar categorías. La primera que elegiste es la principal." : "Elegí al menos una categoría."}
+              </p>
             </Field>
             <Field label="Precio con transferencia (normal)">
               <input

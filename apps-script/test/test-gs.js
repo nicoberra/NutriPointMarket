@@ -137,7 +137,7 @@ const items = (arr) => JSON.stringify(arr);
 
 /* --------------------------------- Pruebas -------------------------------- */
 console.log("Versión y lecturas");
-check("version v13", call({ action: "version" }).version === "v13");
+check("version v14", call({ action: "version" }).version === "v14");
 const l1 = call({ action: "productos_list" });
 check("productos_list público sin costos", l1.ok && l1.data.length === 5 && !("costo" in l1.data[0]));
 const hitsAntes = cacheHits;
@@ -438,6 +438,21 @@ console.log("Compras pendientes (se revisan y se suman después)");
   check("pendiente sin productos asociados: avisa y no suma", /no tiene productos/.test(err));
   ctx.deleteRow("Compras", "idPend1"); ctx.deleteRow("Compras", "idPend2"); ctx.deleteRow("Compras", "idPend3"); ctx.deleteRow("Compras", "idPend4");
   check("borrar las compras sumadas resta lo sumado (vuelve al stock inicial)", cant("CREATINA MONOHIDRATO  300 gr") === c0);
+}
+
+console.log("Varias categorías por producto");
+{
+  const kP = ctx.keysOf("Productos");
+  const catDe = (n) => String(book.sheets.Productos.rows.find((x) => x[0] === n)[kP.indexOf("categoria")]);
+  ctx.addRow("Productos", { nombre: "Chipa Test", categoria: "Snacks | Pancakes PROTEICOS", precio: 0, stock: "no", cantidad: 0 });
+  ctx.addRow("Productos", { nombre: "Cookie Test", categoria: "Snacks", precio: 0, stock: "no", cantidad: 0 });
+  ctx.addRow("Productos", { nombre: "Combo Test", categoria: "Snacks proteicos | Snacks", precio: 0, stock: "no", cantidad: 0 });
+  ctx.categoriaRename("Snacks", "Snacks proteicos");
+  check("renombrar una categoría la cambia dentro de las que tienen varias", catDe("Chipa Test") === "Snacks proteicos | Pancakes PROTEICOS", catDe("Chipa Test"));
+  check("  ...y en las que tienen una sola", catDe("Cookie Test") === "Snacks proteicos");
+  check("  ...sin repetirla si ya estaba en la nueva", catDe("Combo Test") === "Snacks proteicos", catDe("Combo Test"));
+  check("  ...y no toca categorías que solo empiezan igual", catDe("Chipa Test").indexOf("Pancakes PROTEICOS") > 0);
+  ["Chipa Test", "Cookie Test", "Combo Test"].forEach((n) => ctx.deleteRow("Productos", n));
 }
 
 console.log("Copias automáticas");
