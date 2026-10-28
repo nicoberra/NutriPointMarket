@@ -12,7 +12,7 @@ import {
 } from "react";
 import type { Product, CategorySlug } from "@/lib/types";
 import { fetchProducts } from "@/lib/api";
-import { applyComboStock } from "@/lib/stock";
+import { applyComboStock, conFotosDeCombos } from "@/lib/stock";
 import { productSeed } from "@/data/products-seed";
 import { usePathname } from "next/navigation";
 import { estaEnCategoria } from "@/lib/categorias";
@@ -107,7 +107,8 @@ export function ProductsProvider({ children }: { children: ReactNode }) {
   const isAdmin = !!pathname && pathname.startsWith("/admin");
 
   const value = useMemo<ProductsContextValue>(() => {
-    const list = isAdmin ? products : products.filter((p) => !!p.image);
+    // En la tienda, los combos muestran también las fotos de sus productos.
+    const list = isAdmin ? products : conFotosDeCombos(products).filter((p) => !!p.image);
     const bySlug = new Map(list.map((p) => [p.slug, p]));
 
     // Marcas derivadas de los productos cargados (para filtros y /marcas).
