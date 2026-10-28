@@ -810,29 +810,52 @@ function ProductRow({
                     : "—"}
                 </span>
               </div>
-              <label className="col-span-2 block">
-                <span className="mb-1 block text-xs font-semibold text-ink">
-                  Precio de la caja con transferencia <span className="font-normal text-muted">(vacío = no se vende por caja)</span>
-                </span>
+              {/* Precios de venta (con transferencia): la caja y cada una por separado */}
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold text-ink">Precio de la caja</span>
                 <input
                   type="number"
                   inputMode="numeric"
                   value={precioCaja}
+                  placeholder="No se vende por caja"
                   onChange={(e) => setPrecioCaja(e.target.value ? Number(e.target.value) : "")}
                   onBlur={() => onSave(product, { precioCaja: precioCaja === "" ? 0 : precioCaja })}
+                  className="input h-10 text-base placeholder:text-xs"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold text-ink">Precio de cada una</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={precioNormal}
+                  onChange={(e) => setPrecioNormal(Number(e.target.value))}
+                  onBlur={savePrices}
                   className="input h-10 text-base"
                 />
               </label>
+              <p className="col-span-2 text-[11px] text-muted">
+                Precios con transferencia. Vacío el de la caja = solo se vende por unidad.
+              </p>
               {precioCaja !== "" && precioCaja > 0 && (
-                <p className="col-span-2 text-xs text-muted">
-                  En la web: {formatPrice(listPrice(precioCaja))} la caja ·{" "}
-                  {formatPrice(Math.round(precioCaja / nCaja))} cada una con transferencia
+                <div className="col-span-2 space-y-1 rounded-lg border border-line bg-white px-3 py-2 text-xs text-muted">
+                  <p>
+                    En la web: <b className="text-ink">{formatPrice(listPrice(precioCaja))}</b> la caja ·{" "}
+                    <b className="text-ink">{formatPrice(listPrice(precioFinal))}</b> cada una
+                  </p>
                   {costoPesos > 0 && (
-                    <span className="ml-1 rounded-full bg-green-100 px-2 py-0.5 font-bold text-green-700">
-                      Ganancia por caja {formatPrice(Math.round(precioCaja - costoPesos * nCaja))}
-                    </span>
+                    <p className="flex flex-wrap gap-1.5">
+                      <span className="rounded-full bg-green-100 px-2 py-0.5 font-bold text-green-700">
+                        Ganancia por caja {formatPrice(Math.round(precioCaja - costoPesos * nCaja))}
+                      </span>
+                      {precioFinal > 0 && (
+                        <span className="rounded-full bg-green-100 px-2 py-0.5 font-bold text-green-700">
+                          Las {nCaja} sueltas: ganancia {formatPrice(Math.round((precioFinal - costoPesos) * nCaja))}
+                        </span>
+                      )}
+                    </p>
                   )}
-                </p>
+                </div>
               )}
             </div>
           )}
