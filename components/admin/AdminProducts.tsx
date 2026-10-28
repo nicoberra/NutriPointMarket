@@ -228,7 +228,8 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
         </div>
       </div>
 
-      <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
+      {/* Compu: todas las categorías a la vista (bajan de renglón). Celular: fila deslizable. */}
+      <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
         <Chip active={cat === ""} onClick={() => setCat("")}>
           Todas
         </Chip>
