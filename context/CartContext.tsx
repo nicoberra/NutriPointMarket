@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import type { CartItem, Product } from "@/lib/types";
+import { comoCaja, vendePorCaja } from "@/lib/stock";
 
 /* ------------------------------- Estado --------------------------------- */
 
@@ -91,6 +92,8 @@ interface CartContextValue {
       comboChoices?: Record<string, string>;
       /** false = no abrir el cajón del carrito (ej. "Comprar" va directo al checkout). */
       openDrawer?: boolean;
+      /** Caja cerrada (se cobra el precio de la caja y descuenta todas sus unidades). */
+      box?: boolean;
     },
   ) => void;
   removeItem: (key: string) => void;
@@ -160,9 +163,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
       isOpen,
       openCart: () => setIsOpen(true),
       closeCart: () => setIsOpen(false),
-      addItem: (product, opts) => {
+      addItem: (prod, opts) => {
         const flavor = opts?.flavor;
-        const presentation = opts?.presentation;
+        // La caja es otra línea del carrito, con su precio y su leyenda.
+        const box = !!opts?.box && vendePorCaja(prod);
+        const product = box ? comoCaja(prod) : prod;
+        const presentation = box ? `Caja x${prod.unitsPerBox}` : opts?.presentation;
         const comboChoices =
           opts?.comboChoices && Object.keys(opts.comboChoices).length ? opts.comboChoices : undefined;
         // Un combo con otras variantes elegidas es otra línea del carrito.
@@ -181,9 +187,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
             flavor,
             presentation,
             comboChoices,
+            ...(box ? { box: true } : {}),
           },
         });
-        setToast(`${product.name} agregado al carrito`);
+        setToast(`${product.name}${box ? ` (${presentation})` : ""} agregado al carrito`);
         if (opts?.openDrawer !== false) setIsOpen(true);
       },
       removeItem: (key) => dispatch({ type: "REMOVE", key }),

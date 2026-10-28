@@ -73,6 +73,10 @@ export interface Product {
   /** Costo (para calcular ganancia en el CRM). En la moneda de `costCurrency`. */
   cost?: number;
   costCurrency?: "USD" | "ARS";
+  /** Si se compra en caja: unidades por caja (el costo de arriba es por unidad). */
+  unitsPerBox?: number;
+  /** Precio de la caja CON transferencia (columna Precio caja). Sin precio no se vende por caja. */
+  boxBasePrice?: number;
   featured: boolean;
   bestSeller: boolean;
   freeShipping: boolean;
@@ -90,4 +94,6 @@ export interface CartItem {
   /** Combos: variante elegida para cada producto que la tenga (nombre → variante). */
   comboChoices?: Record<string, string>;
   presentation?: string;
+  /** Caja cerrada: `product` trae el precio de la caja y cada unidad del ítem es una caja. */
+  box?: boolean;
 }

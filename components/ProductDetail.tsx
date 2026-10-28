@@ -9,7 +9,7 @@ import { formatPrice } from "@/lib/format";
 import { transferPrice } from "@/lib/config";
 import { useCart } from "@/context/CartContext";
 import { useProducts } from "@/context/ProductsContext";
-import { availableVariants, comboComponents, comboStockMax } from "@/lib/stock";
+import { availableVariants, cajasDisponibles, comboComponents, comboStockMax, comoCaja, vendePorCaja } from "@/lib/stock";
 import { flyToCart } from "@/lib/motion";
 import { ProductVisual } from "./ProductVisual";
 import { Rating } from "./Rating";
@@ -65,22 +65,36 @@ export function ProductDetail({ product: initial }: { product: Product }) {
   const [qty, setQty] = useState(1);
   const [activeThumb, setActiveThumb] = useState(0);
 
+  // Por unidad o por caja cerrada (si el producto tiene precio de caja).
+  const porCaja = vendePorCaja(product);
+  const [modo, setModo] = useState<"unidad" | "caja">("unidad");
+  const cajas = porCaja ? cajasDisponibles(product, flavor) : 0;
+  const enCaja = porCaja && modo === "caja";
+  const shown = enCaja ? comoCaja(product) : product;
+
   const selQty = variantQty(flavor);
   const soldOut =
     product.inStock === false ||
-    (selQty !== null && selQty <= 0) ||
+    (enCaja ? cajas <= 0 : selQty !== null && selQty <= 0) ||
     (comboMax !== null && comboMax <= 0);
   // Máximo que se puede comprar: en combos, según las variantes elegidas; si
   // no, el stock de la variante elegida o el total del producto. Sin
   // seguimiento → 99.
-  const maxQty =
-    comboMax !== null
+  const maxQty = enCaja
+    ? Math.max(1, Math.min(cajas, 99))
+    : comboMax !== null
       ? Math.max(1, comboMax)
       : selQty !== null
         ? Math.max(1, selQty)
         : (product.stockQty ?? 0) > 0
           ? (product.stockQty as number)
           : 99;
+
+  // Sin cajas cerradas de esta variante: vuelve a "Unidad". Y la cantidad no se pasa.
+  useEffect(() => {
+    if (enCaja && cajas <= 0) setModo("unidad");
+    else if (enCaja) setQty((cur) => Math.min(Math.max(1, cur), Math.max(1, cajas)));
+  }, [enCaja, cajas]);
 
   // Al cambiar la elección del combo, no pasarse del stock disponible.
   useEffect(() => {
@@ -113,6 +127,7 @@ export function ProductDetail({ product: initial }: { product: Product }) {
       quantity: qty,
       comboChoices: comboComps.length ? choices : undefined,
       openDrawer: openDrawer !== false,
+      box: enCaja,
     });
 
   // "Comprar ahora": directo al checkout, sin abrir el cajón del carrito.
@@ -190,23 +205,31 @@ export function ProductDetail({ product: initial }: { product: Product }) {
           <div className="mt-5 rounded-xl border border-line bg-white p-5">
             <div className="flex flex-wrap items-end gap-3">
               <span className="font-display text-3xl font-black text-primary">
-                {formatPrice(product.price)}
+                {formatPrice(shown.price)}
               </span>
-              {product.oldPrice && (
+              {enCaja && (
+                <span className="mb-1.5 text-sm font-semibold text-muted">la caja x{product.unitsPerBox}</span>
+              )}
+              {shown.oldPrice && (
                 <span className="mb-1 text-lg text-muted line-through">
-                  {formatPrice(product.oldPrice)}
+                  {formatPrice(shown.oldPrice)}
                 </span>
               )}
-              {product.discount > 0 && (
+              {shown.discount > 0 && (
                 <span className="mb-1 rounded-md bg-accent-soft px-2 py-0.5 text-sm font-bold text-primary">
-                  Ahorrás {product.discount}%
+                  Ahorrás {shown.discount}%
                 </span>
               )}
             </div>
             <p className="mt-1.5 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
               <PercentIcon className="h-4.5 w-4.5" /> Con transferencia:{" "}
-              <b>{formatPrice(product.basePrice ?? transferPrice(product.price))}</b> (10% de descuento)
+              <b>{formatPrice(shown.basePrice ?? transferPrice(shown.price))}</b> (10% de descuento)
             </p>
+            {enCaja && (
+              <p className="mt-1 text-xs text-muted">
+                {formatPrice(Math.round((shown.basePrice ?? 0) / (product.unitsPerBox ?? 1)))} por unidad con transferencia
+              </p>
+            )}
             {product.freeShipping && (
               <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
                 <TruckIcon className="h-4.5 w-4.5" /> Envío gratis
@@ -240,6 +263,39 @@ export function ProductDetail({ product: initial }: { product: Product }) {
                       >
                         {f}
                         {out ? " · sin stock" : ""}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Unidad suelta o caja cerrada */}
+            {porCaja && (
+              <div>
+                <p className="mb-2 text-sm font-bold text-ink">
+                  Comprar por: <span className="font-normal text-muted">{enCaja ? `Caja x${product.unitsPerBox}` : "Unidad"}</span>
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {(["unidad", "caja"] as const).map((m) => {
+                    const out = m === "caja" && cajas <= 0;
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => !out && setModo(m)}
+                        disabled={out}
+                        aria-pressed={modo === m}
+                        className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+                          out
+                            ? "cursor-not-allowed border-line bg-page-soft text-muted line-through opacity-50"
+                            : modo === m
+                              ? "border-accent bg-accent-soft text-primary"
+                              : "border-line bg-white text-muted hover:border-accent"
+                        }`}
+                      >
+                        {m === "unidad" ? "Unidad" : `Caja x${product.unitsPerBox}`}
+                        {out ? " · sin cajas cerradas" : ""}
                       </button>
                     );
                   })}
@@ -322,6 +378,12 @@ export function ProductDetail({ product: initial }: { product: Product }) {
             >
               {soldOut
                 ? "Sin stock"
+                : enCaja
+                  ? cajas >= 99
+                    ? "En stock"
+                    : cajas === 1
+                      ? "¡Última caja cerrada!"
+                      : `Quedan ${cajas} cajas cerradas`
                 : maxQty === 1
                   ? "¡Última unidad!"
                   : comboMax !== null

@@ -18,7 +18,7 @@
  * ============================================================================ */
 
 var SHEET_ID = "12paAzW6OcSgYv4u6L7QVI4tpvrEx1yqnujW0OjcieMc";
-var API_VERSION = "v14"; // v14: un producto puede estar en varias categorías ("A | B") // v13: compras pendientes (se revisan y se suman al stock después) // v12: lectura de compras con Claude Haiku 5.5 (el más barato) // v11: las compras leen fotos, archivos y texto con Claude // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
+var API_VERSION = "v15"; // v15: venta por caja o por unidad (Unidades por caja + Precio caja) // v14: un producto puede estar en varias categorías ("A | B") // v13: compras pendientes (se revisan y se suman al stock después) // v12: lectura de compras con Claude Haiku 5.5 (el más barato) // v11: las compras leen fotos, archivos y texto con Claude // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
 
 // Repo de GitHub donde se guardan las fotos de productos (en public/productos/).
 // El token NO va acá: se guarda en Propiedades del script como GITHUB_TOKEN.
@@ -64,6 +64,8 @@ var TABLES = {
       ["infoNutricional", "Información nutricional"],
       ["ingredientes", "Ingredientes"],
       ["combo", "Combo"],
+      ["porCaja", "Unidades por caja"], // si se compra/vende en caja: unidades que trae (el costo es por unidad)
+      ["precioCaja", "Precio caja"], // precio de la caja CON transferencia (vacío o 0 = no se vende por caja)
     ],
     idField: "nombre",
   },
@@ -559,7 +561,7 @@ function addRow(tab, obj) {
     try { itemsP = JSON.parse(obj.items || "[]"); } catch (eP) {}
     if (itemsP.length && String(obj.descontado || "").trim().toLowerCase() !== "sí") {
       for (var ip = 0; ip < itemsP.length; ip++) {
-        descontarProducto(itemsP[ip].n, Number(itemsP[ip].q) || 0, itemsP[ip].v, itemsP[ip].cv);
+        descontarProducto(itemsP[ip].n, unidadesItem(itemsP[ip]), itemsP[ip].v, itemsP[ip].cv);
       }
       obj.descontado = "sí";
     }
@@ -635,9 +637,9 @@ function ajustarStockPorEdicion(n, obj) {
   try { itemsV = JSON.parse(viejo); } catch (e1) {}
   try { itemsN = JSON.parse(nuevo); } catch (e2) {}
   if (yaDesc) {
-    for (var i = 0; i < itemsV.length; i++) ajustarProducto(itemsV[i].n, Number(itemsV[i].q) || 0, itemsV[i].v, itemsV[i].cv, +1);
+    for (var i = 0; i < itemsV.length; i++) ajustarProducto(itemsV[i].n, unidadesItem(itemsV[i]), itemsV[i].v, itemsV[i].cv, +1);
   }
-  for (var j = 0; j < itemsN.length; j++) ajustarProducto(itemsN[j].n, Number(itemsN[j].q) || 0, itemsN[j].v, itemsN[j].cv, -1);
+  for (var j = 0; j < itemsN.length; j++) ajustarProducto(itemsN[j].n, unidadesItem(itemsN[j]), itemsN[j].v, itemsN[j].cv, -1);
   obj.descontado = "sí";
 }
 
@@ -702,8 +704,18 @@ function reponerStockPedido(n) {
   var items = [];
   try { items = JSON.parse(row[keys.indexOf("items")] || "[]"); } catch (e) {}
   for (var i = 0; i < items.length; i++) {
-    ajustarProducto(items[i].n, Number(items[i].q) || 0, items[i].v, items[i].cv, +1);
+    ajustarProducto(items[i].n, unidadesItem(items[i]), items[i].v, items[i].cv, +1);
   }
+}
+
+// Unidades que mueve un renglón de pedido: si es una caja, cantidad × unidades por caja.
+function unidadesItem(it) {
+  var q = Number(it && it.q) || 0;
+  if (!it || !it.caja) return q;
+  var n = findRowById("Productos", it.n);
+  if (n < 0) return q;
+  var porCaja = Math.floor(Number(sheetFor("Productos").getRange(n, keysOf("Productos").indexOf("porCaja") + 1).getValue()) || 0);
+  return q * Math.max(1, porCaja);
 }
 
 function findRowById(tab, id) {
@@ -824,6 +836,7 @@ function validarAltaPublica(tab, obj) {
 function verificarStock(items) {
   var values = sheetFor("Productos").getDataRange().getValues();
   var keys = keysOf("Productos");
+  var iPorCaja = keys.indexOf("porCaja");
   var iN = keys.indexOf("nombre"), iS = keys.indexOf("stock"), iC = keys.indexOf("cantidad"),
     iV = keys.indexOf("variantes"), iCo = keys.indexOf("combo");
   var prods = {};
@@ -853,8 +866,9 @@ function verificarStock(items) {
   }
   for (var i = 0; i < items.length; i++) {
     var it = items[i] || {};
-    var q = Math.floor(Number(it.q) || 0);
     var row0 = prods[low(it.n)];
+    // Una caja descuenta todas sus unidades: si hay menos (caja abierta), no alcanza.
+    var q = Math.floor(Number(it.q) || 0) * (it.caja && row0 ? Math.max(1, Math.floor(Number(row0[iPorCaja]) || 0)) : 1);
     var esCombo = row0 && String(row0[iCo] || "").trim();
     sumar(it.n, esCombo ? (it.cv || null) : (it.v || ""), q);
   }
@@ -1015,10 +1029,14 @@ function precioWeb(base) {
 function calcularTotalPedido(items, pago) {
   var sh = sheetFor("Productos");
   var values = sh.getDataRange().getValues();
-  var precios = {};
+  var keysP = keysOf("Productos"), iPC = keysP.indexOf("porCaja"), iPrC = keysP.indexOf("precioCaja");
+  var precios = {}, cajas = {};
   for (var r = 1; r < values.length; r++) {
     var nombre = low(values[r][0]);
-    if (nombre) precios[nombre] = Number(values[r][3]) || 0;
+    if (!nombre) continue;
+    precios[nombre] = Number(values[r][3]) || 0;
+    var nC = Math.floor(Number(values[r][iPC]) || 0), pC = Number(values[r][iPrC]) || 0;
+    if (nC > 1 && pC > 0) cajas[nombre] = pC;
   }
   var subtotal = 0, subtotalWeb = 0;
   for (var i = 0; i < items.length; i++) {
@@ -1027,6 +1045,11 @@ function calcularTotalPedido(items, pago) {
     if (q <= 0 || q > 99) throw new Error("Cantidad inválida");
     var base = precios[low(it.n)];
     if (base === undefined) throw new Error("Producto no disponible: " + String(it.n || "").slice(0, 60));
+    if (it.caja) {
+      // Caja cerrada: se cobra el precio de la caja (si ya no se vende por caja, rechaza).
+      if (!cajas[low(it.n)]) throw new Error("Este producto ya no se vende por caja. Recargá la página: " + String(it.n || "").slice(0, 60));
+      base = cajas[low(it.n)];
+    }
     if (!base) throw new Error("Producto sin precio: " + String(it.n || "").slice(0, 60));
     subtotal += (pago === "Mercado Pago" ? precioWeb(base) : base) * q;
     subtotalWeb += precioWeb(base) * q;
@@ -1090,6 +1113,8 @@ function listProductos(conCostos) {
       infoNutricional: String(row[15] || "").trim(),
       ingredientes: String(row[16] || "").trim(),
       combo: String(row[17] || "").trim(),
+      porCaja: Number(row[18]) || 0,
+      precioCaja: Number(row[19]) || 0,
     });
   }
   if (!conCostos) {
@@ -1629,7 +1654,7 @@ function aprobarPedido(id) {
   for (var i = 0; i < items.length; i++) {
     // items[i].cv: en combos, la variante elegida por el cliente para cada
     // producto del combo ({ "WHEY ...": "Vainilla" }).
-    descontarProducto(items[i].n, Number(items[i].q) || 0, items[i].v, items[i].cv);
+    descontarProducto(items[i].n, unidadesItem(items[i]), items[i].v, items[i].cv);
   }
   updateRowByNumber("Pedidos", n, { estado: "pagado", descontado: "sí" });
   return { ok: true, descontados: items.length };

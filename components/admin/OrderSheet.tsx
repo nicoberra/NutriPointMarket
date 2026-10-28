@@ -7,10 +7,13 @@ import { formatPrice } from "@/lib/format";
 import { brandName } from "@/data/brands";
 import { CloseIcon, PlusIcon, TrashIcon } from "@/components/Icons";
 import { useDollar, costToPesos } from "./AdminProducts";
+import { vendePorCaja } from "@/lib/stock";
+import { listPrice } from "@/lib/config";
 
 type Row = Record<string, string>;
 type Pago = "Transferencia" | "Efectivo" | "Mercado Pago";
-type Line = { pid: string; variant: string; qty: number };
+/** caja: se vende la caja cerrada (precio de la caja; descuenta todas sus unidades). */
+type Line = { pid: string; variant: string; qty: number; caja?: boolean };
 
 /**
  * Pedido cargado a mano desde el CRM: se eligen productos del catálogo y el
@@ -52,11 +55,11 @@ export function OrderSheet({
   const [lines, setLines] = useState<Line[]>(() => {
     if (!initial?.items) return [];
     try {
-      const items = JSON.parse(initial.items) as { n: string; v?: string; q: number }[];
+      const items = JSON.parse(initial.items) as { n: string; v?: string; q: number; caja?: boolean }[];
       return items
         .map((it) => {
           const p = products.find((x) => x.name === it.n);
-          return p ? { pid: p.id, variant: it.v || "", qty: Math.max(1, Number(it.q) || 1) } : null;
+          return p ? { pid: p.id, variant: it.v || "", qty: Math.max(1, Number(it.q) || 1), ...(it.caja ? { caja: true } : {}) } : null;
         })
         .filter((l): l is Line => l !== null);
     } catch {
@@ -79,7 +82,15 @@ export function OrderSheet({
     [products],
   );
 
-  const unitPrice = (p: Product) => (pago === "Mercado Pago" ? p.price : (p.basePrice ?? p.price));
+  const unitPrice = (p: Product, caja?: boolean) => {
+    if (caja && vendePorCaja(p)) {
+      const base = p.boxBasePrice ?? 0;
+      return pago === "Mercado Pago" ? listPrice(base) : base;
+    }
+    return pago === "Mercado Pago" ? p.price : (p.basePrice ?? p.price);
+  };
+  // Unidades que mueve el renglón (una caja = todas sus unidades), para el costo.
+  const unidades = (p: Product, l: Line) => l.qty * (l.caja && vendePorCaja(p) ? (p.unitsPerBox ?? 1) : 1);
   const unitCost = (p: Product): number => {
     if (p.combo && p.combo.length) {
       return p.combo.reduce((acc, c) => {
@@ -92,11 +103,11 @@ export function OrderSheet({
 
   const subtotal = lines.reduce((acc, l) => {
     const p = byId.get(l.pid);
-    return acc + (p ? unitPrice(p) * l.qty : 0);
+    return acc + (p ? unitPrice(p, l.caja) * l.qty : 0);
   }, 0);
   const costo = lines.reduce((acc, l) => {
     const p = byId.get(l.pid);
-    return acc + (p ? unitCost(p) * l.qty : 0);
+    return acc + (p ? unitCost(p) * unidades(p, l) : 0);
   }, 0);
   const envioNum = Number(montoEnvio) || 0;
   const total = subtotal + envioNum;
@@ -123,13 +134,14 @@ export function OrderSheet({
     const items = lines
       .map((l) => {
         const p = byId.get(l.pid);
-        return p ? { n: p.name, v: l.variant || "", q: l.qty } : null;
+        return p ? { n: p.name, v: l.variant || "", q: l.qty, ...(l.caja && vendePorCaja(p) ? { caja: true } : {}) } : null;
       })
       .filter(Boolean);
     const detalle = lines
       .map((l) => {
         const p = byId.get(l.pid);
-        return p ? `${l.qty}x ${p.name}${l.variant ? ` (${l.variant})` : ""}` : "";
+        const caja = p && l.caja && vendePorCaja(p) ? ` [Caja x${p.unitsPerBox}]` : "";
+        return p ? `${l.qty}x ${p.name}${caja}${l.variant ? ` (${l.variant})` : ""}` : "";
       })
       .filter(Boolean)
       .join(" | ");
@@ -242,7 +254,7 @@ export function OrderSheet({
                           value={l.pid}
                           onChange={(e) => {
                             const np = byId.get(e.target.value);
-                            setLine(i, { pid: e.target.value, variant: np?.flavors[0] ?? "" });
+                            setLine(i, { pid: e.target.value, variant: np?.flavors[0] ?? "", caja: false });
                           }}
                           className="input h-11 min-w-0 flex-1 text-sm"
                         >
@@ -278,6 +290,21 @@ export function OrderSheet({
                             ))}
                           </select>
                         )}
+                        {p && vendePorCaja(p) && (
+                          <div className="flex overflow-hidden rounded-lg border border-line text-xs font-bold">
+                            {[false, true].map((c) => (
+                              <button
+                                key={String(c)}
+                                type="button"
+                                onClick={() => setLine(i, { caja: c })}
+                                aria-pressed={!!l.caja === c}
+                                className={`h-10 px-2.5 transition-colors ${!!l.caja === c ? "bg-primary text-white" : "bg-white text-muted"}`}
+                              >
+                                {c ? `Caja x${p.unitsPerBox}` : "Unidad"}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                         <div className="ml-auto flex items-center rounded-lg border border-line">
                           <button
                             type="button"
@@ -300,8 +327,8 @@ export function OrderSheet({
                       </div>
                       {p && (
                         <p className="mt-2 text-right text-sm font-semibold text-ink">
-                          {l.qty > 1 && <span className="text-xs font-normal text-muted">{l.qty} × {formatPrice(unitPrice(p))} = </span>}
-                          {formatPrice(unitPrice(p) * l.qty)}
+                          {l.qty > 1 && <span className="text-xs font-normal text-muted">{l.qty} × {formatPrice(unitPrice(p, l.caja))} = </span>}
+                          {formatPrice(unitPrice(p, l.caja) * l.qty)}
                         </p>
                       )}
                     </li>

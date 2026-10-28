@@ -144,7 +144,7 @@ export default function CheckoutPage() {
     const detalle = items
       .map(
         (i) =>
-          `${i.quantity}x ${i.product.name}${i.flavor ? ` (${i.flavor})` : ""}${choicesTxt(i)}`,
+          `${i.quantity}x ${i.product.name}${i.box && i.presentation ? ` [${i.presentation}]` : ""}${i.flavor ? ` (${i.flavor})` : ""}${choicesTxt(i)}`,
       )
       .join(" | ");
     const itemsJson = JSON.stringify(
@@ -153,6 +153,7 @@ export default function CheckoutPage() {
         v: i.flavor ?? "",
         q: i.quantity,
         ...(i.comboChoices ? { cv: i.comboChoices } : {}),
+        ...(i.box ? { caja: true } : {}),
       })),
     );
     // Total según el método: efectivo/transferencia con 10% off (por producto);

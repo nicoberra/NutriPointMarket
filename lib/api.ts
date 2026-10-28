@@ -299,6 +299,8 @@ export function buildProduct(row: Record<string, unknown>): Product {
     presentations: [],
     cost: toNum(row.costo),
     costCurrency: String(row.costoMoneda ?? "").toUpperCase() === "USD" ? "USD" : "ARS",
+    unitsPerBox: toNum(row.porCaja) > 1 ? Math.floor(toNum(row.porCaja)) : undefined,
+    boxBasePrice: toNum(row.precioCaja) > 0 ? toNum(row.precioCaja) : undefined,
     featured: toBool(row.destacado),
     bestSeller: false,
     freeShipping: false,
@@ -454,6 +456,10 @@ export interface ProductInput {
   infoNutricional?: string;
   ingredientes?: string;
   combo?: string;
+  /** Unidades que trae cada caja (1 = no viene en caja). El costo es siempre por unidad. */
+  porCaja?: number | "";
+  /** Precio de la caja con transferencia (0 = no se vende por caja). */
+  precioCaja?: number | "";
 }
 
 export async function saveProduct(row: ProductInput): Promise<boolean> {
