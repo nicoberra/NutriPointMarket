@@ -31,7 +31,12 @@ export interface Product {
   slug: string;
   name: string;
   brand: string; // slug de la marca
+  /** Categoría principal (ícono, migas de pan). */
   category: CategorySlug;
+  /** Todas las categorías del producto (la primera es la principal). */
+  categories?: CategorySlug[];
+  /** Nombres de las categorías tal como están en la planilla. */
+  categoryNames?: string[];
   description: string;
   /** Modo de uso (opcional, editable desde el CRM). */
   usage?: string;

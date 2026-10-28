@@ -7,6 +7,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useProducts } from "@/context/ProductsContext";
 import { categories } from "@/data/categories";
 import { brandName } from "@/data/brands";
+import { categoriasDe } from "@/lib/categorias";
 import type { CategorySlug } from "@/lib/types";
 import { formatPrice } from "@/lib/format";
 import { ProductCard } from "./ProductCard";
@@ -114,12 +115,12 @@ export function Catalog({
     const q = search.trim().toLowerCase();
     let list = ALL.filter((p) => {
       if (onlyOffers && p.discount <= 0) return false;
-      if (selectedCats.length && !selectedCats.includes(p.category)) return false;
+      if (selectedCats.length && !categoriasDe(p).some((c) => selectedCats.includes(c))) return false;
       if (selectedBrands.length && !selectedBrands.includes(p.brand.toLowerCase()))
         return false;
       if (p.price > maxPrice) return false;
       if (q) {
-        const hay = `${p.name} ${brandName(p.brand)} ${p.category}`.toLowerCase();
+        const hay = `${p.name} ${brandName(p.brand)} ${categoriasDe(p).join(" ")}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;

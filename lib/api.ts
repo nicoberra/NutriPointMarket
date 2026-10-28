@@ -2,6 +2,7 @@ import type { Product, CategorySlug } from "./types";
 import { SHEETS_API_URL, listPrice } from "./config";
 import { discountPercent } from "./format";
 import { categories } from "@/data/categories";
+import { nombresCategorias } from "@/lib/categorias";
 
 /** Quita acentos y pasa a minúsculas (para comparar/armar slugs). */
 function deaccent(s: string): string {
@@ -265,14 +266,18 @@ export function buildProduct(row: Record<string, unknown>): Product {
   const precioML = listPrice(baseML);
   const oldPrice = precioML > precio ? precioML : undefined;
   // El slug se genera del nombre de la categoría (categorías dinámicas).
-  const categoriaTxt = String(row.categoria ?? "").trim();
-  const category = categoriaTxt ? slugify(categoriaTxt) : "proteinas";
+  // Puede tener varias categorías ("A | B"): la primera es la principal.
+  const categoryNames = nombresCategorias(row.categoria);
+  const slugsCat = categoryNames.map(slugify).filter(Boolean);
+  const category = slugsCat[0] || "proteinas";
   return {
     id: slugify(nombre),
     slug: slugify(nombre),
     name: nombre,
     brand: cleanBrand(row.marca),
     category,
+    categories: slugsCat.length ? slugsCat : [category],
+    categoryNames,
     description: String(row.descripcion ?? "").trim(),
     usage: String(row.modoUso ?? "").trim() || undefined,
     nutrition: String(row.infoNutricional ?? "").trim() || undefined,

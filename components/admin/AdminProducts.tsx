@@ -19,6 +19,7 @@ import {
 import { formatPrice } from "@/lib/format";
 import { listPrice } from "@/lib/config";
 import { categoryMap } from "@/data/categories";
+import { categoriasDe, estaEnCategoria, SEP_CATEGORIAS } from "@/lib/categorias";
 import { SearchIcon, CloseIcon, CheckIcon, PlusIcon, TrashIcon, ChevronDownIcon, PackageIcon } from "@/components/Icons";
 import { AdminCategories } from "./AdminCategories";
 import { EmptyState } from "@/components/Estados";
@@ -56,7 +57,7 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
     return products.filter((p) => {
-      if (cat && p.category !== cat) return false;
+      if (cat && !estaEnCategoria(p, cat)) return false;
       if (query && !`${p.name} ${p.brand}`.toLowerCase().includes(query)) return false;
       return true;
     });
@@ -68,7 +69,8 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
     const row: ProductInput = {
       nombre: p.name,
       marca: p.brand,
-      categoria: categoryMap[p.category]?.name ?? "",
+      // Conserva TODAS sus categorías con el nombre exacto de la planilla.
+      categoria: p.categoryNames?.length ? p.categoryNames.join(SEP_CATEGORIAS) : categoryMap[p.category]?.name ?? "",
       // La planilla guarda el precio CON transferencia (base), no el publicado.
       precio: ch.precio ?? p.basePrice ?? p.price,
       precioML: "precioML" in ch ? ch.precioML : p.baseOldPrice,
@@ -166,7 +168,7 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
   const groups =
     cat === ""
       ? categories
-          .map((c) => ({ cat: c, list: filtered.filter((p) => p.category === c.slug) }))
+          .map((c) => ({ cat: c, list: filtered.filter((p) => categoriasDe(p).includes(c.slug)) }))
           .filter((g) => g.list.length > 0)
       : [{ cat: categoryMap[cat], list: filtered }];
 
@@ -792,11 +794,15 @@ function ProductSheet({
     product?.combo ? product.combo.map((c) => ({ n: c.n, q: String(c.q) })) : [],
   );
   const [marca, setMarca] = useState(product?.brand ?? "");
-  const [categoria, setCategoria] = useState<string>(
-    product
-      ? categoryMap[product.category]?.name ?? categories[0]?.name ?? ""
-      : categories[0]?.name ?? "",
-  );
+  // Puede estar en varias categorías; la primera elegida es la principal.
+  const [cats, setCats] = useState<string[]>(() => {
+    if (product?.categoryNames?.length) return product.categoryNames;
+    const n = product ? categoryMap[product.category]?.name : undefined;
+    return n ? [n] : categories[0]?.name ? [categories[0].name] : [];
+  });
+  const toggleCat = (n: string) =>
+    setCats((prev) => (prev.some((x) => x.toLowerCase() === n.toLowerCase()) ? prev.filter((x) => x.toLowerCase() !== n.toLowerCase()) : [...prev, n]));
+  const categoria = cats.join(SEP_CATEGORIAS);
   // Precio NORMAL + descuento (en $ o %). El precio final = normal − descuento.
   const [precioNormal, setPrecioNormal] = useState<number>(
     product ? (product.baseOldPrice && product.baseOldPrice > (product.basePrice ?? product.price) ? product.baseOldPrice : (product.basePrice ?? product.price)) : 0,
@@ -1112,18 +1118,30 @@ function ProductSheet({
                 />
               )}
             </Field>
-            <Field label="Categoría">
-              <select
-                value={categoria}
-                onChange={(e) => setCategoria(e.target.value)}
-                className="input h-11 text-base"
-              >
-                {categories.map((c) => (
-                  <option key={c.slug} value={c.name}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+            <Field label="Categorías">
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Categorías del producto">
+                {categories.map((c) => {
+                  const i = cats.findIndex((x) => x.toLowerCase() === c.name.toLowerCase());
+                  return (
+                    <button
+                      key={c.slug}
+                      type="button"
+                      onClick={() => toggleCat(c.name)}
+                      aria-pressed={i >= 0}
+                      className={`rounded-full px-3 py-1.5 text-sm font-semibold transition active:scale-[0.97] motion-reduce:active:scale-100 ${
+                        i >= 0 ? "bg-primary text-white shadow-soft" : "border border-line bg-white text-ink hover:border-primary/40"
+                      }`}
+                    >
+                      {i >= 0 && "✓ "}
+                      {c.name}
+                      {i === 0 && cats.length > 1 && <span className="ml-1 text-[10px] font-bold uppercase opacity-80">principal</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-1.5 text-xs text-muted">
+                {cats.length ? "Tocá para sumar o sacar categorías. La primera que elegiste es la principal." : "Elegí al menos una categoría."}
+              </p>
             </Field>
             <Field label="Precio con transferencia (normal)">
               <input

@@ -33,7 +33,45 @@ async function download(src: string, name: string) {
   }
 }
 
-/** Visor de una foto a pantalla completa con descarga. */
+/** La foto en PNG (el portapapeles de los navegadores solo acepta PNG). */
+async function aPng(src: string): Promise<Blob> {
+  const blob = await (await fetch(src)).blob();
+  if (blob.type === "image/png") return blob;
+  const bmp = await createImageBitmap(blob);
+  const c = document.createElement("canvas");
+  c.width = bmp.width;
+  c.height = bmp.height;
+  c.getContext("2d")?.drawImage(bmp, 0, 0);
+  return new Promise((ok, mal) => c.toBlob((b) => (b ? ok(b) : mal(new Error("png"))), "image/png"));
+}
+
+/**
+ * Copia la foto al portapapeles para pegarla (WhatsApp, Instagram, etc.). La
+ * promesa va directo al ClipboardItem así Safari no pierde el toque del usuario.
+ * Si el celu no deja copiar imágenes, abre el menú de compartir con la foto.
+ */
+async function copiar(src: string, name: string): Promise<"copiada" | "compartida" | "error"> {
+  if (navigator.clipboard?.write && typeof ClipboardItem !== "undefined") {
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": aPng(src) })]);
+      return "copiada";
+    } catch {
+      /* sigue con compartir */
+    }
+  }
+  try {
+    const file = new File([await (await fetch(src)).blob()], name, { type: "image/jpeg" });
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file] });
+      return "compartida";
+    }
+  } catch {
+    /* sin compartir */
+  }
+  return "error";
+}
+
+/** Visor de una foto a pantalla completa con copiar y descargar. */
 export function PhotoViewer({
   src,
   label,
@@ -44,6 +82,7 @@ export function PhotoViewer({
   onClose: () => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [copia, setCopia] = useState<"" | "copiando" | "copiada" | "compartida" | "error">("");
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -89,13 +128,31 @@ export function PhotoViewer({
       >
         <button
           type="button"
+          disabled={copia === "copiando"}
+          onClick={async () => {
+            setCopia("copiando");
+            const r = await copiar(src, name);
+            setCopia(r);
+            if (r !== "error") setTimeout(() => setCopia(""), 2500);
+          }}
+          className="btn btn-primary btn-lg font-bold sm:min-w-[220px]"
+        >
+          {copia === "copiando" ? "Copiando…" : copia === "copiada" ? "✓ Foto copiada" : copia === "compartida" ? "✓ Listo" : "⧉ Copiar foto"}
+        </button>
+        {copia === "error" && (
+          <p className="text-center text-xs text-white/80 sm:hidden" role="status">
+            Este navegador no deja copiar fotos: usá Descargar.
+          </p>
+        )}
+        <button
+          type="button"
           disabled={busy}
           onClick={async () => {
             setBusy(true);
             await download(src, name);
             setBusy(false);
           }}
-          className="btn btn-primary btn-lg font-bold sm:min-w-[220px]"
+          className="btn btn-lg border-2 border-white/60 font-bold text-white hover:bg-white/10 sm:min-w-[220px]"
         >
           {busy ? "Descargando…" : "⬇ Descargar foto"}
         </button>

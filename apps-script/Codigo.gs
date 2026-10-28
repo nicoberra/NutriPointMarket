@@ -18,7 +18,7 @@
  * ============================================================================ */
 
 var SHEET_ID = "12paAzW6OcSgYv4u6L7QVI4tpvrEx1yqnujW0OjcieMc";
-var API_VERSION = "v13"; // v13: compras pendientes (se revisan y se suman al stock después) // v12: lectura de compras con Claude Haiku 5.5 (el más barato) // v11: las compras leen fotos, archivos y texto con Claude // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
+var API_VERSION = "v14"; // v14: un producto puede estar en varias categorías ("A | B") // v13: compras pendientes (se revisan y se suman al stock después) // v12: lectura de compras con Claude Haiku 5.5 (el más barato) // v11: las compras leen fotos, archivos y texto con Claude // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
 
 // Repo de GitHub donde se guardan las fotos de productos (en public/productos/).
 // El token NO va acá: se guarda en Propiedades del script como GITHUB_TOKEN.
@@ -48,7 +48,7 @@ var TABLES = {
     columns: [
       ["nombre", "Nombre"],
       ["marca", "Marca"],
-      ["categoria", "Categoría"],
+      ["categoria", "Categoría"], // una o varias, separadas por " | " (la primera es la principal)
       ["precio", "Precio"],
       ["precioML", "Precio sin descuento"], // precio normal cuando el CRM carga un descuento (vacío = sin descuento)
       ["variantes", "Variantes"],
@@ -1707,7 +1707,16 @@ function categoriaRename(from, to) {
   if (iCat >= 0) {
     var data = sh.getDataRange().getValues();
     for (var r = 1; r < data.length; r++) {
-      if (low(data[r][iCat]) === low(from)) sh.getRange(r + 1, iCat + 1).setValue(to);
+      // El producto puede estar en varias categorías ("A | B"): se cambia solo esa.
+      var cats = String(data[r][iCat] || "").split("|").map(function (c) { return c.trim(); }).filter(String);
+      var cambio = false, vistas = {}, nuevas = [];
+      for (var c = 0; c < cats.length; c++) {
+        var nombre = low(cats[c]) === low(from) ? (cambio = true, to) : cats[c];
+        if (vistas[low(nombre)]) continue; // si ya estaba en la nueva, no se repite
+        vistas[low(nombre)] = true;
+        nuevas.push(nombre);
+      }
+      if (cambio) sh.getRange(r + 1, iCat + 1).setValue(nuevas.join(" | "));
     }
   }
   return { from: from, to: to };
