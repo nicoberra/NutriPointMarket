@@ -6,6 +6,7 @@ import { CopyLinkButton } from "./CopyLinkButton";
 import { ComboBreakdown } from "./ComboBreakdown";
 import { PhotoViewer } from "./PhotoViewer";
 import { MarcaCombo } from "./MarcaCombo";
+import { ComboPicker } from "./ComboPicker";
 import type { Product } from "@/lib/types";
 import { useProducts } from "@/context/ProductsContext";
 import { useCategories } from "@/context/CategoriesContext";
@@ -51,6 +52,7 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
   const [cat, setCat] = useState<string>("");
   const [editing, setEditing] = useState<Product | null>(null);
   const [adding, setAdding] = useState(false);
+  const [creandoCombo, setCreandoCombo] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showCats, setShowCats] = useState(false);
   const { confirm, dialog } = useConfirm();
@@ -137,6 +139,7 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
   const handleFullSave = async (row: ProductInput) => {
     setEditing(null);
     setAdding(false);
+    setCreandoCombo(false);
     onToast("Guardando…");
     try {
       const ok = await saveProduct(row);
@@ -182,6 +185,12 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
             className="btn btn-outline btn-md flex-1 sm:flex-none"
           >
             Categorías
+          </button>
+          <button
+            onClick={() => setCreandoCombo(true)}
+            className="btn btn-outline btn-md flex-1 sm:flex-none"
+          >
+            🎁 Combo
           </button>
           <button
             onClick={() => setAdding(true)}
@@ -250,14 +259,16 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
         ))
       )}
 
-      {(editing || adding) && (
+      {(editing || adding || creandoCombo) && (
         <ProductSheet
           product={editing}
+          modoCombo={creandoCombo && !editing}
           saving={saving}
           dollar={dollar}
           onClose={() => {
             setEditing(null);
             setAdding(false);
+            setCreandoCombo(false);
           }}
           onSave={handleFullSave}
         />
@@ -775,12 +786,15 @@ function Chip({
 /** Alta/edición completa de producto (nombre, marca, categoría, variantes). */
 function ProductSheet({
   product,
+  modoCombo = false,
   saving,
   dollar,
   onClose,
   onSave,
 }: {
   product: Product | null;
+  /** Abierto desde "Crear combo": la lista de productos aparece primero y abierta. */
+  modoCombo?: boolean;
   saving: boolean;
   dollar: number;
   onClose: () => void;
@@ -814,7 +828,8 @@ function ProductSheet({
   const [cats, setCats] = useState<string[]>(() => {
     if (product?.categoryNames?.length) return product.categoryNames;
     const n = product ? categoryMap[product.category]?.name : undefined;
-    return n ? [n] : categories[0]?.name ? [categories[0].name] : [];
+    const combos = modoCombo ? categories.find((c) => /combo/i.test(c.name))?.name : undefined;
+    return n ? [n] : combos ? [combos] : categories[0]?.name ? [categories[0].name] : [];
   });
   const toggleCat = (n: string) =>
     setCats((prev) => (prev.some((x) => x.toLowerCase() === n.toLowerCase()) ? prev.filter((x) => x.toLowerCase() !== n.toLowerCase()) : [...prev, n]));
@@ -956,7 +971,7 @@ function ProductSheet({
       <div className="relative max-h-[95vh] w-full max-w-md animate-section-in overflow-y-auto rounded-t-2xl bg-page p-5 motion-reduce:animate-none sm:rounded-2xl lg:max-w-4xl lg:p-7">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-display text-lg font-bold text-primary">
-            {isEdit ? "Editar producto" : "Agregar producto"}
+            {isEdit ? "Editar producto" : modoCombo ? "Crear combo" : "Agregar producto"}
           </h3>
           <button
             onClick={closeAndSave}
@@ -993,64 +1008,19 @@ function ProductSheet({
           {/* Combo */}
           <div className="lg:col-span-2 rounded-xl border border-dashed border-primary/30 bg-primary/5 p-3">
             <span className="mb-1 block text-xs font-semibold text-ink">
-              Combo (opcional) — elegí los productos que lo arman
+              {modoCombo ? "Productos del combo — tildá los que lo arman" : "Combo (opcional) — elegí los productos que lo arman"}
             </span>
             <p className="mb-2 text-[11px] text-muted">
               Si agregás productos acá, este producto es un <b>combo</b>: al venderse se
               descuenta el stock de cada uno. El stock del combo se calcula solo según lo
               que haya de cada producto.
             </p>
-            <div className="space-y-2">
-              {comboRows.map((row, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <select
-                    value={row.n}
-                    onChange={(e) =>
-                      setComboRows((rs) =>
-                        rs.map((r, j) => (j === i ? { ...r, n: e.target.value } : r)),
-                      )
-                    }
-                    className="input h-11 flex-1 text-base"
-                  >
-                    <option value="">Elegí un producto…</option>
-                    {allProducts
-                      .filter((pr) => pr.name !== nombre && !(pr.combo && pr.combo.length))
-                      .map((pr) => (
-                        <option key={pr.id} value={pr.name}>
-                          {pr.brand ? `${pr.brand} · ${pr.name}` : pr.name}
-                        </option>
-                      ))}
-                  </select>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={row.q}
-                    onChange={(e) =>
-                      setComboRows((rs) =>
-                        rs.map((r, j) => (j === i ? { ...r, q: e.target.value } : r)),
-                      )
-                    }
-                    className="input h-11 w-20 text-base"
-                    placeholder="Cant."
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setComboRows((rs) => rs.filter((_, j) => j !== i))}
-                    aria-label="Quitar"
-                    className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-muted hover:bg-white"
-                  >
-                    <CloseIcon className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => setComboRows((rs) => [...rs, { n: "", q: "1" }])}
-              className="mt-2 text-sm font-semibold text-primary hover:underline"
-            >
-              + Agregar producto al combo
-            </button>
+            <ComboPicker
+              value={comboRows}
+              onChange={setComboRows}
+              productos={allProducts.filter((pr) => pr.name !== nombre && !(pr.combo && pr.combo.length))}
+              abiertoAlInicio={modoCombo}
+            />
 
             {comboCostDetail.length > 0 && (
               <div className="mt-3 overflow-hidden rounded-lg border border-primary/20 bg-white text-xs">
