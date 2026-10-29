@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm } from "./useConfirm";
 import { CopyLinkButton } from "./CopyLinkButton";
+import { categoryHref } from "@/lib/seo";
 import { ComboBreakdown } from "./ComboBreakdown";
 import { PhotoViewer } from "./PhotoViewer";
 import { MarcaCombo } from "./MarcaCombo";
@@ -260,6 +261,9 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
             <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-primary">
               {g.cat?.name ?? "Otros"}
               <span className="text-xs font-normal text-muted">({g.list.length})</span>
+              {g.cat && (
+                <CopyLinkButton url={`https://suplemarket.com.ar${categoryHref(g.cat.slug)}`} title={`Copiar link de ${g.cat.name}`} />
+              )}
             </h3>
             <div className="space-y-2 sm:grid sm:grid-cols-2 sm:gap-2 sm:space-y-0 xl:grid-cols-3">
               {g.list.map((p) => (
