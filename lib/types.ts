@@ -45,7 +45,7 @@ export interface Product {
   /** Ingredientes (opcional; si está vacío no se muestra). */
   ingredients?: string;
   /** Si es un combo: productos que lo componen y cuántos de cada uno. */
-  combo?: { n: string; q: number }[];
+  combo?: { n: string; q: number; /** Sabor/variante fija de ese renglón; sin `v`, la elige el cliente. */ v?: string }[];
   /** Precio publicado en la web (= basePrice + margen por transferencia). */
   price: number;
   oldPrice?: number;

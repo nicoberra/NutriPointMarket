@@ -42,24 +42,28 @@ export function availableVariants(p: Product): string[] {
   return p.variants.filter((v) => v.qty == null || v.qty > 0).map((v) => v.name);
 }
 
-/** Productos que componen un combo (resueltos contra el catálogo) y cuántos de cada uno. */
+/**
+ * Productos que componen un combo (resueltos contra el catálogo) y cuántos de
+ * cada uno. `v` = sabor fijo de ese renglón (ej. "1 Keto Chocolate + 1 Keto
+ * Vainilla"); sin `v`, el cliente lo elige al comprar.
+ */
 export function comboComponents(
   product: Product,
   all: Product[],
-): { comp: Product; q: number }[] {
+): { comp: Product; q: number; v?: string }[] {
   if (!product.combo?.length) return [];
   const byName = new Map(all.map((p) => [p.name, p]));
-  const out: { comp: Product; q: number }[] = [];
+  const out: { comp: Product; q: number; v?: string }[] = [];
   for (const c of product.combo) {
     const comp = byName.get(c.n);
-    if (comp) out.push({ comp, q: Number(c.q) || 1 });
+    if (comp) out.push({ comp, q: Number(c.q) || 1, ...(c.v ? { v: c.v } : {}) });
   }
   return out;
 }
 
-/** ¿El combo tiene algún producto con variantes? (el cliente debe elegir). */
+/** ¿El combo tiene algún producto con variantes sin sabor fijo? (el cliente debe elegir). */
 export function comboNeedsChoice(product: Product, all: Product[]): boolean {
-  return comboComponents(product, all).some(({ comp }) => comp.flavors.length > 0);
+  return comboComponents(product, all).some(({ comp, v }) => !v && comp.flavors.length > 0);
 }
 
 /**
@@ -74,9 +78,9 @@ export function comboStockMax(
   const comps = comboComponents(product, all);
   if (!comps.length) return stockMax(product);
   let max = Infinity;
-  for (const { comp, q } of comps) {
+  for (const { comp, q, v: fijo } of comps) {
     if (comp.inStock === false) return 0;
-    const v = comp.variants?.find((x) => x.name === choices[comp.name]);
+    const v = comp.variants?.find((x) => x.name === (fijo ?? choices[comp.name]));
     if (v) {
       if (v.qty == null) continue; // variante sin seguimiento: no limita
       if (v.qty <= 0) return 0;
@@ -135,6 +139,13 @@ export function applyComboStock(products: Product[]): Product[] {
       if (!comp || comp.inStock === false) {
         max = 0;
         break;
+      }
+      // Sabor fijo: manda el stock de esa variante (si tiene seguimiento).
+      const fija = c.v ? comp.variants?.find((x) => x.name === c.v) : undefined;
+      if (fija && fija.qty != null) {
+        if (fija.qty <= 0) { max = 0; break; }
+        if (c.q > 0) max = Math.min(max, Math.floor(fija.qty / c.q));
+        continue;
       }
       const s = comp.stockQty ?? 0;
       if (s > 0 && c.q > 0) max = Math.min(max, Math.floor(s / c.q));

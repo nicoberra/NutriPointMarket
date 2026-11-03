@@ -4,16 +4,21 @@ import { useMemo, useState } from "react";
 import type { Product } from "@/lib/types";
 import { CheckIcon, CloseIcon, MinusIcon, PlusIcon, SearchIcon } from "@/components/Icons";
 
-type Fila = { n: string; q: string };
+/** Un renglón del combo: producto, cantidad y (opcional) sabor fijo. Sin `v`, el cliente elige. */
+export type FilaCombo = { n: string; q: string; v?: string };
 const sinAcento = (t: string) => t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+/** Valor del selector para "lo elige el cliente". */
+const ELIGE = "__elige__";
 
 /**
- * Elegir los productos de un combo: lista con foto y buscador para tildarlos, y
- * cantidad de cada uno. El sabor lo elige el cliente al comprar.
+ * Elegir los productos de un combo: lista con foto y buscador para tildarlos,
+ * cantidad de cada uno y, si el producto tiene sabores, el sabor de ese renglón
+ * (o "lo elige el cliente"). Un mismo producto puede ir varias veces con
+ * distinto sabor (ej. "1 Keto Chocolate + 1 Keto Vainilla").
  */
 export function ComboPicker({ value, onChange, productos, abiertoAlInicio = false }: {
-  value: Fila[];
-  onChange: (f: Fila[]) => void;
+  value: FilaCombo[];
+  onChange: (f: FilaCombo[]) => void;
   productos: Product[];
   abiertoAlInicio?: boolean;
 }) {
@@ -28,8 +33,20 @@ export function ComboPicker({ value, onChange, productos, abiertoAlInicio = fals
   }, [productos, q]);
 
   const alternar = (n: string) => onChange(esta(n) ? elegidos.filter((f) => f.n !== n) : [...elegidos, { n, q: "1" }]);
-  const cantidad = (n: string, d: number) =>
-    onChange(elegidos.map((f) => (f.n === n ? { ...f, q: String(Math.max(1, (Number(f.q) || 1) + d)) } : f)));
+  const cambiar = (i: number, patch: Partial<FilaCombo>) =>
+    onChange(elegidos.map((f, k) => (k === i ? { ...f, ...patch } : f)));
+  const cantidad = (i: number, d: number) =>
+    cambiar(i, { q: String(Math.max(1, (Number(elegidos[i].q) || 1) + d)) });
+  const quitar = (i: number) => onChange(elegidos.filter((_, k) => k !== i));
+  // Otro renglón del mismo producto, con el primer sabor que todavía no esté usado.
+  const otroSabor = (i: number) => {
+    const f = elegidos[i];
+    const sabores = porNombre.get(f.n)?.flavors ?? [];
+    const usados = new Set(elegidos.filter((x) => x.n === f.n).map((x) => x.v));
+    const libre = sabores.find((s) => !usados.has(s)) ?? sabores[0];
+    const nuevo: FilaCombo = { n: f.n, q: "1", ...(libre ? { v: libre } : {}) };
+    onChange([...elegidos.slice(0, i + 1), nuevo, ...elegidos.slice(i + 1)]);
+  };
 
   const Foto = ({ p }: { p?: Product }) =>
     p?.image ? (
@@ -43,23 +60,47 @@ export function ComboPicker({ value, onChange, productos, abiertoAlInicio = fals
     <div className="space-y-2">
       {elegidos.length > 0 && (
         <ul className="space-y-1.5">
-          {elegidos.map((f) => {
+          {elegidos.map((f, i) => {
             const p = porNombre.get(f.n);
+            const sabores = p?.flavors ?? [];
             return (
-              <li key={f.n} className="flex items-center gap-2 rounded-xl border border-line bg-white p-2">
-                <Foto p={p} />
-                <div className="min-w-0 flex-1">
-                  {p?.brand && <p className="truncate text-[10px] font-bold uppercase tracking-wide text-primary">{p.brand}</p>}
-                  <p className="line-clamp-2 text-sm font-semibold leading-snug text-ink">{f.n}</p>
+              <li key={`${f.n}|${f.v ?? ""}|${i}`} className="rounded-xl border border-line bg-white p-2">
+                <div className="flex items-center gap-2">
+                  <Foto p={p} />
+                  <div className="min-w-0 flex-1">
+                    {p?.brand && <p className="truncate text-[10px] font-bold uppercase tracking-wide text-primary">{p.brand}</p>}
+                    <p className="line-clamp-2 text-sm font-semibold leading-snug text-ink">{f.n}</p>
+                  </div>
+                  <div className="flex h-9 items-center rounded-full border border-line">
+                    <button type="button" onClick={() => cantidad(i, -1)} aria-label={`Una unidad menos de ${f.n}`} className="grid h-9 w-8 place-items-center text-primary"><MinusIcon className="h-3.5 w-3.5" /></button>
+                    <span className="w-6 text-center text-sm font-bold text-ink">{f.q}</span>
+                    <button type="button" onClick={() => cantidad(i, 1)} aria-label={`Una unidad más de ${f.n}`} className="grid h-9 w-8 place-items-center text-primary"><PlusIcon className="h-3.5 w-3.5" /></button>
+                  </div>
+                  <button type="button" onClick={() => quitar(i)} aria-label={`Quitar ${f.n} del combo`} className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted hover:bg-page-soft hover:text-sale">
+                    <CloseIcon className="h-4 w-4" />
+                  </button>
                 </div>
-                <div className="flex h-9 items-center rounded-full border border-line">
-                  <button type="button" onClick={() => cantidad(f.n, -1)} aria-label={`Una unidad menos de ${f.n}`} className="grid h-9 w-8 place-items-center text-primary"><MinusIcon className="h-3.5 w-3.5" /></button>
-                  <span className="w-6 text-center text-sm font-bold text-ink">{f.q}</span>
-                  <button type="button" onClick={() => cantidad(f.n, 1)} aria-label={`Una unidad más de ${f.n}`} className="grid h-9 w-8 place-items-center text-primary"><PlusIcon className="h-3.5 w-3.5" /></button>
-                </div>
-                <button type="button" onClick={() => alternar(f.n)} aria-label={`Quitar ${f.n} del combo`} className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted hover:bg-page-soft hover:text-sale">
-                  <CloseIcon className="h-4 w-4" />
-                </button>
+                {sabores.length > 0 && (
+                  <div className="mt-1.5 flex items-center gap-2 pl-12">
+                    <label className="flex min-w-0 flex-1 items-center gap-2 text-[11px] font-semibold text-muted">
+                      Sabor
+                      <select
+                        value={f.v ?? ELIGE}
+                        onChange={(e) => cambiar(i, e.target.value === ELIGE ? { v: undefined } : { v: e.target.value })}
+                        aria-label={`Sabor de ${f.n}`}
+                        className="input h-8 min-w-0 flex-1 px-2 text-xs"
+                      >
+                        <option value={ELIGE}>Lo elige el cliente</option>
+                        {sabores.map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <button type="button" onClick={() => otroSabor(i)} className="shrink-0 text-[11px] font-bold text-primary hover:underline">
+                      + otro sabor
+                    </button>
+                  </div>
+                )}
               </li>
             );
           })}
