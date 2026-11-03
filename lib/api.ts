@@ -240,12 +240,15 @@ export function parseVariantImages(raw: unknown): Record<string, string[]> {
 }
 
 /** Parsea el JSON de combo [{n,q}]. */
-export function parseCombo(raw: unknown): { n: string; q: number }[] | undefined {
+export function parseCombo(raw: unknown): { n: string; q: number; v?: string }[] | undefined {
   try {
     const a = JSON.parse(String(raw ?? "") || "[]");
     if (!Array.isArray(a) || !a.length) return undefined;
     return a
-      .map((x) => ({ n: String(x.n ?? "").trim(), q: Number(x.q) || 1 }))
+      .map((x) => {
+        const v = String(x.v ?? "").trim();
+        return { n: String(x.n ?? "").trim(), q: Number(x.q) || 1, ...(v ? { v } : {}) };
+      })
       .filter((x) => x.n);
   } catch {
     return undefined;

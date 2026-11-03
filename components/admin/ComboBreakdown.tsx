@@ -29,6 +29,7 @@ export function ComboBreakdown({
     const unitPrice = pr ? (pr.basePrice ?? pr.price) : 0;
     return {
       name: c.n,
+      v: c.v,
       brand: pr?.brand ?? "",
       q,
       cost: unitCost * q,
@@ -71,6 +72,7 @@ export function ComboBreakdown({
                 <span className="font-semibold text-ink">
                   {r.q > 1 ? `${r.q}× ` : ""}
                   {r.name}
+                  {r.v ? ` · ${r.v}` : ""}
                 </span>
                 {r.brand && (
                   <span className="block text-[10px] font-bold uppercase text-primary">{r.brand}</span>

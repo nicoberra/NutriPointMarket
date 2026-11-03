@@ -37,9 +37,10 @@ export function ProductDetail({ product: initial }: { product: Product }) {
   // Combos: el cliente elige la variante de cada producto que la tenga (solo
   // se ofrecen las que tienen stock) y el stock del combo sale de esa elección.
   const isCombo = !!product.combo?.length;
-  const comboComps = comboComponents(product, allProducts).filter(
-    ({ comp }) => comp.flavors.length > 0,
-  );
+  const comboTodos = comboComponents(product, allProducts);
+  // Renglones con sabor fijo (se muestran como "incluye"); los demás con variantes, los elige el cliente.
+  const comboFijos = comboTodos.filter(({ v }) => !!v);
+  const comboComps = comboTodos.filter(({ comp, v }) => !v && comp.flavors.length > 0);
   const [choices, setChoices] = useState<Record<string, string>>(() =>
     Object.fromEntries(
       comboComps.map(({ comp }) => [
@@ -300,6 +301,20 @@ export function ProductDetail({ product: initial }: { product: Product }) {
                     );
                   })}
                 </div>
+              </div>
+            )}
+
+            {/* Combo: renglones con sabor fijo */}
+            {comboFijos.length > 0 && (
+              <div>
+                <p className="mb-2 text-sm font-bold text-ink">Incluye:</p>
+                <ul className="flex flex-wrap gap-2">
+                  {comboFijos.map(({ comp, q, v }, i) => (
+                    <li key={i} className="rounded-full border border-accent bg-accent-soft px-4 py-2 text-sm font-medium text-primary">
+                      {q} × {comp.name} · <b>{v}</b>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
 

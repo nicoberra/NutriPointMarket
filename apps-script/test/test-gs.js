@@ -123,6 +123,7 @@ const call = (params, body) => {
   const t = ctx.handle(e).text;
   return JSON.parse(t.slice(3, -1));
 };
+const prodRowSet = (name, col, val) => { const k = ctx.__keysOf("Productos"); const r = book.sheets.Productos.rows.find((x) => x[0] === name); r[k.indexOf(col)] = val; };
 const prod = (name) => {
   const k = ctx.__keysOf("Productos");
   const r = book.sheets.Productos.rows.find((x) => x[0] === name);
@@ -478,6 +479,19 @@ console.log("Venta por caja o por unidad");
   check("borrar el pedido de la caja repone las 10 unidades", /Choco:14/.test(v()), v());
   ctx.deleteRow("Productos", "Barra Test");
   ctx.deleteRow("Productos", "Barra Sin Caja");
+}
+
+console.log("Combo con sabores fijos (1 de cada sabor)");
+{
+  ctx.addRow("Productos", { nombre: "Panqueque Test", categoria: "Snacks", precio: 3000, stock: "sí", cantidad: 6, variantes: "Choco:3, Vainilla:3" });
+  ctx.addRow("Productos", { nombre: "Combo Panqueque Test", categoria: "Combos", precio: 5500, stock: "sí", cantidad: 0, combo: JSON.stringify([{ n: "Panqueque Test", q: 1, v: "Choco" }, { n: "Panqueque Test", q: 1, v: "Vainilla" }]) });
+  const v = () => String(prod("Panqueque Test").variantes);
+  let rf = addPedido({ id: "ped1795500000001", cliente: "Fijo", monto: 5500, pago: "Efectivo", items: items([{ n: "Combo Panqueque Test", q: 1 }]) });
+  check("combo con sabor fijo por renglón → descuenta 1 de cada sabor sin que el cliente elija", rf.ok && /Choco:2/.test(v()) && /Vainilla:2/.test(v()) && prod("Panqueque Test").cantidad === 4, [rf, v()]);
+  prodRowSet("Panqueque Test", "variantes", "Choco:0, Vainilla:5"); prodRowSet("Panqueque Test", "cantidad", 5);
+  rf = addPedido({ id: "ped1795500000002", cliente: "Fijo", monto: 5500, pago: "Efectivo", items: items([{ n: "Combo Panqueque Test", q: 1 }]) });
+  check("  ...sin stock de uno de los sabores fijos → rechazo", rf.ok === false && /Solo quedan|Sin stock/.test(rf.error), rf);
+  ["Combo Panqueque Test", "Panqueque Test"].forEach((n) => ctx.deleteRow("Productos", n));
 }
 
 console.log("Copias automáticas");

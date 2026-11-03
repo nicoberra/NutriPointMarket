@@ -7,7 +7,7 @@ import { categoryHref } from "@/lib/seo";
 import { ComboBreakdown } from "./ComboBreakdown";
 import { PhotoViewer } from "./PhotoViewer";
 import { MarcaCombo } from "./MarcaCombo";
-import { ComboPicker } from "./ComboPicker";
+import { ComboPicker, type FilaCombo } from "./ComboPicker";
 import { MoneyInput, formatoPlata } from "./MoneyInput";
 import type { Product } from "@/lib/types";
 import { useProducts } from "@/context/ProductsContext";
@@ -481,7 +481,7 @@ function ProductRow({
           <p className="text-[11px] font-bold uppercase text-muted">
             {product.brand || "—"}
           </p>
-          {!product.image && (
+          {!product.image && !fotosCombo.length && (
             <span className="mb-0.5 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">
               Sin foto · oculto en la web
             </span>
@@ -998,8 +998,8 @@ function ProductSheet({
   const isEdit = !!product;
   const [nombre, setNombre] = useState(product?.name ?? "");
   const [renameError, setRenameError] = useState<string | null>(null);
-  const [comboRows, setComboRows] = useState<{ n: string; q: string }[]>(
-    product?.combo ? product.combo.map((c) => ({ n: c.n, q: String(c.q) })) : [],
+  const [comboRows, setComboRows] = useState<FilaCombo[]>(
+    product?.combo ? product.combo.map((c) => ({ n: c.n, q: String(c.q), ...(c.v ? { v: c.v } : {}) })) : [],
   );
   const [marca, setMarca] = useState(product?.brand ?? "");
   // Marcas que ya existen (de los productos cargados, sin combos ni repetidas por mayúsculas).
@@ -1065,7 +1065,7 @@ function ProductSheet({
       const q = Number(r.q) || 1;
       const unit = pr ? costToPesos(pr.cost || 0, pr.costCurrency ?? "ARS", dollar) : 0;
       const priceUnit = pr?.basePrice ?? pr?.price ?? 0;
-      return { name: r.n, brand: pr?.brand, q, unit, total: unit * q, priceTotal: priceUnit * q };
+      return { name: r.n, brand: pr?.brand, q, v: r.v, unit, total: unit * q, priceTotal: priceUnit * q };
     });
   const isCombo = comboCostDetail.length > 0;
   const comboCostTotal = comboCostDetail.reduce((a, d) => a + d.total, 0);
@@ -1100,7 +1100,7 @@ function ProductSheet({
   const comboDescription = isCombo
     ? [
         "Este combo incluye:\n" +
-          comboCostDetail.map((d) => `• ${d.q} × ${d.name}${d.brand ? ` (${d.brand})` : ""}`).join("\n"),
+          comboCostDetail.map((d) => `• ${d.q} × ${d.name}${d.v ? ` sabor ${d.v}` : ""}${d.brand ? ` (${d.brand})` : ""}`).join("\n"),
         ...comboProducts.filter((p) => p.description?.trim()).map((p) => `${p.name}:\n${p.description!.trim()}`),
       ].join("\n\n")
     : "";
@@ -1159,7 +1159,7 @@ function ProductSheet({
         ? JSON.stringify(
             comboRows
               .filter((r) => r.n)
-              .map((r) => ({ n: r.n, q: Number(r.q) || 1 })),
+              .map((r) => ({ n: r.n, q: Number(r.q) || 1, ...(r.v ? { v: r.v } : {}) })),
           )
         : "",
     });
