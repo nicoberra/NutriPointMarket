@@ -10,6 +10,7 @@ import { AdminDashboard } from "./AdminDashboard";
 import { AdminBilling } from "./AdminBilling";
 import { ValorMercaderia } from "./ValorMercaderia";
 import { ClubPanel } from "./ClubPanel";
+import { RegaloPanel } from "./RegaloPanel";
 import { resumenCompra } from "./Compras";
 import { PullToRefresh } from "./PullToRefresh";
 import { prefetchTables, clearTables } from "@/lib/tableCache";
@@ -354,6 +355,7 @@ export function AdminApp() {
           {section === "clientes" && (
             <div className="space-y-4">
               <ClubPanel onToast={setToast} />
+              <RegaloPanel onToast={setToast} />
               <AdminRecords config={CLIENTES_CFG} orderConfig={PEDIDOS_CFG} onToast={setToast} />
             </div>
           )}

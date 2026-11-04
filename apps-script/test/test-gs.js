@@ -138,7 +138,7 @@ const items = (arr) => JSON.stringify(arr);
 
 /* --------------------------------- Pruebas -------------------------------- */
 console.log("Versión y lecturas");
-check("version v16", call({ action: "version" }).version === "v16");
+check("version v17", call({ action: "version" }).version === "v17");
 const l1 = call({ action: "productos_list" });
 check("productos_list público sin costos", l1.ok && l1.data.length === 5 && !("costo" in l1.data[0]));
 const hitsAntes = cacheHits;
@@ -606,6 +606,101 @@ console.log("Club de sellos");
   book.sheets.Pedidos.rows = book.sheets.Pedidos.rows.filter((r, i) => i === 0 || !/^ped1792000000\d{3}$/.test(String(r[kP.indexOf("id")])));
   book.sheets.Productos.rows = book.sheets.Productos.rows.filter((r) => r[0] !== "Sello Test");
   check("limpieza de pedidos de prueba", pedidos().length === n0);
+}
+
+console.log("Regalo con cupón");
+{
+  const kP = ctx.__keysOf("Pedidos");
+  const kL = ctx.__keysOf("Leads");
+  const filaPedido = (id) => book.sheets.Pedidos.rows.find((r) => r[kP.indexOf("id")] === id);
+  const pagar = (id) => { filaPedido(id)[kP.indexOf("cobrado")] = "sí"; };
+  const lead = (o) => call({ action: "lead", data: JSON.stringify(o) });
+  const cupon = (codigo) => call({ action: "cupon", codigo: codigo || "" });
+  const n0 = pedidos().length;
+  book.sheets.Productos.rows.push(rowFrom("Productos", { nombre: "Cupon Test", categoria: "Kinesio", precio: 10000, stock: "sí", cantidad: 1000 }));
+  const tok = ctx.crearToken().token;
+
+  check("sin configurar: regalo apagado", cupon().data.activo === false);
+  check("  ...pedir el regalo apagado → aviso", /no está disponible/.test(lead({ nombre: "A", telefono: "1155550010" }).error));
+  check("cupon_config sin token → auth", call({ action: "cupon_config" }).error === "auth");
+  check("porcentaje mayor a 50 → rechazo", call({ action: "cupon_config", token: tok, data: JSON.stringify({ tipo: "porcentaje", valor: 80, dias: 30 }) }).ok === false);
+  const cfg = call({ action: "cupon_config", token: tok, data: JSON.stringify({ tipo: "monto", valor: 3000, dias: 30 }) });
+  check("configurar $3.000 por 30 días", cfg.ok && cfg.data.activo && cfg.data.valor === 3000, cfg);
+  check("config pública sin datos privados", cupon().data.activo === true && cupon().data.valor === 3000 && !("clientes" in cupon().data));
+
+  // Alta
+  check("sin WhatsApp → rechazo", /WhatsApp/.test(lead({ nombre: "A", telefono: "123" }).error));
+  check("campo trampa lleno → rechazo", lead({ nombre: "Bot", telefono: "1155550011", hp_sm: "x" }).ok === false);
+  const l1 = lead({ nombre: "Ana", telefono: "11 15 5555 0010", email: "ana@test.com", origen: "IG-Reel!!" });
+  check("alta crea cupón único SUPLE-XXXXXX", l1.ok && /^SUPLE-[A-Z2-9]{6}$/.test(l1.data.codigo) && l1.data.repetido === false, l1);
+  const filaL = book.sheets.Leads.rows.find((r) => r[kL.indexOf("codigo")] === l1.data.codigo);
+  check("  ...guardado en Leads con origen limpio y vencimiento", filaL && filaL[kL.indexOf("origen")] === "ig-reel" && /^\d{4}-\d{2}-\d{2}$/.test(filaL[kL.indexOf("vence")]));
+  const l2 = lead({ nombre: "Ana", telefono: "+54 9 11 5555-0010" });
+  check("mismo WhatsApp (otro formato) → mismo cupón, sin fila nueva", l2.ok && l2.data.codigo === l1.data.codigo && l2.data.repetido === true && book.sheets.Leads.rows.length === 2);
+  check("consultar cupón válido", cupon(l1.data.codigo).data.valido === true);
+  check("consultar cupón en minúsculas también", cupon(l1.data.codigo.toLowerCase()).data.valido === true);
+  check("cupón inexistente", cupon("SUPLE-ZZZZZZ").data.valido === false && /no existe/.test(cupon("SUPLE-ZZZZZZ").data.motivo));
+
+  // Uso en un pedido: 1 producto $10.000 con transferencia → 10.000 − 3.000.
+  const r1 = addPedido({ id: "ped1793000000001", cliente: "Ana", telefono: "1155550010", monto: 7000, pago: "Transferencia", items: items([{ n: "Cupon Test", q: 1 }]), cupon: l1.data.codigo });
+  check("pedido con cupón: descuento aplicado en el servidor", r1.ok && r1.data.monto === 7000 && r1.data.cupon === l1.data.codigo + " $3000", r1);
+  check("  ...el cupón queda marcado con el pedido", book.sheets.Leads.rows.find((r) => r[kL.indexOf("codigo")] === l1.data.codigo)[kL.indexOf("usado")] === "ped1793000000001");
+  check("  ...ya no sirve para otro pedido", cupon(l1.data.codigo).data.valido === false && /ya se usó/.test(cupon(l1.data.codigo).data.motivo));
+  const r1b = addPedido({ id: "ped1793000000002", cliente: "Otro", telefono: "1155559999", monto: 7000, pago: "Transferencia", items: items([{ n: "Cupon Test", q: 1 }]), cupon: l1.data.codigo });
+  check("  ...usarlo de nuevo → rechazo sin crear pedido", r1b.ok === false && /ya se usó/.test(r1b.error) && !filaPedido("ped1793000000002"));
+  const r1c = addPedido({ id: "ped1793000000001", cliente: "Ana", telefono: "1155550010", monto: 7000, pago: "Transferencia", items: items([{ n: "Cupon Test", q: 1 }]), cupon: l1.data.codigo });
+  check("  ...reintento del MISMO pedido no falla", r1c.ok === true && r1c.repetido === true);
+  // Pedido sin pagar más de 48 h: el cupón se libera.
+  filaPedido("ped1793000000001")[kP.indexOf("fecha")] = "2026-01-01 10:00";
+  check("pedido con cupón sin pagar 48 h → el cupón vuelve a servir", cupon(l1.data.codigo).data.valido === true);
+  filaPedido("ped1793000000001")[kP.indexOf("fecha")] = "2099-01-01 10:00";
+  pagar("ped1793000000001");
+  check("pedido pagado → usado para siempre", cupon(l1.data.codigo).data.valido === false);
+
+  // Total manipulado con cupón
+  const l3 = lead({ nombre: "Beto", telefono: "1155550020" });
+  const r3 = addPedido({ id: "ped1793000000003", cliente: "Beto", telefono: "1155550020", monto: 1000, pago: "Transferencia", items: items([{ n: "Cupon Test", q: 1 }]), cupon: l3.data.codigo });
+  check("monto que no coincide con el cupón → rechazo", r3.ok === false && /precios se actualizaron/.test(r3.error));
+  check("  ...el cupón no se marca", cupon(l3.data.codigo).data.valido === true);
+  // Mercado Pago: el cupón se descuenta del precio publicado.
+  const pw = precioWeb(10000);
+  const r4 = addPedido({ id: "ped1793000000004", cliente: "Beto", telefono: "1155550020", monto: pw - 3000, pago: "Mercado Pago", items: items([{ n: "Cupon Test", q: 1 }]), cupon: l3.data.codigo });
+  check("Mercado Pago con cupón", r4.ok && r4.data.monto === pw - 3000, r4);
+  check("  ...la preferencia de MP usa el monto con cupón", (() => { call({ action: "mp_crear_pref", pedido: "ped1793000000004" }); const f = fetches[fetches.length - 1]; return JSON.parse(f.opt.payload).items[0].unit_price === pw - 3000; })());
+
+  // Porcentaje
+  call({ action: "cupon_config", token: tok, data: JSON.stringify({ tipo: "porcentaje", valor: 10, dias: 30 }) });
+  const l5 = lead({ nombre: "Caro", telefono: "1155550030" });
+  const r5 = addPedido({ id: "ped1793000000005", cliente: "Caro", telefono: "1155550030", monto: 18000, pago: "Transferencia", items: items([{ n: "Cupon Test", q: 2 }]), cupon: l5.data.codigo });
+  check("cupón del 10%: 20.000 → 18.000", r5.ok && r5.data.monto === 18000, r5);
+
+  // Vencido
+  const l6 = lead({ nombre: "Dani", telefono: "1155550040" });
+  book.sheets.Leads.rows.find((r) => r[kL.indexOf("codigo")] === l6.data.codigo)[kL.indexOf("vence")] = "2026-01-01";
+  check("cupón vencido", cupon(l6.data.codigo).data.valido === false && /venció/.test(cupon(l6.data.codigo).data.motivo));
+
+  // Cupón + premio del Club en el mismo pedido (se suman, nunca más que los productos).
+  call({ action: "club_config", token: tok, data: JSON.stringify({ premio: 4000, meta: 2 }) });
+  const r7a = addPedido({ id: "ped1793000000007", cliente: "Euge", email: "euge@test.com", monto: 10000, pago: "Transferencia", items: items([{ n: "Cupon Test", q: 1 }]) });
+  pagar("ped1793000000007");
+  call({ action: "cupon_config", token: tok, data: JSON.stringify({ tipo: "monto", valor: 3000, dias: 30 }) });
+  const l7 = lead({ nombre: "Euge", telefono: "1155550050", email: "euge@test.com" });
+  const r7 = addPedido({ id: "ped1793000000008", cliente: "Euge", email: "euge@test.com", monto: 3000, pago: "Transferencia", items: items([{ n: "Cupon Test", q: 1 }]), cupon: l7.data.codigo });
+  check("premio del Club + cupón juntos: 10.000 − 4.000 − 3.000", r7a.ok && r7.ok && r7.data.monto === 3000 && r7.data.club === "premio $4000" && r7.data.cupon === l7.data.codigo + " $3000", r7);
+  call({ action: "club_config", token: tok, data: JSON.stringify({ premio: 0, meta: 6 }) });
+
+  // Apagado: los cupones dejan de servir.
+  call({ action: "cupon_config", token: tok, data: JSON.stringify({ tipo: "monto", valor: 0, dias: 30 }) });
+  const l8code = l5.data.codigo;
+  check("regalo apagado: el cupón no se acepta", cupon(l8code).data.valido === false);
+  check("Leads sin token → auth", call({ action: "list", tab: "Leads" }).error === "auth");
+  check("Leads con token se lee", call({ action: "list", tab: "Leads", token: tok }).data.length >= 4);
+
+  // Limpieza
+  book.sheets.Pedidos.rows = book.sheets.Pedidos.rows.filter((r, i) => i === 0 || !/^ped1793000000\d{3}$/.test(String(r[kP.indexOf("id")])));
+  book.sheets.Productos.rows = book.sheets.Productos.rows.filter((r) => r[0] !== "Cupon Test");
+  book.sheets.Leads.rows = book.sheets.Leads.rows.slice(0, 1);
+  check("limpieza de pedidos de prueba del cupón", pedidos().length === n0);
 }
 
 console.log("Copias automáticas");

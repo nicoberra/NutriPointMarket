@@ -6,7 +6,8 @@ import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { formatPrice } from "@/lib/format";
 import { whatsappLink, TRANSFER, transferPrice } from "@/lib/config";
-import { createOrder, mpCreatePreference, uploadComprobante, clubEstado, type ClubEstado } from "@/lib/api";
+import { createOrder, mpCreatePreference, uploadComprobante, clubEstado, cuponConsultar, type ClubEstado } from "@/lib/api";
+import { leerCupon, guardarCupon, descuentoCupon, esCodigoValido, normalizarCodigo, type CuponGuardado } from "@/lib/cupon";
 import { ClubCard } from "@/components/ClubCard";
 import { PageBanner } from "@/components/PageBanner";
 import { CheckIcon, WhatsappIcon } from "@/components/Icons";
@@ -26,6 +27,8 @@ interface DoneInfo {
   premioClub: number;
   /** Estado del club al confirmar (para decir qué sello suma). */
   club: ClubEstado | null;
+  /** Descuento del cupón del regalo que aplicó el servidor ($). */
+  descCupon: number;
 }
 
 export default function CheckoutPage() {
@@ -44,6 +47,43 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (user?.email) setEmailClub((v) => v || user.email);
   }, [user?.email]);
+
+  // Cupón del regalo: viene guardado de /regalo o se escribe acá. Se revisa con
+  // el servidor antes de mostrarlo; el descuento final lo fija el servidor.
+  const [cupon, setCupon] = useState<CuponGuardado | null>(null);
+  const [cuponTxt, setCuponTxt] = useState("");
+  const [cuponMsg, setCuponMsg] = useState("");
+  const [cuponCargando, setCuponCargando] = useState(false);
+  const aplicarCupon = async (codigoIn: string, silencioso = false) => {
+    const codigo = normalizarCodigo(codigoIn);
+    if (!esCodigoValido(codigo)) {
+      if (!silencioso) setCuponMsg("El código tiene que ser como SUPLE-ABC123.");
+      return;
+    }
+    setCuponCargando(true);
+    setCuponMsg("");
+    const r = await cuponConsultar(codigo);
+    setCuponCargando(false);
+    if (!r) {
+      if (!silencioso) setCuponMsg("No pudimos revisar el cupón. Probá de nuevo.");
+      return;
+    }
+    if (!r.valido) {
+      guardarCupon(null);
+      setCupon(null);
+      setCuponMsg(r.motivo || "El cupón no es válido.");
+      return;
+    }
+    const c = { codigo, tipo: r.tipo, valor: r.valor };
+    guardarCupon(c);
+    setCupon(c);
+    setCuponTxt("");
+  };
+  useEffect(() => {
+    const c = leerCupon();
+    if (c) void aplicarCupon(c.codigo, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     const em = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailClub.trim()) ? emailClub.trim() : "";
     const tel = telClub.replace(/\D/g, "").length >= 8 ? telClub.trim() : "";
@@ -128,7 +168,8 @@ export default function CheckoutPage() {
   // Premio del Club de sellos (monto fijo): lo aplica y valida el servidor;
   // acá solo se muestra. Nunca supera el importe de los productos.
   const descuentoClub = club?.premioDisponible ? Math.min(club.premio, subtotal - descuento) : 0;
-  const totalFinal = total - descuento - descuentoClub;
+  const descuentoCup = cupon ? descuentoCupon(cupon, subtotal - descuento - descuentoClub) : 0;
+  const totalFinal = total - descuento - descuentoClub - descuentoCup;
 
   const confirm = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -189,9 +230,10 @@ export default function CheckoutPage() {
     // Mercado Pago sin descuento.
     const desc = metodo === "Mercado Pago" ? 0 : descuentoProductos;
     const descClub = club?.premioDisponible ? Math.min(club.premio, subtotal - desc) : 0;
-    const montoFinal = total - desc - descClub;
+    const descCup = cupon ? descuentoCupon(cupon, subtotal - desc - descClub) : 0;
+    const montoFinal = total - desc - descClub - descCup;
 
-    const firma = JSON.stringify([itemsJson, cliente, telefono, email, metodo, envioTexto, montoFinal]);
+    const firma = JSON.stringify([itemsJson, cliente, telefono, email, metodo, envioTexto, montoFinal, cupon?.codigo ?? ""]);
     if (!intento.current || intento.current.firma !== firma) {
       intento.current = { firma, id: "ped" + Date.now() };
     }
@@ -210,8 +252,11 @@ export default function CheckoutPage() {
         envio: envioTexto,
         metodo,
         items: itemsJson,
+        cupon: cupon?.codigo ?? "",
         hp: String(fd.get(CAMPO_TRAMPA) || ""),
       });
+      // El cupón ya quedó usado en este pedido: se borra de este navegador.
+      if (cupon) guardarCupon(null);
 
       if (metodo === "Mercado Pago") {
         const link = await mpCreatePreference({
@@ -235,10 +280,15 @@ export default function CheckoutPage() {
       // Efectivo / Transferencia
       intento.current = null; // compra cerrada: la próxima usa otro número
       clear();
-      setDone({ metodo, id, total: creado.monto, premioClub: creado.premioClub, club });
+      setDone({ metodo, id, total: creado.monto, premioClub: creado.premioClub, club, descCupon: creado.descCupon });
     } catch (e) {
       // El backend puede rechazar el pedido (p. ej. precios desactualizados) con un motivo claro.
       const msg = e instanceof Error && e.message && !/timeout|fetch/i.test(e.message) ? e.message : "";
+      // Cupón que dejó de servir (vencido, usado): se saca para que pueda confirmar sin él.
+      if (cupon && /cup[oó]n/i.test(msg)) {
+        guardarCupon(null);
+        setCupon(null);
+      }
       setError(msg || "No se pudo confirmar el pedido. Revisá tu conexión e intentá de nuevo.");
       setLoading(false);
     }
@@ -260,6 +310,11 @@ export default function CheckoutPage() {
               Pedido <span className="font-semibold text-ink">{done.id}</span> ·{" "}
               {formatPrice(done.total)}
             </p>
+            {done.descCupon > 0 && (
+              <p className="mt-2 inline-block rounded-full bg-accent-soft px-3 py-1 text-xs font-bold text-primary">
+                Cupón aplicado: −{formatPrice(done.descCupon)}
+              </p>
+            )}
             {done.premioClub > 0 ? (
               <p className="mt-2 inline-block rounded-full bg-accent px-3 py-1 text-xs font-bold text-primary">
                 🎁 Premio del Club Suple: −{formatPrice(done.premioClub)}
@@ -601,11 +656,62 @@ export default function CheckoutPage() {
                     <dd className="font-semibold">− {formatPrice(descuentoClub)}</dd>
                   </div>
                 )}
+                {cupon && (
+                  <div className="flex items-start justify-between gap-2 text-primary">
+                    <dt className="font-semibold">
+                      Cupón {cupon.codigo}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          guardarCupon(null);
+                          setCupon(null);
+                        }}
+                        className="ml-2 text-xs font-normal text-muted underline hover:text-sale"
+                      >
+                        quitar
+                      </button>
+                    </dt>
+                    <dd className="shrink-0 font-semibold">− {formatPrice(descuentoCup)}</dd>
+                  </div>
+                )}
               </dl>
+              {!cupon && (
+                <div className="mt-3">
+                  <div className="flex gap-2">
+                    <input
+                      value={cuponTxt}
+                      onChange={(e) => setCuponTxt(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void aplicarCupon(cuponTxt);
+                        }
+                      }}
+                      placeholder="¿Tenés un cupón?"
+                      aria-label="Código de cupón"
+                      autoCapitalize="characters"
+                      className="input h-10 min-w-0 flex-1 text-sm uppercase"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void aplicarCupon(cuponTxt)}
+                      disabled={cuponCargando || !cuponTxt.trim()}
+                      className="btn btn-outline btn-md shrink-0 disabled:opacity-50"
+                    >
+                      {cuponCargando ? "…" : "Aplicar"}
+                    </button>
+                  </div>
+                  {cuponMsg && (
+                    <p role="status" className="mt-1.5 text-xs text-sale">
+                      {cuponMsg}
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="mt-4 flex items-center justify-between gap-2 border-t border-line pt-4">
                 <span className="font-semibold text-ink">Total</span>
                 <span className="flex items-baseline gap-2">
-                  {(descuento > 0 || descuentoClub > 0) && (
+                  {(descuento > 0 || descuentoClub > 0 || descuentoCup > 0) && (
                     <span className="text-base font-semibold text-muted line-through">
                       {formatPrice(total)}
                     </span>
