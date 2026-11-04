@@ -667,15 +667,20 @@ export async function aprobarPedido(id: string): Promise<boolean> {
  * Guarda un pedido en la planilla (pestaña Pedidos). Timeout largo (18s) porque
  * en 4G/WiFi lento el guardado tarda. NO se reintenta para no duplicar pedidos.
  */
-/** Devuelve true si se creó; si el backend rechazó el pedido, lanza Error con el motivo. */
-export async function createOrder(o: OrderInput): Promise<boolean> {
+/**
+ * Devuelve el monto final que fijó el servidor (con el premio del Club de
+ * sellos si correspondía) y el premio aplicado. Si el backend rechazó el
+ * pedido, lanza Error con el motivo.
+ */
+export async function createOrder(o: OrderInput): Promise<{ monto: number; premioClub: number }> {
   const estado = o.metodo === "Mercado Pago" ? "pendiente de pago" : "nuevo";
-  const r = await api("add", {
+  const r = (await api("add", {
     tab: "Pedidos",
     data: JSON.stringify({
       id: o.id,
       cliente: o.cliente,
       telefono: o.telefono,
+      email: o.email,
       detalle: o.detalle,
       monto: o.monto,
       estado,
@@ -687,9 +692,98 @@ export async function createOrder(o: OrderInput): Promise<boolean> {
       hp_sm: o.hp ?? "",
       descontado: "no",
     }),
-  }, 18000);
+  }, 18000)) as ApiResult<{ monto?: unknown; club?: unknown }>;
   if (r.ok === false) throw new Error(r.error || "No se pudo confirmar el pedido");
-  return true;
+  const monto = Number(r.data?.monto);
+  const premio = Number(String(r.data?.club ?? "").replace(/[^\d]/g, ""));
+  return {
+    monto: Number.isFinite(monto) && monto >= 0 ? monto : o.monto,
+    premioClub: Number.isFinite(premio) ? premio : 0,
+  };
+}
+
+/* ---------------------------- Club de sellos ----------------------------- */
+
+/** Estado del Club de sellos de un cliente (o solo la configuración, sin identificar). */
+export interface ClubEstado {
+  /** false = el club está apagado (premio 0): no se muestra nada. */
+  activo: boolean;
+  /** Monto fijo del premio ($). */
+  premio: number;
+  /** Compra en la que toca el premio (6 = sexta compra). */
+  meta: number;
+  /** Compras pagadas en el ciclo actual. */
+  sellos: number;
+  /** Premios ya usados. */
+  premios: number;
+  /** true = la próxima compra lleva el premio. */
+  premioDisponible: boolean;
+}
+
+export interface ClubConfig {
+  premio: number;
+  meta: number;
+  /** "AAAA-MM-DD": solo cuentan las compras desde esa fecha (vacío = todas). */
+  desde: string;
+  activo: boolean;
+}
+
+export interface ClubCliente {
+  nombre: string;
+  email: string;
+  telefono: string;
+  sellos: number;
+  premios: number;
+  ultima: string;
+  premioDisponible: boolean;
+}
+
+function toClubEstado(d: Record<string, unknown> | undefined): ClubEstado | null {
+  if (!d || typeof d !== "object") return null;
+  return {
+    activo: d.activo === true,
+    premio: toNum(d.premio),
+    meta: Math.max(2, toNum(d.meta) || 6),
+    sellos: toNum(d.sellos),
+    premios: toNum(d.premios),
+    premioDisponible: d.premioDisponible === true,
+  };
+}
+
+/** Consulta pública: sellos del cliente por email y/o teléfono. null si no se pudo conectar. */
+export async function clubEstado(email = "", telefono = ""): Promise<ClubEstado | null> {
+  try {
+    const r = (await api("club", { email: email.trim().toLowerCase(), telefono: telefono.trim() }, 10000)) as ApiResult<Record<string, unknown>>;
+    return r.ok ? toClubEstado(r.data) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** CRM: sellos y premios de todos los clientes + configuración. */
+export async function clubResumen(): Promise<{ config: ClubConfig; clientes: ClubCliente[] } | null> {
+  const r = (await api("club_resumen", {}, 30000)) as ApiResult<{ config?: Record<string, unknown>; clientes?: Record<string, unknown>[] }>;
+  if (!r.ok || !r.data) return null;
+  const c = r.data.config ?? {};
+  return {
+    config: { premio: toNum(c.premio), meta: toNum(c.meta) || 6, desde: String(c.desde ?? ""), activo: c.activo === true },
+    clientes: (r.data.clientes ?? []).map((x) => ({
+      nombre: String(x.nombre ?? ""),
+      email: String(x.email ?? ""),
+      telefono: String(x.telefono ?? ""),
+      sellos: toNum(x.sellos),
+      premios: toNum(x.premios),
+      ultima: String(x.ultima ?? ""),
+      premioDisponible: x.premioDisponible === true,
+    })),
+  };
+}
+
+/** CRM: guarda premio, meta y fecha desde la que cuentan las compras. Lanza Error si el backend rechaza. */
+export async function clubConfigGuardar(c: { premio: number; meta: number; desde: string }): Promise<ClubConfig> {
+  const r = (await api("club_config", { data: JSON.stringify(c) }, 20000)) as ApiResult<Record<string, unknown>>;
+  if (r.ok === false || !r.data) throw new Error(r.error || "No se pudo guardar");
+  return { premio: toNum(r.data.premio), meta: toNum(r.data.meta) || 6, desde: String(r.data.desde ?? ""), activo: r.data.activo === true };
 }
 
 /**

@@ -138,7 +138,7 @@ const items = (arr) => JSON.stringify(arr);
 
 /* --------------------------------- Pruebas -------------------------------- */
 console.log("Versión y lecturas");
-check("version v15", call({ action: "version" }).version === "v15");
+check("version v16", call({ action: "version" }).version === "v16");
 const l1 = call({ action: "productos_list" });
 check("productos_list público sin costos", l1.ok && l1.data.length === 5 && !("costo" in l1.data[0]));
 const hitsAntes = cacheHits;
@@ -492,6 +492,120 @@ console.log("Combo con sabores fijos (1 de cada sabor)");
   rf = addPedido({ id: "ped1795500000002", cliente: "Fijo", monto: 5500, pago: "Efectivo", items: items([{ n: "Combo Panqueque Test", q: 1 }]) });
   check("  ...sin stock de uno de los sabores fijos → rechazo", rf.ok === false && /Solo quedan|Sin stock/.test(rf.error), rf);
   ["Combo Panqueque Test", "Panqueque Test"].forEach((n) => ctx.deleteRow("Productos", n));
+}
+
+console.log("Club de sellos");
+{
+  const kP = ctx.__keysOf("Pedidos");
+  const filaPedido = (id) => book.sheets.Pedidos.rows.find((r) => r[kP.indexOf("id")] === id);
+  const pagar = (id) => { filaPedido(id)[kP.indexOf("cobrado")] = "sí"; };
+  const club = (email, telefono) => call({ action: "club", email: email || "", telefono: telefono || "" }).data;
+  const n0 = pedidos().length;
+  // Producto propio de estas pruebas (precio $1.000, sin tope de cantidad).
+  book.sheets.Productos.rows.push(rowFrom("Productos", { nombre: "Sello Test", categoria: "Kinesio", precio: 1000, stock: "sí", cantidad: 1000 }));
+
+  check("sin configurar: club apagado", club("a@b.com").activo === false && club("a@b.com").premioDisponible === false);
+  check("club_config sin token → auth", call({ action: "club_config" }).error === "auth");
+  check("club_resumen sin token → auth", call({ action: "club_resumen" }).error === "auth");
+  const tok = ctx.crearToken().token;
+  let rc = call({ action: "club_config", token: tok, data: JSON.stringify({ premio: 5000, meta: 6 }) });
+  check("configurar premio $5.000 cada 6 compras", rc.ok && rc.data.activo === true && rc.data.premio === 5000 && rc.data.meta === 6, rc);
+  check("meta fuera de rango → rechazo", call({ action: "club_config", token: tok, data: JSON.stringify({ premio: 5000, meta: 1 }) }).ok === false);
+  check("leer configuración con token", call({ action: "club_config", token: tok }).data.premio === 5000);
+  check("club público devuelve premio y meta sin identificar", club("").premio === 5000 && club("").meta === 6 && club("").sellos === 0);
+
+  // Cliente A: compra 5 veces (teléfono escrito distinto cada vez) y paga 4.
+  const telA = ["11 5555 0001", "+54 9 11 5555-0001", "01155550001", "5491155550001", "1155550001"];
+  const idsA = [];
+  for (let i = 0; i < 5; i++) {
+    const id = "ped1792000000" + (100 + i);
+    idsA.push(id);
+    const r = addPedido({ id, cliente: "Club A", telefono: telA[i], email: "clubA@test.com", monto: 1000, pago: "Transferencia", items: items([{ n: "Sello Test", q: 1 }]) });
+    check(`  pedido ${i + 1} de A creado sin premio`, r.ok === true && r.data.monto === 1000 && !r.data.club, r);
+  }
+  check("  ...email guardado en la columna Email", filaPedido(idsA[0])[kP.indexOf("email")] === "cluba@test.com");
+  idsA.slice(0, 4).forEach(pagar);
+  check("4 pagados + 1 sin pagar → 4 sellos, sin premio", club("clubA@test.com").sellos === 4 && club("clubA@test.com").premioDisponible === false, club("clubA@test.com"));
+  check("  ...consulta por teléfono (otro formato) da lo mismo", club("", "+54 11 5555 0001").sellos === 4);
+  pagar(idsA[4]);
+  check("5 pagados → premio disponible", club("clubA@test.com").premioDisponible === true && club("clubA@test.com").sellos === 5);
+
+  // 6ta compra de A: 10 Tape = $10.000 → paga $5.000.
+  let r6 = addPedido({ id: "ped1792000000200", cliente: "Club A", telefono: "1155550001", email: "clubA@test.com", monto: 5000, pago: "Transferencia", items: items([{ n: "Sello Test", q: 10 }]) });
+  check("6ta compra: premio aplicado en el servidor", r6.ok === true && r6.data.monto === 5000 && r6.data.club === "premio $5000", r6);
+  check("  ...queda anotado en la columna Club", filaPedido("ped1792000000200")[kP.indexOf("club")] === "premio $5000");
+  check("  ...el contador vuelve a 0 y cuenta 1 premio", club("clubA@test.com").sellos === 0 && club("clubA@test.com").premios === 1 && club("clubA@test.com").premioDisponible === false);
+  pagar("ped1792000000200");
+  check("  ...el pedido del premio pagado no suma sello", club("clubA@test.com").sellos === 0);
+  const r7 = addPedido({ id: "ped1792000000201", cliente: "Club A", telefono: "1155550001", email: "clubA@test.com", monto: 1000, pago: "Transferencia", items: items([{ n: "Sello Test", q: 1 }]) });
+  pagar("ped1792000000201");
+  check("7ma compra pagada → 1 sello del ciclo nuevo", r7.ok && club("clubA@test.com").sellos === 1);
+
+  // Cliente B: solo teléfono, con 5 pagos; la web manda el total SIN premio.
+  for (let i = 0; i < 5; i++) {
+    const id = "ped1792000000" + (300 + i);
+    addPedido({ id, cliente: "Club B", telefono: "1155550002", monto: 1000, pago: "Transferencia", items: items([{ n: "Sello Test", q: 1 }]) });
+    pagar(id);
+  }
+  const rb = addPedido({ id: "ped1792000000310", cliente: "Club B", telefono: "+54 9 11 5555 0002", monto: 10000, pago: "Transferencia", items: items([{ n: "Sello Test", q: 10 }]) });
+  check("web sin enterarse del premio: se cobra igual el total con premio", rb.ok === true && rb.data.monto === 5000 && rb.data.club === "premio $5000", rb);
+  const rbMal = addPedido({ id: "ped1792000000311", cliente: "Club B", telefono: "1155550002", monto: 7000, pago: "Transferencia", items: items([{ n: "Sello Test", q: 10 }]) });
+  check("  ...un monto que no es ni con ni sin premio → rechazo", rbMal.ok === false && /precios se actualizaron/.test(rbMal.error));
+
+  // Cliente C: premio mayor que la compra → nunca descuenta más que los productos.
+  for (let i = 0; i < 5; i++) {
+    const id = "ped1792000000" + (400 + i);
+    addPedido({ id, cliente: "Club C", email: "clubc@test.com", monto: 1000, pago: "Transferencia", items: items([{ n: "Sello Test", q: 1 }]) });
+    pagar(id);
+  }
+  const rcC = addPedido({ id: "ped1792000000410", cliente: "Club C", email: "clubc@test.com", monto: 0, pago: "Transferencia", items: items([{ n: "Sello Test", q: 2 }]) });
+  check("premio mayor que la compra: descuenta solo los productos", rcC.ok === true && rcC.data.monto === 0 && rcC.data.club === "premio $2000", rcC);
+
+  // Pedidos viejos: el email estaba en las notas.
+  book.sheets.Pedidos.rows.push(rowFrom("Pedidos", { id: "ped1792000000500", fecha: "2026-01-05 10:00", cliente: "Viejo", monto: 1000, pago: "Efectivo", estado: "Entregado", notas: "Email: viejo@test.com" }));
+  check("pedido viejo entregado con 'Email:' en notas cuenta como sello", club("viejo@test.com").sellos === 1);
+  book.sheets.Pedidos.rows.push(rowFrom("Pedidos", { id: "ped1792000000501", fecha: "2026-01-06 10:00", cliente: "Viejo", monto: 1000, pago: "Efectivo", estado: "nuevo", notas: "Email: viejo@test.com" }));
+  check("  ...un pedido sin pagar ni entregar no suma", club("viejo@test.com").sellos === 1);
+
+  // Pedido con premio que quedó sin pagar más de 48 h: el premio se libera.
+  for (let i = 0; i < 5; i++) {
+    const id = "ped1792000000" + (800 + i);
+    addPedido({ id, cliente: "Club E", email: "clube@test.com", monto: 1000, pago: "Transferencia", items: items([{ n: "Sello Test", q: 1 }]) });
+    pagar(id);
+  }
+  const re = addPedido({ id: "ped1792000000810", cliente: "Club E", email: "clube@test.com", monto: 5000, pago: "Transferencia", items: items([{ n: "Sello Test", q: 10 }]) });
+  check("E: 6ta compra con premio (sin pagar, reciente) reserva el premio", re.data.club === "premio $5000" && club("clube@test.com").premioDisponible === false && club("clube@test.com").premios === 1);
+  filaPedido("ped1792000000810")[kP.indexOf("fecha")] = "2026-01-01 10:00";
+  check("  ...si pasan 48 h sin pagarlo, se libera: vuelve a tener el premio", club("clube@test.com").premioDisponible === true && club("clube@test.com").sellos === 5 && club("clube@test.com").premios === 0);
+  pagar("ped1792000000810");
+  check("  ...y si al final se paga, cuenta como usado", club("clube@test.com").premios === 1 && club("clube@test.com").sellos === 0);
+
+  // "Contar desde": las compras anteriores a la fecha no suman.
+  call({ action: "club_config", token: tok, data: JSON.stringify({ premio: 5000, meta: 6, desde: "2026-02-01" }) });
+  check("contar desde una fecha: el pedido viejo deja de sumar", club("viejo@test.com").sellos === 0);
+  check("  ...los de hoy siguen sumando", club("clubA@test.com").sellos === 1);
+  check("fecha inválida → rechazo", call({ action: "club_config", token: tok, data: JSON.stringify({ premio: 5000, meta: 6, desde: "ayer" }) }).ok === false);
+  call({ action: "club_config", token: tok, data: JSON.stringify({ premio: 5000, meta: 6, desde: "" }) });
+
+  // Resumen para el CRM.
+  const res = call({ action: "club_resumen", token: tok }).data;
+  const a = res.clientes.find((c) => c.email === "cluba@test.com");
+  const b = res.clientes.find((c) => c.telefono && c.telefono.replace(/\D/g, "").slice(-8) === "55550002");
+  check("resumen: A unificado por email y teléfono (1 premio, 1 sello)", a && a.premios === 1 && a.sellos === 1 && a.telefono && res.clientes.filter((c) => c.nombre === "Club A").length === 1, a);
+  check("resumen: B con premio usado y 0 sellos", b && b.premios === 1 && b.sellos === 0, b);
+  check("resumen: trae la configuración", res.config.premio === 5000 && res.config.meta === 6);
+
+  // Apagar el club: sin descuento y la tienda lo ve apagado.
+  call({ action: "club_config", token: tok, data: JSON.stringify({ premio: 0, meta: 6 }) });
+  check("premio 0 = club apagado", club("clubA@test.com").activo === false);
+  for (let i = 0; i < 5; i++) { const id = "ped1792000000" + (600 + i); addPedido({ id, cliente: "Club D", email: "clubd@test.com", monto: 1000, pago: "Transferencia", items: items([{ n: "Sello Test", q: 1 }]) }); pagar(id); }
+  const rd = addPedido({ id: "ped1792000000610", cliente: "Club D", email: "clubd@test.com", monto: 10000, pago: "Transferencia", items: items([{ n: "Sello Test", q: 10 }]) });
+  check("  ...apagado: la 6ta compra se cobra completa", rd.ok === true && rd.data.monto === 10000 && !rd.data.club, rd);
+  check("campo email inválido no se guarda", filaPedido(addPedido({ id: "ped1792000000700", cliente: "X", email: "no-es-email", monto: 1000, pago: "Efectivo", items: items([{ n: "Sello Test", q: 1 }]) }).data.id)[kP.indexOf("email")] === "");
+  // Limpieza: saca los pedidos de estas pruebas para no afectar lo que sigue.
+  book.sheets.Pedidos.rows = book.sheets.Pedidos.rows.filter((r, i) => i === 0 || !/^ped1792000000\d{3}$/.test(String(r[kP.indexOf("id")])));
+  book.sheets.Productos.rows = book.sheets.Productos.rows.filter((r) => r[0] !== "Sello Test");
+  check("limpieza de pedidos de prueba", pedidos().length === n0);
 }
 
 console.log("Copias automáticas");
