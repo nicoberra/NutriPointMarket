@@ -22,7 +22,11 @@ function parseDate(v: unknown): Date | null {
 }
 const low = (v: unknown) => String(v ?? "").trim().toLowerCase();
 
-export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
+export function AdminDashboard({ onGo, onProducto }: {
+  onGo: (s: Section) => void;
+  /** Abre Productos con ese producto a la vista (para cargarle foto, stock, etc.). */
+  onProducto: (nombre: string) => void;
+}) {
   const { products } = useProducts();
   const [errorCarga, setErrorCarga] = useState(false);
   const [intento, setIntento] = useState(0);
@@ -140,27 +144,24 @@ export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
               </h2>
               <ul className="space-y-2 sm:grid sm:grid-cols-2 sm:gap-2 sm:space-y-0 lg:grid-cols-3">
                 {sinFoto.slice(0, 8).map((p) => (
-                  <li
-                    key={p.id}
-                    className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-3"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-ink">{p.name}</p>
-                      <p className="text-xs text-muted">{p.brand || "—"}</p>
-                    </div>
-                    <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700">
-                      Falta foto
-                    </span>
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      onClick={() => onProducto(p.name)}
+                      aria-label={`Abrir ${p.name} en Productos para cargarle foto`}
+                      className="flex w-full items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-3 text-left transition-colors hover:border-amber-400"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-ink">{p.name}</p>
+                        <p className="text-xs text-muted">{p.brand || "—"}</p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700">
+                        Falta foto
+                      </span>
+                    </button>
                   </li>
                 ))}
               </ul>
-              <button
-                onClick={() => onGo("productos")}
-                className="mt-2 flex w-full items-center justify-between rounded-xl border border-line bg-white p-3 text-sm font-semibold text-primary"
-              >
-                Cargar fotos en Productos
-                <ChevronRightIcon className="h-5 w-5" />
-              </button>
             </div>
           )}
 
@@ -174,18 +175,21 @@ export function AdminDashboard({ onGo }: { onGo: (s: Section) => void }) {
               </h2>
               <ul className="space-y-2 sm:grid sm:grid-cols-2 sm:gap-2 sm:space-y-0 lg:grid-cols-3">
                 {sinStock.map((p) => (
-                  <li
-                    key={p.id}
-                    onClick={() => onGo("productos")}
-                    className="flex cursor-pointer items-center justify-between rounded-xl border border-line bg-white p-3 transition-colors hover:border-accent"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-ink">{p.name}</p>
-                      <p className="text-xs text-muted">{formatPrice(p.basePrice ?? p.price)}</p>
-                    </div>
-                    <span className="shrink-0 rounded-full bg-sale/10 px-2.5 py-1 text-xs font-bold text-sale">
-                      Sin stock
-                    </span>
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      onClick={() => onProducto(p.name)}
+                      aria-label={`Abrir ${p.name} en Productos para cargarle stock`}
+                      className="flex w-full items-center justify-between rounded-xl border border-line bg-white p-3 text-left transition-colors hover:border-accent"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-ink">{p.name}</p>
+                        <p className="text-xs text-muted">{formatPrice(p.basePrice ?? p.price)}</p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-sale/10 px-2.5 py-1 text-xs font-bold text-sale">
+                        Sin stock
+                      </span>
+                    </button>
                   </li>
                 ))}
               </ul>

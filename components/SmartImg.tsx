@@ -1,6 +1,7 @@
 "use client";
 
-import { forwardRef, useState, type ImgHTMLAttributes } from "react";
+import { forwardRef, useCallback, useEffect, useRef, useState, type ImgHTMLAttributes } from "react";
+import { rawAsset } from "@/lib/api";
 
 /**
  * <img> que sirve la versión WebP optimizada (generada en el build por
@@ -28,24 +29,56 @@ export const SmartImg = forwardRef<HTMLImageElement, Props>(function SmartImg(
   { src, sizes, onError, alt = "", ...rest },
   ref,
 ) {
-  const [fallback, setFallback] = useState(false);
-  const srcSet = fallback ? null : webpSrcSet(src);
+  // 0 = webp + original · 1 = original sin webp · 2 = la misma foto desde GitHub
+  // (una foto recién subida existe en el repo antes de que termine el deploy del sitio).
+  const [nivel, setNivel] = useState(0);
+  const srcSet = nivel > 0 ? null : webpSrcSet(src);
+  // Si la imagen ya falló antes de que React se active (HTML estático), el evento
+  // onError se pierde: al montar se revisa si quedó rota y se pasa al siguiente nivel.
+  const propio = useRef<HTMLImageElement | null>(null);
+  const setRefs = useCallback(
+    (el: HTMLImageElement | null) => {
+      propio.current = el;
+      if (typeof ref === "function") ref(el);
+      else if (ref) ref.current = el;
+    },
+    [ref],
+  );
+  useEffect(() => {
+    const el = propio.current;
+    if (el && el.complete && el.naturalWidth === 0 && el.getAttribute("src")) {
+      setNivel((n) => (n === 0 ? 1 : n === 1 ? 2 : n));
+    }
+  }, [nivel, src]);
 
   if (!srcSet) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img ref={ref} src={src} alt={alt} onError={onError} {...rest} />;
+    const local = String(src ?? "");
+    const url = nivel >= 2 && local.startsWith("/") ? rawAsset(local) : src;
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        ref={setRefs}
+        src={url}
+        alt={alt}
+        onError={(e) => {
+          if (nivel < 2) setNivel(2);
+          onError?.(e);
+        }}
+        {...rest}
+      />
+    );
   }
   return (
     <picture className="contents">
       <source type="image/webp" srcSet={srcSet} sizes={sizes} />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        ref={ref}
+        ref={setRefs}
         src={src}
         alt={alt}
         sizes={sizes}
         onError={(e) => {
-          setFallback(true);
+          setNivel(1);
           onError?.(e);
         }}
         {...rest}

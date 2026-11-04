@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import type { Product } from "@/lib/types";
 import { BackgroundVideo } from "./BackgroundVideo";
 import { ArrowRightIcon } from "./Icons";
@@ -25,6 +25,7 @@ export function FeaturedVideoWall({
   products,
   eyebrow,
   title,
+  tituloGrande = false,
   viewAllHref,
   video,
   poster,
@@ -33,6 +34,8 @@ export function FeaturedVideoWall({
   products: Product[];
   eyebrow?: string;
   title: string;
+  /** Título a todo el ancho de la franja (promos como la Cyber Week). */
+  tituloGrande?: boolean;
   viewAllHref?: string;
   video: { desktop: string; mobile?: string };
   poster?: string;
@@ -168,6 +171,12 @@ export function FeaturedVideoWall({
   return (
     <section id={id} className="scroll-mt-24 py-10 sm:py-14">
       {/* Título */}
+      {tituloGrande ? (
+        // El texto se estira exactamente al ancho del contenedor (SVG con textLength).
+        <h2 className="container-page mb-5">
+          <TextoAlAncho texto={title} />
+        </h2>
+      ) : (
       <div className="container-page mb-5 flex items-end justify-between gap-4">
         <div>
           {eyebrow && (
@@ -184,6 +193,7 @@ export function FeaturedVideoWall({
           </Link>
         )}
       </div>
+      )}
 
       {/* Video protagonista + tira de productos */}
       <div className="relative isolate h-[72vh] min-h-[480px] max-h-[720px] overflow-hidden sm:h-[560px]">
@@ -239,5 +249,37 @@ export function FeaturedVideoWall({
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * Texto en una sola línea que ocupa exactamente todo el ancho del contenedor:
+ * se mide y se ajusta el tamaño de letra (sin deformar la tipografía).
+ */
+function TextoAlAncho({ texto }: { texto: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const caja = el?.parentElement;
+    if (!el || !caja) return;
+    const ajustar = () => {
+      el.style.fontSize = "100px";
+      const ancho = el.getBoundingClientRect().width || 1;
+      el.style.fontSize = `${Math.max(16, (100 * caja.clientWidth) / ancho)}px`;
+    };
+    ajustar();
+    const ro = new ResizeObserver(ajustar);
+    ro.observe(caja);
+    document.fonts?.ready.then(ajustar);
+    return () => ro.disconnect();
+  }, [texto]);
+  return (
+    <span
+      ref={ref}
+      className="block whitespace-nowrap font-display font-extrabold uppercase leading-none tracking-tight text-primary"
+      style={{ fontSize: "9vw" }}
+    >
+      {texto}
+    </span>
   );
 }

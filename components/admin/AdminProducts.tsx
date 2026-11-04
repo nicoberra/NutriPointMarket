@@ -6,6 +6,7 @@ import { CopyLinkButton } from "./CopyLinkButton";
 import { categoryHref } from "@/lib/seo";
 import { ComboBreakdown } from "./ComboBreakdown";
 import { PhotoViewer } from "./PhotoViewer";
+import { FotoMiniatura } from "./FotoMiniatura";
 import { MarcaCombo } from "./MarcaCombo";
 import { ComboPicker, type FilaCombo } from "./ComboPicker";
 import { MoneyInput, formatoPlata } from "./MoneyInput";
@@ -52,11 +53,15 @@ type Changes = Partial<{
   precioCaja: number;
 }>;
 
-export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
+export function AdminProducts({ onToast, busquedaInicial = "" }: {
+  onToast: (m: string) => void;
+  /** Nombre del producto con el que arranca el buscador (viene de los avisos del Inicio). */
+  busquedaInicial?: string;
+}) {
   const { products, refresh } = useProducts();
   const { categories } = useCategories();
   const dollar = useDollar();
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(busquedaInicial);
   // "" = todas · DESTACADOS = solo los destacados · otro valor = slug de categoría.
   const [cat, setCat] = useState<string>("");
   const [editing, setEditing] = useState<Product | null>(null);
@@ -537,8 +542,7 @@ function ProductRow({
                 title="Ver / descargar foto"
                 className="block"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={src} alt="" className="h-14 w-14 rounded-lg border border-line object-cover" />
+                <FotoMiniatura src={src} className="h-14 w-14 rounded-lg border border-line object-cover" />
               </button>
               <button
                 type="button"
@@ -576,8 +580,7 @@ function ProductRow({
             <p className="mb-1 text-[10px] text-muted">También se muestran en la web (fotos de los productos del combo):</p>
             <div className="flex flex-wrap gap-1.5">
               {fotosCombo.map((src) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img key={src} src={src} alt="" className="h-10 w-10 rounded-lg border border-line object-cover opacity-80" />
+                <FotoMiniatura key={src} src={src} className="h-10 w-10 rounded-lg border border-line object-cover opacity-80" />
               ))}
             </div>
           </div>
@@ -643,8 +646,7 @@ function ProductRow({
                           title="Ver / descargar foto"
                           className="block"
                         >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={src} alt="" className="h-9 w-9 rounded border border-line object-cover" />
+                          <FotoMiniatura src={src} className="h-9 w-9 rounded border border-line object-cover" />
                         </button>
                         <button
                           type="button"
