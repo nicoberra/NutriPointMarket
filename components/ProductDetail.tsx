@@ -6,7 +6,8 @@ import type { Product } from "@/lib/types";
 import { brandName } from "@/data/brands";
 import { categoryMap } from "@/data/categories";
 import { formatPrice } from "@/lib/format";
-import { transferPrice } from "@/lib/config";
+import { PROMO_DESTACADOS, transferPrice } from "@/lib/config";
+import { usePromoDestacados } from "@/lib/promo";
 import { useCart } from "@/context/CartContext";
 import { useProducts } from "@/context/ProductsContext";
 import { availableVariants, cajasDisponibles, comboComponents, comboStockMax, comoCaja, vendePorCaja } from "@/lib/stock";
@@ -107,6 +108,7 @@ export function ProductDetail({ product: initial }: { product: Product }) {
   const variantPhotos = product.variantImages?.[flavor] ?? [];
   const displayPhotos = variantPhotos.length ? variantPhotos : product.images ?? [];
   const mainImage = displayPhotos[activeThumb] ?? product.image;
+  const promo = usePromoDestacados();
 
   // Al cambiar de variante, volver a la primera foto y ajustar la cantidad al
   // stock de esa variante (para no pasarse).
@@ -143,11 +145,14 @@ export function ProductDetail({ product: initial }: { product: Product }) {
         {/* Galería */}
         <div>
           <div className="relative mx-auto w-full max-w-[440px] overflow-hidden rounded-2xl border border-line bg-page-soft lg:max-w-[500px]">
-            {product.discount > 0 && (
-              <span className="badge absolute left-4 top-4 z-10 bg-sale text-white">
-                {product.discount}% OFF
-              </span>
-            )}
+            <div className="absolute left-4 top-4 z-10 flex flex-col gap-1.5">
+              {promo && product.featured && (
+                <span className="badge bg-accent text-primary">⚡ {PROMO_DESTACADOS.nombre}</span>
+              )}
+              {product.discount > 0 && (
+                <span className="badge bg-sale text-white">{product.discount}% OFF</span>
+              )}
+            </div>
             <FavoriteButton id={product.id} className="absolute right-4 top-4 z-10 h-11 w-11" />
             {mainImage ? (
               <SmartImg
@@ -196,6 +201,11 @@ export function ProductDetail({ product: initial }: { product: Product }) {
           <h1 className="mt-1 font-display text-2xl font-extrabold leading-tight text-primary sm:text-3xl">
             {product.name}
           </h1>
+          {promo && product.featured && (
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-primary">
+              ⚡ Promo {PROMO_DESTACADOS.nombre}
+            </p>
+          )}
           {product.reviews > 0 && (
             <div className="mt-2.5">
               <Rating value={product.rating} reviews={product.reviews} size="md" />

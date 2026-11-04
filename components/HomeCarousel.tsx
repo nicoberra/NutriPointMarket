@@ -1,6 +1,8 @@
 "use client";
 
 import { useProducts } from "@/context/ProductsContext";
+import { PROMO_DESTACADOS } from "@/lib/config";
+import { usePromoDestacados } from "@/lib/promo";
 import { ProductCarousel } from "./ProductCarousel";
 import { FeaturedVideoWall } from "./FeaturedVideoWall";
 import { ProductSkeletonRow } from "./ProductSkeleton";
@@ -34,7 +36,13 @@ export function HomeCarousel({ kind }: { kind: keyof typeof CONFIG }) {
   const { featured, bestSellers, loading } = useProducts();
   // "Elegidos del mes" y "Destacados" muestran lo mismo: los marcados destacado.
   const list = kind === "bestSellers" ? bestSellers : featured;
-  const c = CONFIG[kind];
+  const promo = usePromoDestacados();
+  // Con la promo vigente, los destacados se presentan como promos de la Cyber Week
+  // (el bloque "Elegidos" toma el título de la promo; "Destacados" solo el antetítulo).
+  const c =
+    promo && kind !== "bestSellers"
+      ? { ...CONFIG[kind], eyebrow: `⚡ ${PROMO_DESTACADOS.nombre}`, ...(kind === "onSale" ? { title: `Promos ${PROMO_DESTACADOS.nombre}` } : {}) }
+      : CONFIG[kind];
 
   if (!list.length) return loading ? <ProductSkeletonRow /> : null;
 
