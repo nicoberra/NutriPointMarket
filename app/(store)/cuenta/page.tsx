@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
 import { useProducts } from "@/context/ProductsContext";
 import { PageBanner } from "@/components/PageBanner";
 import { ProductCard } from "@/components/ProductCard";
-import { UserIcon, HeartIcon } from "@/components/Icons";
+import { UserIcon, HeartIcon, StarIcon } from "@/components/Icons";
+import { ClubCard } from "@/components/ClubCard";
+import { clubEstado, type ClubEstado } from "@/lib/api";
 import { Trampa, leerTrampa } from "@/components/Trampa";
 import { FormSkeleton } from "@/components/Estados";
 import { EmptyState } from "@/components/Estados";
@@ -76,6 +78,8 @@ export default function CuentaPage() {
               Cerrar sesión
             </button>
           </div>
+
+          <ClubSection email={user.email} />
 
           <section id="favoritos" className="scroll-mt-40">
             <h2 className="mb-5 flex items-center gap-2 font-display text-xl font-bold text-primary">
@@ -237,5 +241,30 @@ export default function CuentaPage() {
         </div>
       </div>
     </>
+  );
+}
+
+/** Club de sellos del cliente (solo se muestra si el club está activo). */
+function ClubSection({ email }: { email: string }) {
+  const [estado, setEstado] = useState<ClubEstado | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    clubEstado(email).then((e) => {
+      if (vivo) setEstado(e);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [email]);
+  if (!estado?.activo) return null;
+  return (
+    <section id="club" className="mb-10 scroll-mt-40">
+      <h2 className="mb-5 flex items-center gap-2 font-display text-xl font-bold text-primary">
+        <StarIcon className="h-5 w-5" /> Club Suple
+      </h2>
+      <div className="max-w-xl">
+        <ClubCard estado={estado} />
+      </div>
+    </section>
   );
 }

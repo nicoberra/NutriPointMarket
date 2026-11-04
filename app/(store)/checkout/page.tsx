@@ -6,7 +6,8 @@ import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { formatPrice } from "@/lib/format";
 import { whatsappLink, TRANSFER, transferPrice } from "@/lib/config";
-import { createOrder, mpCreatePreference, uploadComprobante } from "@/lib/api";
+import { createOrder, mpCreatePreference, uploadComprobante, clubEstado, type ClubEstado } from "@/lib/api";
+import { ClubCard } from "@/components/ClubCard";
 import { PageBanner } from "@/components/PageBanner";
 import { CheckIcon, WhatsappIcon } from "@/components/Icons";
 import { PROVINCIAS, ZONAS_ENVIO, ENVIO_GRATIS_DESDE, calcularEnvio, detectarZona, type ZonaDetectada } from "@/lib/envios";
@@ -21,6 +22,10 @@ interface DoneInfo {
   metodo: Metodo;
   id: string;
   total: number;
+  /** Premio del Club de sellos que el servidor descontó en este pedido ($). */
+  premioClub: number;
+  /** Estado del club al confirmar (para decir qué sello suma). */
+  club: ClubEstado | null;
 }
 
 export default function CheckoutPage() {
@@ -31,6 +36,27 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [compUp, setCompUp] = useState<"idle" | "up" | "done">("idle");
+  // Club de sellos: estado del cliente según el email / WhatsApp que escribe.
+  // Sin identificar, el servidor devuelve solo la configuración (premio y meta).
+  const [club, setClub] = useState<ClubEstado | null>(null);
+  const [emailClub, setEmailClub] = useState("");
+  const [telClub, setTelClub] = useState("");
+  useEffect(() => {
+    if (user?.email) setEmailClub((v) => v || user.email);
+  }, [user?.email]);
+  useEffect(() => {
+    const em = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailClub.trim()) ? emailClub.trim() : "";
+    const tel = telClub.replace(/\D/g, "").length >= 8 ? telClub.trim() : "";
+    let vivo = true;
+    const t = setTimeout(async () => {
+      const e = await clubEstado(em, tel);
+      if (vivo && e) setClub(e);
+    }, em || tel ? 700 : 0);
+    return () => {
+      vivo = false;
+      clearTimeout(t);
+    };
+  }, [emailClub, telClub]);
   // Número de pedido del intento de compra actual: si el cliente reintenta la
   // MISMA compra (p. ej. tras un corte de conexión) se reutiliza y el servidor
   // no la duplica. Si cambia algo del pedido, se genera uno nuevo.
@@ -99,7 +125,10 @@ export default function CheckoutPage() {
   void DESCUENTO_EF_TR;
   const pagaConDescuento = method === "Transferencia";
   const descuento = pagaConDescuento ? descuentoProductos : 0;
-  const totalFinal = total - descuento;
+  // Premio del Club de sellos (monto fijo): lo aplica y valida el servidor;
+  // acá solo se muestra. Nunca supera el importe de los productos.
+  const descuentoClub = club?.premioDisponible ? Math.min(club.premio, subtotal - descuento) : 0;
+  const totalFinal = total - descuento - descuentoClub;
 
   const confirm = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -159,7 +188,8 @@ export default function CheckoutPage() {
     // Total según el método: efectivo/transferencia con 10% off (por producto);
     // Mercado Pago sin descuento.
     const desc = metodo === "Mercado Pago" ? 0 : descuentoProductos;
-    const montoFinal = total - desc;
+    const descClub = club?.premioDisponible ? Math.min(club.premio, subtotal - desc) : 0;
+    const montoFinal = total - desc - descClub;
 
     const firma = JSON.stringify([itemsJson, cliente, telefono, email, metodo, envioTexto, montoFinal]);
     if (!intento.current || intento.current.firma !== firma) {
@@ -169,7 +199,7 @@ export default function CheckoutPage() {
 
     setLoading(true);
     try {
-      await createOrder({
+      const creado = await createOrder({
         id,
         cliente,
         telefono,
@@ -186,7 +216,7 @@ export default function CheckoutPage() {
       if (metodo === "Mercado Pago") {
         const link = await mpCreatePreference({
           pedido: id,
-          monto: montoFinal,
+          monto: creado.monto,
           titulo: `Pedido Suple Market (${count} art.)`,
           email,
           // El envío va como ítem aparte en Mercado Pago
@@ -205,7 +235,7 @@ export default function CheckoutPage() {
       // Efectivo / Transferencia
       intento.current = null; // compra cerrada: la próxima usa otro número
       clear();
-      setDone({ metodo, id, total: montoFinal });
+      setDone({ metodo, id, total: creado.monto, premioClub: creado.premioClub, club });
     } catch (e) {
       // El backend puede rechazar el pedido (p. ej. precios desactualizados) con un motivo claro.
       const msg = e instanceof Error && e.message && !/timeout|fetch/i.test(e.message) ? e.message : "";
@@ -230,6 +260,16 @@ export default function CheckoutPage() {
               Pedido <span className="font-semibold text-ink">{done.id}</span> ·{" "}
               {formatPrice(done.total)}
             </p>
+            {done.premioClub > 0 ? (
+              <p className="mt-2 inline-block rounded-full bg-accent px-3 py-1 text-xs font-bold text-primary">
+                🎁 Premio del Club Suple: −{formatPrice(done.premioClub)}
+              </p>
+            ) : done.club?.activo ? (
+              <p className="mt-2 text-xs text-muted">
+                Club Suple: cuando se acredite el pago sumás el sello{" "}
+                {Math.min(done.club.sellos + 1, done.club.meta - 1)} de {done.club.meta - 1}.
+              </p>
+            ) : null}
 
             <div className="mt-5 rounded-xl border border-line bg-page-soft p-4 text-left text-sm">
               <p className="font-semibold text-primary">Datos para transferir</p>
@@ -355,8 +395,8 @@ export default function CheckoutPage() {
               </legend>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field name="nombre" label="Nombre y apellido" defaultValue={user?.name} required />
-                <Field name="email" label="Email" type="email" defaultValue={user?.email} required />
-                <Field name="telefono" label="WhatsApp" type="tel" required />
+                <Field name="email" label="Email" type="email" defaultValue={user?.email} required onChange={setEmailClub} />
+                <Field name="telefono" label="WhatsApp" type="tel" required onChange={setTelClub} />
                 <Field name="dni" label="DNI" />
               </div>
             </fieldset>
@@ -509,6 +549,11 @@ export default function CheckoutPage() {
           <aside className="lg:sticky lg:top-40 lg:self-start">
             <div className="rounded-xl border border-line bg-white p-5">
               <h2 className="font-display text-lg font-bold text-primary">Tu pedido</h2>
+              {club?.activo && (
+                <div className="mt-3">
+                  <ClubCard estado={club} variant="compact" />
+                </div>
+              )}
               <ul className="mt-4 space-y-3">
                 {items.map((item) => (
                   <li key={item.key} className="flex justify-between gap-3 text-sm">
@@ -550,11 +595,17 @@ export default function CheckoutPage() {
                     <dd className="font-semibold">− {formatPrice(descuento)}</dd>
                   </div>
                 )}
+                {descuentoClub > 0 && (
+                  <div className="flex justify-between text-primary">
+                    <dt className="font-semibold">🎁 Premio Club Suple</dt>
+                    <dd className="font-semibold">− {formatPrice(descuentoClub)}</dd>
+                  </div>
+                )}
               </dl>
               <div className="mt-4 flex items-center justify-between gap-2 border-t border-line pt-4">
                 <span className="font-semibold text-ink">Total</span>
                 <span className="flex items-baseline gap-2">
-                  {descuento > 0 && (
+                  {(descuento > 0 || descuentoClub > 0) && (
                     <span className="text-base font-semibold text-muted line-through">
                       {formatPrice(total)}
                     </span>
@@ -647,12 +698,14 @@ function Field({
   type = "text",
   defaultValue,
   required,
+  onChange,
 }: {
   name: string;
   label: string;
   type?: string;
   defaultValue?: string;
   required?: boolean;
+  onChange?: (value: string) => void;
 }) {
   return (
     <label className="block">
@@ -664,6 +717,7 @@ function Field({
         type={type}
         defaultValue={defaultValue}
         required={required}
+        onChange={onChange ? (e) => onChange(e.target.value) : undefined}
         className="input h-11"
       />
     </label>

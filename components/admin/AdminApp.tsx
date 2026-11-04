@@ -9,6 +9,7 @@ import { AdminRecords, type RecordsConfig } from "./AdminRecords";
 import { AdminDashboard } from "./AdminDashboard";
 import { AdminBilling } from "./AdminBilling";
 import { ValorMercaderia } from "./ValorMercaderia";
+import { ClubPanel } from "./ClubPanel";
 import { resumenCompra } from "./Compras";
 import { PullToRefresh } from "./PullToRefresh";
 import { prefetchTables, clearTables } from "@/lib/tableCache";
@@ -351,7 +352,10 @@ export function AdminApp() {
           {section === "facturacion" && <AdminBilling />}
           {section === "productos" && <AdminProducts onToast={setToast} busquedaInicial={productoBuscado} />}
           {section === "clientes" && (
-            <AdminRecords config={CLIENTES_CFG} orderConfig={PEDIDOS_CFG} onToast={setToast} />
+            <div className="space-y-4">
+              <ClubPanel onToast={setToast} />
+              <AdminRecords config={CLIENTES_CFG} orderConfig={PEDIDOS_CFG} onToast={setToast} />
+            </div>
           )}
           {section === "pedidos" && (
             <AdminRecords config={PEDIDOS_CFG} onToast={setToast} />

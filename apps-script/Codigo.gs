@@ -18,7 +18,7 @@
  * ============================================================================ */
 
 var SHEET_ID = "12paAzW6OcSgYv4u6L7QVI4tpvrEx1yqnujW0OjcieMc";
-var API_VERSION = "v15"; // v15: venta por caja o por unidad (Unidades por caja + Precio caja) // v14: un producto puede estar en varias categorías ("A | B") // v13: compras pendientes (se revisan y se suman al stock después) // v12: lectura de compras con Claude Haiku 5.5 (el más barato) // v11: las compras leen fotos, archivos y texto con Claude // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
+var API_VERSION = "v16"; // v16: Club de sellos (premio en la N-ésima compra, descuento aplicado y validado en el servidor) // v15: venta por caja o por unidad (Unidades por caja + Precio caja) // v14: un producto puede estar en varias categorías ("A | B") // v13: compras pendientes (se revisan y se suman al stock después) // v12: lectura de compras con Claude Haiku 5.5 (el más barato) // v11: las compras leen fotos, archivos y texto con Claude // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
 
 // Repo de GitHub donde se guardan las fotos de productos (en public/productos/).
 // El token NO va acá: se guarda en Propiedades del script como GITHUB_TOKEN.
@@ -121,6 +121,8 @@ var TABLES = {
       ["descontado", "Descontado"],
       ["comprobante", "Comprobante"],
       ["cobrado", "Cobrado"],
+      ["email", "Email"], // email del cliente (la web lo manda; sirve para el Club de sellos)
+      ["club", "Club"], // "premio $X" cuando este pedido usó el premio del Club de sellos
     ],
     idField: "id",
   },
@@ -231,6 +233,7 @@ var LIMITES = {
   login:       { porId: [15, 600], global: [120, 60] },
   mp:          { porId: [8, 600],  global: [60, 60] },
   comprobante: { porId: [6, 600],  global: [30, 60] },
+  club:        { porId: [30, 600], global: [120, 60] },
   crm:         { global: [30, 60] },
 };
 var MSG_LIMITE = "Hiciste muchos intentos seguidos. Esperá unos minutos y volvé a probar.";
@@ -267,6 +270,9 @@ function controlarAbuso(action, p) {
       break;
     case "subir_comprobante":
       limitar("comprobante", p.pedido);
+      break;
+    case "club":
+      limitar("club", p.email || p.telefono);
       break;
     case "crm_login":
       limitar("crm", "");
@@ -399,6 +405,17 @@ function ejecutar(action, p, e, esAdmin) {
         break;
       case "crm_logout":
         out = crmLogout(p.token);
+        break;
+      case "club":
+        // Estado del Club de sellos de un cliente (público, con límite). Sin
+        // email ni teléfono devuelve solo la configuración (premio y meta).
+        out = { ok: true, data: clubEstado(p.email, p.telefono) };
+        break;
+      case "club_resumen":
+        out = { ok: true, data: clubResumen() };
+        break;
+      case "club_config":
+        out = { ok: true, data: p.data ? clubConfigGuardar(parseData(p)) : clubConfig() };
         break;
       default:
         out = { ok: false, error: "Acción desconocida: " + action };
@@ -766,7 +783,7 @@ function sanitize(key, value) {
 
 // Campos que puede mandar la tienda pública (sin token) al crear una fila.
 var CAMPOS_PUBLICOS = {
-  Pedidos: ["id", "cliente", "telefono", "detalle", "monto", "notas", "envio", "montoEnvio", "pago", "items"],
+  Pedidos: ["id", "cliente", "telefono", "email", "detalle", "monto", "notas", "envio", "montoEnvio", "pago", "items"],
   Suscriptores: ["email"],
 };
 
@@ -812,11 +829,21 @@ function validarAltaPublica(tab, obj) {
   var calc = calcularTotalPedido(items, pago);
   var envio = envioSegunTexto(limpio.envio);
   if (calc.subtotalWeb >= ENVIO_GRATIS_DESDE) envio = 0;
-  var total = calc.subtotal + envio;
-  if (Math.abs(Number(limpio.monto) - total) > 1) {
+  // Email: solo si es válido (sirve para el Club de sellos).
+  limpio.email = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(limpio.email || "")) ? low(limpio.email) : "";
+  // Club de sellos: si al cliente le toca el premio en esta compra, el
+  // descuento se aplica ACÁ (la web solo lo muestra). Nunca supera los productos.
+  var club = clubEstado(limpio.email, limpio.telefono);
+  var descClub = club.premioDisponible ? Math.min(club.premio, calc.subtotal) : 0;
+  var total = calc.subtotal + envio - descClub;
+  var enviado = Number(limpio.monto);
+  // Se acepta el total con el premio aplicado o, si la web no llegó a verlo,
+  // el total sin premio: el cliente nunca paga de más.
+  if (Math.abs(enviado - total) > 1 && !(descClub > 0 && Math.abs(enviado - (total + descClub)) <= 1)) {
     throw new Error("Los precios se actualizaron. Recargá la página y volvé a confirmar el pedido.");
   }
   limpio.monto = total;
+  limpio.club = descClub > 0 ? "premio $" + descClub : "";
   limpio.montoEnvio = envio;
   limpio.estado = pago === "Mercado Pago" ? "pendiente de pago" : "nuevo";
   limpio.descontado = "no";
@@ -1068,6 +1095,135 @@ function envioSegunTexto(txt) {
 
 function cleanPhone(v) {
   return String(v).replace(/^[+\-=@]+\s*/, "").trim();
+}
+
+/* ---------------------------- Club de sellos ----------------------------- */
+// Cada compra pagada (web o cargada en el CRM) suma un sello al cliente; en la
+// compra número META (6 por defecto) el premio (monto fijo) se descuenta solo en
+// el checkout y el contador arranca de nuevo. Configuración en la Propiedad del
+// Script "CLUB" (JSON: premio, meta, desde); premio 0 = club apagado.
+var CLUB_META_DEFAULT = 6;
+
+function clubConfig() {
+  var c = {};
+  try { c = JSON.parse(PropertiesService.getScriptProperties().getProperty("CLUB") || "{}") || {}; } catch (e) {}
+  var premio = Math.max(0, Math.round(Number(c.premio) || 0));
+  var meta = Math.floor(Number(c.meta) || 0);
+  if (meta < 2 || meta > 20) meta = CLUB_META_DEFAULT;
+  var desde = /^\d{4}-\d{2}-\d{2}$/.test(String(c.desde || "")) ? String(c.desde) : "";
+  return { premio: premio, meta: meta, desde: desde, activo: premio > 0 };
+}
+
+function clubConfigGuardar(obj) {
+  var premio = Math.round(Number(obj.premio) || 0);
+  if (premio < 0 || premio > 10000000) throw new Error("Monto del premio inválido");
+  var meta = Math.floor(Number(obj.meta) || CLUB_META_DEFAULT);
+  if (meta < 2 || meta > 20) throw new Error("La meta tiene que ser entre 2 y 20 compras");
+  var desde = String(obj.desde || "").trim().slice(0, 10);
+  if (desde && !/^\d{4}-\d{2}-\d{2}$/.test(desde)) throw new Error("Fecha inválida (AAAA-MM-DD)");
+  PropertiesService.getScriptProperties().setProperty("CLUB", JSON.stringify({ premio: premio, meta: meta, desde: desde }));
+  return clubConfig();
+}
+
+// Teléfono normalizado para comparar: solo dígitos, sin +54 / 9 / 0 iniciales,
+// últimos 10. Vacío si es muy corto.
+function telefonoClave(v) {
+  var d = String(v || "").replace(/\D/g, "");
+  if (d.indexOf("54") === 0 && d.length > 10) d = d.slice(2);
+  if (d.indexOf("9") === 0 && d.length > 10) d = d.slice(1);
+  d = d.replace(/^0+/, "");
+  return d.length < 8 ? "" : d.slice(-10);
+}
+
+function pedidoPagado(row, keys) {
+  var est = low(row[keys.indexOf("estado")]);
+  return low(row[keys.indexOf("cobrado")]) === "sí" || est === "pagado" || est === "entregado";
+}
+
+// Email del pedido: columna Email o, en pedidos viejos, "Email: x" en las notas.
+function emailDePedido(row, keys) {
+  var e = low(row[keys.indexOf("email")]);
+  if (!e) {
+    var m = String(row[keys.indexOf("notas")] || "").match(/email:\s*([^\s@,;]+@[^\s@,;]+)/i);
+    if (m) e = low(m[1]);
+  }
+  return e;
+}
+
+// Estado del club para un cliente (por email y/o teléfono). Recorre los
+// pedidos en orden: un pedido con premio reinicia el contador; los pagados
+// posteriores (desde la fecha configurada) suman sellos.
+function clubEstado(email, telefono) {
+  var cfg = clubConfig();
+  var res = { activo: cfg.activo, premio: cfg.premio, meta: cfg.meta, sellos: 0, premios: 0, premioDisponible: false };
+  var em = low(email), tel = telefonoClave(telefono);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) em = "";
+  if (!cfg.activo || (!em && !tel)) return res;
+  var keys = keysOf("Pedidos");
+  var data = sheetFor("Pedidos").getDataRange().getValues();
+  var iTel = keys.indexOf("telefono"), iClub = keys.indexOf("club"), iFecha = keys.indexOf("fecha");
+  var sellos = 0, premios = 0;
+  for (var r = 1; r < data.length; r++) {
+    var row = data[r];
+    var mismo = (em && emailDePedido(row, keys) === em) || (tel && telefonoClave(row[iTel]) === tel);
+    if (!mismo) continue;
+    if (String(row[iClub] || "").indexOf("premio") === 0) { premios++; sellos = 0; continue; }
+    if (cfg.desde && String(row[iFecha] || "").slice(0, 10) < cfg.desde) continue;
+    if (pedidoPagado(row, keys)) sellos++;
+  }
+  res.sellos = sellos;
+  res.premios = premios;
+  res.premioDisponible = sellos >= cfg.meta - 1;
+  return res;
+}
+
+// Resumen para el CRM: sellos y premios de cada cliente (agrupa por email y
+// teléfono, unificando cuando un pedido trae los dos).
+function clubResumen() {
+  var cfg = clubConfig();
+  var keys = keysOf("Pedidos");
+  var data = sheetFor("Pedidos").getDataRange().getValues();
+  var iTel = keys.indexOf("telefono"), iClub = keys.indexOf("club"), iFecha = keys.indexOf("fecha"), iNom = keys.indexOf("cliente");
+  var grupos = {}, porClave = {}, nId = 0;
+  for (var r = 1; r < data.length; r++) {
+    var row = data[r];
+    var em = emailDePedido(row, keys), tel = telefonoClave(row[iTel]);
+    if (!em && !tel) continue;
+    var gE = em ? porClave["e:" + em] : "", gT = tel ? porClave["t:" + tel] : "";
+    var g = gE || gT;
+    if (!g) {
+      g = "g" + (++nId);
+      grupos[g] = { nombre: "", email: "", telefono: "", sellos: 0, premios: 0, ultima: "" };
+    } else if (gE && gT && gE !== gT) {
+      // El mismo cliente apareció por email y por teléfono: se unifica.
+      var a = grupos[gE], b = grupos[gT];
+      a.sellos += b.sellos; a.premios += b.premios;
+      if (!a.telefono) a.telefono = b.telefono;
+      if (!a.email) a.email = b.email;
+      for (var k in porClave) if (porClave[k] === gT) porClave[k] = gE;
+      delete grupos[gT];
+      g = gE;
+    }
+    if (em) porClave["e:" + em] = g;
+    if (tel) porClave["t:" + tel] = g;
+    var gr = grupos[g];
+    if (!gr.nombre && row[iNom]) gr.nombre = String(row[iNom]);
+    if (!gr.email && em) gr.email = em;
+    if (!gr.telefono && tel) gr.telefono = String(row[iTel]);
+    if (String(row[iClub] || "").indexOf("premio") === 0) { gr.premios++; gr.sellos = 0; gr.ultima = String(row[iFecha] || ""); continue; }
+    if (cfg.desde && String(row[iFecha] || "").slice(0, 10) < cfg.desde) continue;
+    if (pedidoPagado(row, keys)) { gr.sellos++; gr.ultima = String(row[iFecha] || ""); }
+  }
+  var lista = [];
+  for (var id in grupos) {
+    var x = grupos[id];
+    if (x.sellos > 0 || x.premios > 0) {
+      x.premioDisponible = x.sellos >= cfg.meta - 1;
+      lista.push(x);
+    }
+  }
+  lista.sort(function (a, b) { return b.sellos - a.sellos || b.premios - a.premios; });
+  return { config: cfg, clientes: lista.slice(0, 500) };
 }
 
 /* ------------------------------ Productos -------------------------------- */
@@ -1888,6 +2044,7 @@ function esAccionPublica(action, p) {
     case "mp_webhook":
     case "crm_login":
     case "crm_logout":
+    case "club":
       return true;
     case "list":
       return p.tab === "Categorias";
@@ -2118,7 +2275,7 @@ function resetProductos_BORRA_TODO() {
 // datos. Ejecutar una vez después de agregar la columna "Cobrado".
 function encabezadosPedidos() {
   writeHeader(sheetFor("Pedidos"), "Pedidos");
-  SpreadsheetApp.getActive().toast("Encabezados de Pedidos actualizados (incluye Cobrado).", "Suple Market", 5);
+  SpreadsheetApp.getActive().toast("Encabezados de Pedidos actualizados (incluye Cobrado, Email y Club).", "Suple Market", 5);
 }
 
 function writeHeader(sh, tab) {
