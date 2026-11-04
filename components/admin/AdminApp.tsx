@@ -354,9 +354,10 @@ export function AdminApp() {
           {section === "productos" && <AdminProducts onToast={setToast} busquedaInicial={productoBuscado} />}
           {section === "clientes" && (
             <div className="space-y-4">
+              <AdminRecords config={CLIENTES_CFG} orderConfig={PEDIDOS_CFG} onToast={setToast} />
+              {/* Abajo de la lista: no molestan al agregar o buscar clientes. */}
               <ClubPanel onToast={setToast} />
               <RegaloPanel onToast={setToast} />
-              <AdminRecords config={CLIENTES_CFG} orderConfig={PEDIDOS_CFG} onToast={setToast} />
             </div>
           )}
           {section === "pedidos" && (
