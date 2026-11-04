@@ -647,6 +647,8 @@ export interface OrderInput {
   envio: string; // dirección
   metodo: string; // "Transferencia" | "Mercado Pago"
   items?: string; // JSON de los productos: [{n,v,q}]
+  /** Cupón del regalo (SUPLE-XXXXXX), si el cliente tiene uno. */
+  cupon?: string;
   /** Campo trampa (vacío si lo envía una persona). */
   hp?: string;
 }
@@ -672,7 +674,7 @@ export async function aprobarPedido(id: string): Promise<boolean> {
  * sellos si correspondía) y el premio aplicado. Si el backend rechazó el
  * pedido, lanza Error con el motivo.
  */
-export async function createOrder(o: OrderInput): Promise<{ monto: number; premioClub: number }> {
+export async function createOrder(o: OrderInput): Promise<{ monto: number; premioClub: number; descCupon: number }> {
   const estado = o.metodo === "Mercado Pago" ? "pendiente de pago" : "nuevo";
   const r = (await api("add", {
     tab: "Pedidos",
@@ -689,17 +691,116 @@ export async function createOrder(o: OrderInput): Promise<{ monto: number; premi
       montoEnvio: o.montoEnvio,
       pago: o.metodo,
       items: o.items ?? "",
+      cupon: o.cupon ?? "",
       hp_sm: o.hp ?? "",
       descontado: "no",
     }),
-  }, 18000)) as ApiResult<{ monto?: unknown; club?: unknown }>;
+  }, 18000)) as ApiResult<{ monto?: unknown; club?: unknown; cupon?: unknown }>;
   if (r.ok === false) throw new Error(r.error || "No se pudo confirmar el pedido");
   const monto = Number(r.data?.monto);
   const premio = Number(String(r.data?.club ?? "").replace(/[^\d]/g, ""));
+  const descCupon = Number(String(r.data?.cupon ?? "").split("$")[1] ?? 0);
   return {
     monto: Number.isFinite(monto) && monto >= 0 ? monto : o.monto,
     premioClub: Number.isFinite(premio) ? premio : 0,
+    descCupon: Number.isFinite(descCupon) ? descCupon : 0,
   };
+}
+
+/* -------------------------- Regalo con cupón ----------------------------- */
+
+export interface CuponConfig {
+  /** false = el regalo está apagado (valor 0). */
+  activo: boolean;
+  tipo: "monto" | "porcentaje";
+  valor: number;
+  /** Días de validez del cupón desde que se pide. */
+  dias: number;
+}
+
+export interface CuponEstado {
+  valido: boolean;
+  /** Motivo si no es válido (para mostrar tal cual). */
+  motivo: string;
+  tipo: "monto" | "porcentaje";
+  valor: number;
+  /** AAAA-MM-DD */
+  vence: string;
+}
+
+export interface LeadResultado {
+  codigo: string;
+  vence: string;
+  tipo: "monto" | "porcentaje";
+  valor: number;
+  /** true = ese WhatsApp/email ya había pedido el regalo (se devuelve el mismo cupón). */
+  repetido: boolean;
+  /** true = ya lo había pedido: el código viene tapado (SUPLE-••••AB). */
+  enmascarado: boolean;
+  disponible: boolean;
+  motivo: string;
+}
+
+const tipoCupon = (v: unknown): "monto" | "porcentaje" => (v === "porcentaje" ? "porcentaje" : "monto");
+
+/** Configuración pública del regalo. null si no se pudo conectar. */
+export async function cuponConfigPublica(): Promise<CuponConfig | null> {
+  try {
+    const r = (await api("cupon", {}, 10000)) as ApiResult<Record<string, unknown>>;
+    if (!r.ok || !r.data) return null;
+    return { activo: r.data.activo === true, tipo: tipoCupon(r.data.tipo), valor: toNum(r.data.valor), dias: toNum(r.data.dias) || 30 };
+  } catch {
+    return null;
+  }
+}
+
+/** ¿El cupón sirve? null si no se pudo conectar. */
+export async function cuponConsultar(codigo: string): Promise<CuponEstado | null> {
+  try {
+    const r = (await api("cupon", { codigo: codigo.trim().toUpperCase() }, 10000)) as ApiResult<Record<string, unknown>>;
+    if (!r.ok || !r.data) return null;
+    return {
+      valido: r.data.valido === true,
+      motivo: String(r.data.motivo ?? ""),
+      tipo: tipoCupon(r.data.tipo),
+      valor: toNum(r.data.valor),
+      vence: String(r.data.vence ?? ""),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Pide el regalo: guarda el contacto y devuelve el cupón. Lanza Error con el motivo si el backend rechaza. */
+export async function pedirRegalo(d: { nombre: string; telefono: string; email: string; origen: string; hp: string }): Promise<LeadResultado> {
+  const r = (await api("lead", {
+    data: JSON.stringify({ nombre: d.nombre, telefono: d.telefono, email: d.email.trim().toLowerCase(), origen: d.origen, hp_sm: d.hp }),
+  }, 18000)) as ApiResult<Record<string, unknown>>;
+  if (r.ok === false || !r.data) throw new Error(r.error || "No se pudo generar tu cupón. Probá de nuevo.");
+  return {
+    codigo: String(r.data.codigo ?? ""),
+    vence: String(r.data.vence ?? ""),
+    tipo: tipoCupon(r.data.tipo),
+    valor: toNum(r.data.valor),
+    repetido: r.data.repetido === true,
+    enmascarado: r.data.enmascarado === true,
+    disponible: r.data.disponible !== false,
+    motivo: String(r.data.motivo ?? ""),
+  };
+}
+
+/** CRM: configuración del regalo. */
+export async function cuponConfigLeer(): Promise<CuponConfig | null> {
+  const r = (await api("cupon_config", {}, 20000)) as ApiResult<Record<string, unknown>>;
+  if (!r.ok || !r.data) return null;
+  return { activo: r.data.activo === true, tipo: tipoCupon(r.data.tipo), valor: toNum(r.data.valor), dias: toNum(r.data.dias) || 30 };
+}
+
+/** CRM: guarda la configuración del regalo. Lanza Error si el backend rechaza. */
+export async function cuponConfigGuardar(c: { tipo: "monto" | "porcentaje"; valor: number; dias: number }): Promise<CuponConfig> {
+  const r = (await api("cupon_config", { data: JSON.stringify(c) }, 20000)) as ApiResult<Record<string, unknown>>;
+  if (r.ok === false || !r.data) throw new Error(r.error || "No se pudo guardar");
+  return { activo: r.data.activo === true, tipo: tipoCupon(r.data.tipo), valor: toNum(r.data.valor), dias: toNum(r.data.dias) || 30 };
 }
 
 /* ---------------------------- Club de sellos ----------------------------- */

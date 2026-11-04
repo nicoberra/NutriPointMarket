@@ -84,7 +84,7 @@ function telNacional(telefono: string | undefined): string {
   return d;
 }
 
-function whatsappCliente(telefono: string | undefined, texto = ""): string {
+export function whatsappCliente(telefono: string | undefined, texto = ""): string {
   const d = telNacional(telefono);
   if (!d) return "";
   const num = d.length === 10 ? "549" + d : d;

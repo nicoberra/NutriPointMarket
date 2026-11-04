@@ -18,7 +18,7 @@
  * ============================================================================ */
 
 var SHEET_ID = "12paAzW6OcSgYv4u6L7QVI4tpvrEx1yqnujW0OjcieMc";
-var API_VERSION = "v16"; // v16: Club de sellos (premio en la N-ésima compra, descuento aplicado y validado en el servidor) // v15: venta por caja o por unidad (Unidades por caja + Precio caja) // v14: un producto puede estar en varias categorías ("A | B") // v13: compras pendientes (se revisan y se suman al stock después) // v12: lectura de compras con Claude Haiku 5.5 (el más barato) // v11: las compras leen fotos, archivos y texto con Claude // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
+var API_VERSION = "v17"; // v17: regalo con cupón (pestaña Leads, cupón único validado en el servidor) // v16: Club de sellos (premio en la N-ésima compra, descuento aplicado y validado en el servidor) // v15: venta por caja o por unidad (Unidades por caja + Precio caja) // v14: un producto puede estar en varias categorías ("A | B") // v13: compras pendientes (se revisan y se suman al stock después) // v12: lectura de compras con Claude Haiku 5.5 (el más barato) // v11: las compras leen fotos, archivos y texto con Claude // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
 
 // Repo de GitHub donde se guardan las fotos de productos (en public/productos/).
 // El token NO va acá: se guarda en Propiedades del script como GITHUB_TOKEN.
@@ -123,6 +123,22 @@ var TABLES = {
       ["cobrado", "Cobrado"],
       ["email", "Email"], // email del cliente (la web lo manda; sirve para el Club de sellos)
       ["club", "Club"], // "premio $X" cuando este pedido usó el premio del Club de sellos
+      ["cupon", "Cupón"], // "SUPLE-XXXXXX $X" cuando este pedido usó un cupón del regalo
+    ],
+    idField: "id",
+  },
+  Leads: {
+    columns: [
+      ["id", "id"],
+      ["fecha", "Fecha"],
+      ["nombre", "Nombre"],
+      ["telefono", "Teléfono"],
+      ["email", "Email"],
+      ["origen", "Origen"], // de dónde vino (ej. ig-reel, ig-bio, ig-historia)
+      ["codigo", "Código"], // cupón único de este contacto
+      ["vence", "Vence"], // AAAA-MM-DD
+      ["usado", "Usado en pedido"], // id del pedido que lo usó (vacío = disponible)
+      ["notas", "Notas"],
     ],
     idField: "id",
   },
@@ -234,6 +250,9 @@ var LIMITES = {
   mp:          { porId: [8, 600],  global: [60, 60] },
   comprobante: { porId: [6, 600],  global: [30, 60] },
   club:        { porId: [12, 600], global: [120, 60] },
+  lead:        { porId: [4, 600],  global: [30, 60] },
+  leadDia:     { global: [300, 86400] },
+  cupon:       { porId: [10, 600], global: [60, 60] },
   crm:         { global: [30, 60] },
 };
 var MSG_LIMITE = "Hiciste muchos intentos seguidos. Esperá unos minutos y volvé a probar.";
@@ -274,6 +293,14 @@ function controlarAbuso(action, p) {
     case "club":
       limitar("club", p.email || p.telefono);
       break;
+    case "lead":
+      trampa();
+      limitar("lead", String(datos().telefono || "").replace(/\D/g, "") || datos().email);
+      limitar("leadDia", "");
+      break;
+    case "cupon":
+      limitar("cupon", p.codigo || "config");
+      break;
     case "crm_login":
       limitar("crm", "");
       break;
@@ -304,7 +331,7 @@ function limitar(tipo, id) {
 var ACCIONES_ESCRITURA = {
   productos_save: 1, add: 1, update: 1, delete: 1, categoria_rename: 1, producto_rename: 1,
   subir_imagen: 1, borrar_imagen: 1, subir_comprobante: 1, mp_webhook: 1, aprobar_pedido: 1, registrar: 1,
-  compra_sumar_stock: 1,
+  compra_sumar_stock: 1, lead: 1, cupon_config: 1,
 };
 
 function conBloqueo(fn) {
@@ -353,6 +380,10 @@ function ejecutar(action, p, e, esAdmin) {
           out = alta.__repetido
             ? { ok: true, data: { id: alta.id }, repetido: true }
             : { ok: true, data: addRow(p.tab, alta) };
+          if (!alta.__repetido && p.tab === "Pedidos") {
+            if (alta.cupon) marcarCuponUsado(String(alta.cupon).split(" ")[0], alta.id);
+            (alta.__premiosLiberados || []).forEach(function (idL) { quitarDescuentoPedido(idL, "club", alta.id); });
+          }
         }
         break;
       case "update":
@@ -409,13 +440,26 @@ function ejecutar(action, p, e, esAdmin) {
       case "club":
         // Estado del Club de sellos de un cliente (público, con límite). Sin
         // email ni teléfono devuelve solo la configuración (premio y meta).
-        out = { ok: true, data: clubEstado(p.email, p.telefono) };
+        var ce = clubEstado(p.email, p.telefono);
+        delete ce.liberados;
+        out = { ok: true, data: ce };
         break;
       case "club_resumen":
         out = { ok: true, data: clubResumen() };
         break;
       case "club_config":
         out = { ok: true, data: p.data ? clubConfigGuardar(parseData(p)) : clubConfig() };
+        break;
+      case "lead":
+        // Regalo: deja su WhatsApp / email y recibe un cupón único (público, con límite).
+        out = { ok: true, data: leadAlta(parseData(p)) };
+        break;
+      case "cupon":
+        // Sin código: configuración pública del regalo. Con código: si sirve.
+        out = { ok: true, data: p.codigo ? cuponPublico(p.codigo) : cuponConfigPublica() };
+        break;
+      case "cupon_config":
+        out = { ok: true, data: p.data ? cuponConfigGuardar(parseData(p)) : cuponConfig() };
         break;
       default:
         out = { ok: false, error: "Acción desconocida: " + action };
@@ -783,7 +827,7 @@ function sanitize(key, value) {
 
 // Campos que puede mandar la tienda pública (sin token) al crear una fila.
 var CAMPOS_PUBLICOS = {
-  Pedidos: ["id", "cliente", "telefono", "email", "detalle", "monto", "notas", "envio", "montoEnvio", "pago", "items"],
+  Pedidos: ["id", "cliente", "telefono", "email", "detalle", "monto", "notas", "envio", "montoEnvio", "pago", "items", "cupon"],
   Suscriptores: ["email"],
 };
 
@@ -835,7 +879,17 @@ function validarAltaPublica(tab, obj) {
   // descuento se aplica ACÁ (la web solo lo muestra). Nunca supera los productos.
   var club = clubEstado(limpio.email, limpio.telefono);
   var descClub = club.premioDisponible ? Math.min(club.premio, calc.subtotal) : 0;
-  var total = calc.subtotal + envio - descClub;
+  // Pedidos viejos con premio que quedaron sin pagar: si este pedido usa el
+  // premio, a esos se les quita el descuento (así no se usa dos veces).
+  limpio.__premiosLiberados = descClub > 0 ? club.liberados : [];
+  // Cupón del regalo: único, de un solo uso y con vencimiento. Se valida acá.
+  var descCupon = 0, codigoCupon = String(limpio.cupon || "").trim().toUpperCase();
+  if (codigoCupon) {
+    var cu = cuponEstado(codigoCupon, limpio.telefono, limpio.email);
+    if (!cu.valido) throw new Error(cu.motivo);
+    descCupon = Math.min(cuponDescuento(cu, calc.subtotal - descClub), calc.subtotal - descClub);
+  }
+  var total = calc.subtotal + envio - descClub - descCupon;
   var enviado = Number(limpio.monto);
   // Se acepta el total con el premio aplicado o, si la web no llegó a verlo,
   // el total sin premio: el cliente nunca paga de más.
@@ -844,6 +898,7 @@ function validarAltaPublica(tab, obj) {
   }
   limpio.monto = total;
   limpio.club = descClub > 0 ? "premio $" + descClub : "";
+  limpio.cupon = descCupon > 0 ? codigoCupon + " $" + descCupon : "";
   limpio.montoEnvio = envio;
   limpio.estado = pago === "Mercado Pago" ? "pendiente de pago" : "nuevo";
   limpio.descontado = "no";
@@ -1132,6 +1187,10 @@ function telefonoClave(v) {
   if (d.indexOf("54") === 0 && d.length > 10) d = d.slice(2);
   if (d.indexOf("9") === 0 && d.length > 10) d = d.slice(1);
   d = d.replace(/^0+/, "");
+  if (d.length === 12) {
+    // Número local con el 15 después del código de área (2, 3 o 4 dígitos).
+    for (var k = 2; k <= 4; k++) if (d.slice(k, k + 2) === "15") { d = d.slice(0, k) + d.slice(k + 2); break; }
+  }
   return d.length < 8 ? "" : d.slice(-10);
 }
 
@@ -1166,25 +1225,27 @@ function emailDePedido(row, keys) {
 // posteriores (desde la fecha configurada) suman sellos.
 function clubEstado(email, telefono) {
   var cfg = clubConfig();
-  var res = { activo: cfg.activo, premio: cfg.premio, meta: cfg.meta, sellos: 0, premios: 0, premioDisponible: false };
+  var res = { activo: cfg.activo, premio: cfg.premio, meta: cfg.meta, sellos: 0, premios: 0, premioDisponible: false, liberados: [] };
   var em = low(email), tel = telefonoClave(telefono);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) em = "";
   if (!cfg.activo || (!em && !tel)) return res;
   var keys = keysOf("Pedidos");
   var data = sheetFor("Pedidos").getDataRange().getValues();
-  var iTel = keys.indexOf("telefono"), iClub = keys.indexOf("club"), iFecha = keys.indexOf("fecha");
-  var sellos = 0, premios = 0;
+  var iTel = keys.indexOf("telefono"), iClub = keys.indexOf("club"), iFecha = keys.indexOf("fecha"), iId = keys.indexOf("id");
+  var sellos = 0, premios = 0, liberados = [];
   for (var r = 1; r < data.length; r++) {
     var row = data[r];
     var mismo = (em && emailDePedido(row, keys) === em) || (tel && telefonoClave(row[iTel]) === tel);
     if (!mismo) continue;
     if (String(row[iClub] || "").indexOf("premio") === 0) {
       if (premioUsado(row, keys)) { premios++; sellos = 0; }
+      else liberados.push(String(row[iId]));
       continue;
     }
     if (cfg.desde && String(row[iFecha] || "").slice(0, 10) < cfg.desde) continue;
     if (pedidoPagado(row, keys)) sellos++;
   }
+  res.liberados = liberados;
   res.sellos = sellos;
   res.premios = premios;
   res.premioDisponible = sellos >= cfg.meta - 1;
@@ -1241,6 +1302,181 @@ function clubResumen() {
   }
   lista.sort(function (a, b) { return b.sellos - a.sellos || b.premios - a.premios; });
   return { config: cfg, clientes: lista.slice(0, 500) };
+}
+
+/* -------------------------- Regalo con cupón ----------------------------- */
+// El cliente deja su WhatsApp (y opcionalmente email) en /regalo y recibe un
+// cupón único (SUPLE-XXXXXX) de un solo uso, con vencimiento. El descuento lo
+// aplica y valida el servidor al crear el pedido. Configuración en la Propiedad
+// del Script "CUPON" (JSON: tipo "monto"|"porcentaje", valor, dias); valor 0 =
+// regalo apagado. Un pedido con cupón que queda sin pagar más de 48 h libera el
+// cupón (igual que el premio del Club).
+function cuponConfig() {
+  var c = {};
+  try { c = JSON.parse(PropertiesService.getScriptProperties().getProperty("CUPON") || "{}") || {}; } catch (e) {}
+  var tipo = c.tipo === "porcentaje" ? "porcentaje" : "monto";
+  var valor = Math.max(0, Math.round(Number(c.valor) || 0));
+  if (tipo === "porcentaje" && valor > 50) valor = 50;
+  var dias = Math.floor(Number(c.dias) || 30);
+  if (dias < 1 || dias > 365) dias = 30;
+  return { tipo: tipo, valor: valor, dias: dias, activo: valor > 0 };
+}
+
+function cuponConfigPublica() {
+  var c = cuponConfig();
+  return { activo: c.activo, tipo: c.tipo, valor: c.valor, dias: c.dias };
+}
+
+function cuponConfigGuardar(obj) {
+  var tipo = obj.tipo === "porcentaje" ? "porcentaje" : "monto";
+  var valor = Math.round(Number(obj.valor) || 0);
+  if (valor < 0 || (tipo === "porcentaje" && valor > 50) || valor > 10000000) {
+    throw new Error(tipo === "porcentaje" ? "El porcentaje tiene que ser entre 0 y 50" : "Monto inválido");
+  }
+  var dias = Math.floor(Number(obj.dias) || 30);
+  if (dias < 1 || dias > 365) throw new Error("La validez tiene que ser entre 1 y 365 días");
+  PropertiesService.getScriptProperties().setProperty("CUPON", JSON.stringify({ tipo: tipo, valor: valor, dias: dias }));
+  return cuponConfig();
+}
+
+function codigoCuponNuevo() {
+  var abc = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // sin 0/O, 1/I/L
+  for (var intento = 0; intento < 8; intento++) {
+    var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, Utilities.getUuid() + ":" + Date.now() + ":" + intento);
+    var out = "";
+    for (var i = 0; i < 6; i++) out += abc.charAt(((bytes[i] + 256) % 256) % abc.length);
+    var cod = "SUPLE-" + out;
+    if (filaCupon(cod) < 0) return cod; // nunca repetir un código existente
+  }
+  throw new Error("No se pudo generar el cupón. Probá de nuevo.");
+}
+
+function fechaMasDias(dias) {
+  return String(Utilities.formatDate(new Date(Date.now() + dias * 86400000), "GMT-3", "yyyy-MM-dd")).slice(0, 10);
+}
+
+// Alta del regalo. Si el contacto ya pidió uno, devuelve el mismo cupón.
+function leadAlta(obj) {
+  var cfg = cuponConfig();
+  if (!cfg.activo) throw new Error("El regalo no está disponible en este momento.");
+  var nombre = String(obj.nombre || "").trim().slice(0, 80);
+  var tel = telefonoClave(obj.telefono);
+  if (!tel) throw new Error("Escribí tu WhatsApp con código de área (ej. 11 5555 5555).");
+  var email = low(obj.email);
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("Email inválido");
+  var origen = String(obj.origen || "web").toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 40) || "web";
+  var keys = keysOf("Leads");
+  var data = sheetFor("Leads").getDataRange().getValues();
+  var iTel = keys.indexOf("telefono"), iEm = keys.indexOf("email"), iCod = keys.indexOf("codigo"), iVen = keys.indexOf("vence");
+  for (var r = 1; r < data.length; r++) {
+    if (telefonoClave(data[r][iTel]) === tel || (email && low(data[r][iEm]) === email)) {
+      // Ya lo pidió: no se muestra el código completo (cualquiera podría escribir
+      // un WhatsApp ajeno). Lo tiene guardado donde lo pidió o se lo reenviamos.
+      var codR = String(data[r][iCod]);
+      var est = cuponEstado(codR);
+      return { codigo: codR.slice(0, 6) + "••••" + codR.slice(-2), vence: String(data[r][iVen] || "").slice(0, 10), tipo: cfg.tipo, valor: cfg.valor, repetido: true, enmascarado: true, disponible: est.valido, motivo: est.valido ? "" : est.motivo };
+    }
+  }
+  var codigo = codigoCuponNuevo();
+  var lead = {
+    id: "lead" + Date.now() + "-" + codigo.slice(-6), // único aunque lleguen dos en el mismo milisegundo
+    nombre: nombre,
+    telefono: String(obj.telefono || "").trim().slice(0, 40),
+    email: email,
+    origen: origen,
+    codigo: codigo,
+    vence: fechaMasDias(cfg.dias),
+    usado: "",
+  };
+  addRow("Leads", lead);
+  return { codigo: lead.codigo, vence: lead.vence, tipo: cfg.tipo, valor: cfg.valor, repetido: false, disponible: true, motivo: "" };
+}
+
+function filaCupon(codigo) {
+  var cod = String(codigo || "").trim().toUpperCase();
+  if (!/^SUPLE-[A-Z0-9]{6}$/.test(cod)) return -1;
+  var keys = keysOf("Leads");
+  var col = keys.indexOf("codigo") + 1;
+  var sh = sheetFor("Leads");
+  var last = Math.max(sh.getLastRow() - 1, 0);
+  if (!last) return -1;
+  var vals = sh.getRange(2, col, last, 1).getValues();
+  for (var i = 0; i < vals.length; i++) if (String(vals[i][0]).trim().toUpperCase() === cod) return i + 2;
+  return -1;
+}
+
+// ¿El cupón se puede usar ahora? Devuelve { valido, motivo, tipo, valor, vence }.
+// Con telefono/email (al crear el pedido) además exige que sea de quien lo pidió.
+function cuponEstado(codigo, telefono, email) {
+  var cfg = cuponConfig();
+  var res = { valido: false, motivo: "", tipo: cfg.tipo, valor: cfg.valor, vence: "" };
+  if (!cfg.activo) { res.motivo = "Los cupones del regalo no están activos en este momento."; return res; }
+  var n = filaCupon(codigo);
+  if (n < 0) { res.motivo = "El cupón no existe. Revisá que esté bien escrito."; return res; }
+  var keys = keysOf("Leads");
+  var row = sheetFor("Leads").getRange(n, 1, 1, keys.length).getValues()[0];
+  res.vence = String(row[keys.indexOf("vence")] || "").slice(0, 10);
+  var hoy = String(Utilities.formatDate(new Date(), "GMT-3", "yyyy-MM-dd")).slice(0, 10);
+  if (res.vence && res.vence < hoy) { res.motivo = "El cupón venció el " + res.vence.split("-").reverse().join("/") + "."; return res; }
+  if (telefono !== undefined || email !== undefined) {
+    var telL = telefonoClave(row[keys.indexOf("telefono")]), emL = low(row[keys.indexOf("email")]);
+    var mismo = (telL && telL === telefonoClave(telefono)) || (emL && emL === low(email));
+    if (!mismo) { res.motivo = "Este cupón es personal: usalo con el mismo WhatsApp con el que lo pediste."; return res; }
+  }
+  var usado = String(row[keys.indexOf("usado")] || "").trim();
+  if (usado) {
+    var nP = findRowById("Pedidos", usado);
+    if (nP > 0) {
+      var kP = keysOf("Pedidos");
+      var rowP = sheetFor("Pedidos").getRange(nP, 1, 1, kP.length).getValues()[0];
+      // Pagado, entregado o reciente (reservado 48 h): ya se usó.
+      if (premioUsado(rowP, kP)) { res.motivo = "Este cupón ya se usó."; return res; }
+    }
+    // El pedido se borró o quedó sin pagar más de 48 h: el cupón vuelve a servir.
+  }
+  res.valido = true;
+  return res;
+}
+
+function cuponPublico(codigo) {
+  var e = cuponEstado(codigo);
+  return { valido: e.valido, motivo: e.motivo, tipo: e.tipo, valor: e.valor, vence: e.vence };
+}
+
+// Descuento del cupón sobre el importe de los productos (sin envío).
+function cuponDescuento(cu, base) {
+  if (base <= 0) return 0;
+  return cu.tipo === "porcentaje" ? Math.round((base * cu.valor) / 100) : cu.valor;
+}
+
+function marcarCuponUsado(codigo, pedidoId) {
+  var n = filaCupon(codigo);
+  if (n < 0) return;
+  var keys = keysOf("Leads");
+  var celda = sheetFor("Leads").getRange(n, keys.indexOf("usado") + 1);
+  var anterior = String(celda.getValue() || "").trim();
+  if (anterior && anterior !== pedidoId) quitarDescuentoPedido(anterior, "cupon", pedidoId);
+  celda.setValue(pedidoId);
+}
+
+// Un pedido sin pagar perdió su descuento (cupón o premio) porque se liberó y
+// se usó en otro: vuelve al precio completo y queda anotado. Si después llega
+// un pago por el monto viejo, el webhook lo marca "revisar pago".
+function quitarDescuentoPedido(id, campo, nuevoPedido) {
+  var n = findRowById("Pedidos", id);
+  if (n < 0) return;
+  var keys = keysOf("Pedidos");
+  var row = sheetFor("Pedidos").getRange(n, 1, 1, keys.length).getValues()[0];
+  if (pedidoPagado(row, keys)) return;
+  var txt = String(row[keys.indexOf(campo)] || "");
+  var m = txt.match(/\$(\d+)/);
+  if (!m) return;
+  var cambios = {};
+  cambios[campo] = "liberado"; // "" no pisa la celda (updateRowByNumber ignora vacíos)
+  cambios.monto = (Number(row[keys.indexOf("monto")]) || 0) + Number(m[1]);
+  var notas = String(row[keys.indexOf("notas")] || "");
+  cambios.notas = (notas ? notas + " · " : "") + "Sin " + (campo === "cupon" ? "cupón" : "premio del Club") + " ($" + m[1] + "): se liberó a las 48 h y se usó en " + nuevoPedido;
+  updateRowByNumber("Pedidos", n, cambios);
 }
 
 /* ------------------------------ Productos -------------------------------- */
@@ -2062,6 +2298,8 @@ function esAccionPublica(action, p) {
     case "crm_login":
     case "crm_logout":
     case "club":
+    case "lead":
+    case "cupon":
       return true;
     case "list":
       return p.tab === "Categorias";
