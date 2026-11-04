@@ -251,6 +251,7 @@ var LIMITES = {
   comprobante: { porId: [6, 600],  global: [30, 60] },
   club:        { porId: [12, 600], global: [120, 60] },
   lead:        { porId: [4, 600],  global: [30, 60] },
+  leadDia:     { global: [300, 86400] },
   cupon:       { porId: [10, 600], global: [60, 60] },
   crm:         { global: [30, 60] },
 };
@@ -295,6 +296,7 @@ function controlarAbuso(action, p) {
     case "lead":
       trampa();
       limitar("lead", String(datos().telefono || "").replace(/\D/g, "") || datos().email);
+      limitar("leadDia", "");
       break;
     case "cupon":
       limitar("cupon", p.codigo || "config");
@@ -378,7 +380,10 @@ function ejecutar(action, p, e, esAdmin) {
           out = alta.__repetido
             ? { ok: true, data: { id: alta.id }, repetido: true }
             : { ok: true, data: addRow(p.tab, alta) };
-          if (!alta.__repetido && p.tab === "Pedidos" && alta.cupon) marcarCuponUsado(String(alta.cupon).split(" ")[0], alta.id);
+          if (!alta.__repetido && p.tab === "Pedidos") {
+            if (alta.cupon) marcarCuponUsado(String(alta.cupon).split(" ")[0], alta.id);
+            (alta.__premiosLiberados || []).forEach(function (idL) { quitarDescuentoPedido(idL, "club", alta.id); });
+          }
         }
         break;
       case "update":
@@ -435,7 +440,9 @@ function ejecutar(action, p, e, esAdmin) {
       case "club":
         // Estado del Club de sellos de un cliente (público, con límite). Sin
         // email ni teléfono devuelve solo la configuración (premio y meta).
-        out = { ok: true, data: clubEstado(p.email, p.telefono) };
+        var ce = clubEstado(p.email, p.telefono);
+        delete ce.liberados;
+        out = { ok: true, data: ce };
         break;
       case "club_resumen":
         out = { ok: true, data: clubResumen() };
@@ -872,10 +879,13 @@ function validarAltaPublica(tab, obj) {
   // descuento se aplica ACÁ (la web solo lo muestra). Nunca supera los productos.
   var club = clubEstado(limpio.email, limpio.telefono);
   var descClub = club.premioDisponible ? Math.min(club.premio, calc.subtotal) : 0;
+  // Pedidos viejos con premio que quedaron sin pagar: si este pedido usa el
+  // premio, a esos se les quita el descuento (así no se usa dos veces).
+  limpio.__premiosLiberados = descClub > 0 ? club.liberados : [];
   // Cupón del regalo: único, de un solo uso y con vencimiento. Se valida acá.
   var descCupon = 0, codigoCupon = String(limpio.cupon || "").trim().toUpperCase();
   if (codigoCupon) {
-    var cu = cuponEstado(codigoCupon);
+    var cu = cuponEstado(codigoCupon, limpio.telefono, limpio.email);
     if (!cu.valido) throw new Error(cu.motivo);
     descCupon = Math.min(cuponDescuento(cu, calc.subtotal - descClub), calc.subtotal - descClub);
   }
@@ -1215,25 +1225,27 @@ function emailDePedido(row, keys) {
 // posteriores (desde la fecha configurada) suman sellos.
 function clubEstado(email, telefono) {
   var cfg = clubConfig();
-  var res = { activo: cfg.activo, premio: cfg.premio, meta: cfg.meta, sellos: 0, premios: 0, premioDisponible: false };
+  var res = { activo: cfg.activo, premio: cfg.premio, meta: cfg.meta, sellos: 0, premios: 0, premioDisponible: false, liberados: [] };
   var em = low(email), tel = telefonoClave(telefono);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) em = "";
   if (!cfg.activo || (!em && !tel)) return res;
   var keys = keysOf("Pedidos");
   var data = sheetFor("Pedidos").getDataRange().getValues();
-  var iTel = keys.indexOf("telefono"), iClub = keys.indexOf("club"), iFecha = keys.indexOf("fecha");
-  var sellos = 0, premios = 0;
+  var iTel = keys.indexOf("telefono"), iClub = keys.indexOf("club"), iFecha = keys.indexOf("fecha"), iId = keys.indexOf("id");
+  var sellos = 0, premios = 0, liberados = [];
   for (var r = 1; r < data.length; r++) {
     var row = data[r];
     var mismo = (em && emailDePedido(row, keys) === em) || (tel && telefonoClave(row[iTel]) === tel);
     if (!mismo) continue;
     if (String(row[iClub] || "").indexOf("premio") === 0) {
       if (premioUsado(row, keys)) { premios++; sellos = 0; }
+      else liberados.push(String(row[iId]));
       continue;
     }
     if (cfg.desde && String(row[iFecha] || "").slice(0, 10) < cfg.desde) continue;
     if (pedidoPagado(row, keys)) sellos++;
   }
+  res.liberados = liberados;
   res.sellos = sellos;
   res.premios = premios;
   res.premioDisponible = sellos >= cfg.meta - 1;
@@ -1358,8 +1370,11 @@ function leadAlta(obj) {
   var iTel = keys.indexOf("telefono"), iEm = keys.indexOf("email"), iCod = keys.indexOf("codigo"), iVen = keys.indexOf("vence");
   for (var r = 1; r < data.length; r++) {
     if (telefonoClave(data[r][iTel]) === tel || (email && low(data[r][iEm]) === email)) {
-      var est = cuponEstado(String(data[r][iCod]));
-      return { codigo: String(data[r][iCod]), vence: String(data[r][iVen] || "").slice(0, 10), tipo: cfg.tipo, valor: cfg.valor, repetido: true, disponible: est.valido, motivo: est.valido ? "" : est.motivo };
+      // Ya lo pidió: no se muestra el código completo (cualquiera podría escribir
+      // un WhatsApp ajeno). Lo tiene guardado donde lo pidió o se lo reenviamos.
+      var codR = String(data[r][iCod]);
+      var est = cuponEstado(codR);
+      return { codigo: codR.slice(0, 6) + "••••" + codR.slice(-2), vence: String(data[r][iVen] || "").slice(0, 10), tipo: cfg.tipo, valor: cfg.valor, repetido: true, enmascarado: true, disponible: est.valido, motivo: est.valido ? "" : est.motivo };
     }
   }
   var codigo = codigoCuponNuevo();
@@ -1391,7 +1406,8 @@ function filaCupon(codigo) {
 }
 
 // ¿El cupón se puede usar ahora? Devuelve { valido, motivo, tipo, valor, vence }.
-function cuponEstado(codigo) {
+// Con telefono/email (al crear el pedido) además exige que sea de quien lo pidió.
+function cuponEstado(codigo, telefono, email) {
   var cfg = cuponConfig();
   var res = { valido: false, motivo: "", tipo: cfg.tipo, valor: cfg.valor, vence: "" };
   if (!cfg.activo) { res.motivo = "Los cupones del regalo no están activos en este momento."; return res; }
@@ -1402,6 +1418,11 @@ function cuponEstado(codigo) {
   res.vence = String(row[keys.indexOf("vence")] || "").slice(0, 10);
   var hoy = String(Utilities.formatDate(new Date(), "GMT-3", "yyyy-MM-dd")).slice(0, 10);
   if (res.vence && res.vence < hoy) { res.motivo = "El cupón venció el " + res.vence.split("-").reverse().join("/") + "."; return res; }
+  if (telefono !== undefined || email !== undefined) {
+    var telL = telefonoClave(row[keys.indexOf("telefono")]), emL = low(row[keys.indexOf("email")]);
+    var mismo = (telL && telL === telefonoClave(telefono)) || (emL && emL === low(email));
+    if (!mismo) { res.motivo = "Este cupón es personal: usalo con el mismo WhatsApp con el que lo pediste."; return res; }
+  }
   var usado = String(row[keys.indexOf("usado")] || "").trim();
   if (usado) {
     var nP = findRowById("Pedidos", usado);
@@ -1432,7 +1453,30 @@ function marcarCuponUsado(codigo, pedidoId) {
   var n = filaCupon(codigo);
   if (n < 0) return;
   var keys = keysOf("Leads");
-  sheetFor("Leads").getRange(n, keys.indexOf("usado") + 1).setValue(pedidoId);
+  var celda = sheetFor("Leads").getRange(n, keys.indexOf("usado") + 1);
+  var anterior = String(celda.getValue() || "").trim();
+  if (anterior && anterior !== pedidoId) quitarDescuentoPedido(anterior, "cupon", pedidoId);
+  celda.setValue(pedidoId);
+}
+
+// Un pedido sin pagar perdió su descuento (cupón o premio) porque se liberó y
+// se usó en otro: vuelve al precio completo y queda anotado. Si después llega
+// un pago por el monto viejo, el webhook lo marca "revisar pago".
+function quitarDescuentoPedido(id, campo, nuevoPedido) {
+  var n = findRowById("Pedidos", id);
+  if (n < 0) return;
+  var keys = keysOf("Pedidos");
+  var row = sheetFor("Pedidos").getRange(n, 1, 1, keys.length).getValues()[0];
+  if (pedidoPagado(row, keys)) return;
+  var txt = String(row[keys.indexOf(campo)] || "");
+  var m = txt.match(/\$(\d+)/);
+  if (!m) return;
+  var cambios = {};
+  cambios[campo] = "liberado"; // "" no pisa la celda (updateRowByNumber ignora vacíos)
+  cambios.monto = (Number(row[keys.indexOf("monto")]) || 0) + Number(m[1]);
+  var notas = String(row[keys.indexOf("notas")] || "");
+  cambios.notas = (notas ? notas + " · " : "") + "Sin " + (campo === "cupon" ? "cupón" : "premio del Club") + " ($" + m[1] + "): se liberó a las 48 h y se usó en " + nuevoPedido;
+  updateRowByNumber("Pedidos", n, cambios);
 }
 
 /* ------------------------------ Productos -------------------------------- */

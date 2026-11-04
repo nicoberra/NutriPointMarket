@@ -577,8 +577,12 @@ console.log("Club de sellos");
   check("E: 6ta compra con premio (sin pagar, reciente) reserva el premio", re.data.club === "premio $5000" && club("clube@test.com").premioDisponible === false && club("clube@test.com").premios === 1);
   filaPedido("ped1792000000810")[kP.indexOf("fecha")] = "2026-01-01 10:00";
   check("  ...si pasan 48 h sin pagarlo, se libera: vuelve a tener el premio", club("clube@test.com").premioDisponible === true && club("clube@test.com").sellos === 5 && club("clube@test.com").premios === 0);
+  check("  ...la consulta pública no muestra ids de pedidos", !("liberados" in club("clube@test.com")));
+  const re2 = addPedido({ id: "ped1792000000811", cliente: "Club E", email: "clube@test.com", monto: 5000, pago: "Transferencia", items: items([{ n: "Sello Test", q: 10 }]) });
+  const v810 = filaPedido("ped1792000000810");
+  check("  ...usar el premio en otro pedido le quita el descuento al viejo", re2.ok && re2.data.club === "premio $5000" && v810[kP.indexOf("club")] === "liberado" && v810[kP.indexOf("monto")] === 10000 && /Sin premio/.test(v810[kP.indexOf("notas")]), [v810[kP.indexOf("monto")], v810[kP.indexOf("notas")]]);
   pagar("ped1792000000810");
-  check("  ...y si al final se paga, cuenta como usado", club("clube@test.com").premios === 1 && club("clube@test.com").sellos === 0);
+  check("  ...si el viejo se paga igual, cuenta como sello (sin premio) y el premio es el del nuevo", club("clube@test.com").premios === 1);
 
   // "Contar desde": las compras anteriores a la fecha no suman.
   call({ action: "club_config", token: tok, data: JSON.stringify({ premio: 5000, meta: 6, desde: "2026-02-01" }) });
@@ -636,7 +640,7 @@ console.log("Regalo con cupón");
   const filaL = book.sheets.Leads.rows.find((r) => r[kL.indexOf("codigo")] === l1.data.codigo);
   check("  ...guardado en Leads con origen limpio y vencimiento", filaL && filaL[kL.indexOf("origen")] === "ig-reel" && /^\d{4}-\d{2}-\d{2}$/.test(filaL[kL.indexOf("vence")]));
   const l2 = lead({ nombre: "Ana", telefono: "+54 9 11 5555-0010" });
-  check("mismo WhatsApp (otro formato) → mismo cupón, sin fila nueva", l2.ok && l2.data.codigo === l1.data.codigo && l2.data.repetido === true && book.sheets.Leads.rows.length === 2);
+  check("mismo WhatsApp (otro formato) → no crea otro ni muestra el código completo", l2.ok && l2.data.repetido === true && l2.data.enmascarado === true && l2.data.codigo !== l1.data.codigo && l2.data.codigo.slice(-2) === l1.data.codigo.slice(-2) && book.sheets.Leads.rows.length === 2, l2);
   check("consultar cupón válido", cupon(l1.data.codigo).data.valido === true);
   check("consultar cupón en minúsculas también", cupon(l1.data.codigo.toLowerCase()).data.valido === true);
   check("cupón inexistente", cupon("SUPLE-ZZZZZZ").data.valido === false && /no existe/.test(cupon("SUPLE-ZZZZZZ").data.motivo));
@@ -646,15 +650,19 @@ console.log("Regalo con cupón");
   check("pedido con cupón: descuento aplicado en el servidor", r1.ok && r1.data.monto === 7000 && r1.data.cupon === l1.data.codigo + " $3000", r1);
   check("  ...el cupón queda marcado con el pedido", book.sheets.Leads.rows.find((r) => r[kL.indexOf("codigo")] === l1.data.codigo)[kL.indexOf("usado")] === "ped1793000000001");
   check("  ...ya no sirve para otro pedido", cupon(l1.data.codigo).data.valido === false && /ya se usó/.test(cupon(l1.data.codigo).data.motivo));
-  const r1b = addPedido({ id: "ped1793000000002", cliente: "Otro", telefono: "1155559999", monto: 7000, pago: "Transferencia", items: items([{ n: "Cupon Test", q: 1 }]), cupon: l1.data.codigo });
+  const r1b = addPedido({ id: "ped1793000000002", cliente: "Ana", telefono: "1155550010", monto: 7000, pago: "Transferencia", items: items([{ n: "Cupon Test", q: 1 }]), cupon: l1.data.codigo });
   check("  ...usarlo de nuevo → rechazo sin crear pedido", r1b.ok === false && /ya se usó/.test(r1b.error) && !filaPedido("ped1793000000002"));
+  const r1d = addPedido({ id: "ped1793000000009", cliente: "Otro", telefono: "1155559999", email: "otro@test.com", monto: 7000, pago: "Transferencia", items: items([{ n: "Cupon Test", q: 1 }]), cupon: l1.data.codigo });
+  check("  ...con otro WhatsApp → 'es personal'", r1d.ok === false && /es personal/.test(r1d.error));
   const r1c = addPedido({ id: "ped1793000000001", cliente: "Ana", telefono: "1155550010", monto: 7000, pago: "Transferencia", items: items([{ n: "Cupon Test", q: 1 }]), cupon: l1.data.codigo });
   check("  ...reintento del MISMO pedido no falla", r1c.ok === true && r1c.repetido === true);
   // Pedido sin pagar más de 48 h: el cupón se libera.
   filaPedido("ped1793000000001")[kP.indexOf("fecha")] = "2026-01-01 10:00";
   check("pedido con cupón sin pagar 48 h → el cupón vuelve a servir", cupon(l1.data.codigo).data.valido === true);
-  filaPedido("ped1793000000001")[kP.indexOf("fecha")] = "2099-01-01 10:00";
-  pagar("ped1793000000001");
+  const r1e = addPedido({ id: "ped1793000000010", cliente: "Ana", telefono: "1155550010", monto: 7000, pago: "Transferencia", items: items([{ n: "Cupon Test", q: 1 }]), cupon: l1.data.codigo });
+  const viejo = filaPedido("ped1793000000001");
+  check("  ...usarlo en otro pedido le quita el descuento al viejo (no se usa dos veces)", r1e.ok && viejo[kP.indexOf("cupon")] === "liberado" && viejo[kP.indexOf("monto")] === 10000 && /Sin cupón/.test(viejo[kP.indexOf("notas")]), [viejo[kP.indexOf("monto")], viejo[kP.indexOf("notas")]]);
+  pagar("ped1793000000010");
   check("pedido pagado → usado para siempre", cupon(l1.data.codigo).data.valido === false);
 
   // Total manipulado con cupón

@@ -735,6 +735,8 @@ export interface LeadResultado {
   valor: number;
   /** true = ese WhatsApp/email ya había pedido el regalo (se devuelve el mismo cupón). */
   repetido: boolean;
+  /** true = ya lo había pedido: el código viene tapado (SUPLE-••••AB). */
+  enmascarado: boolean;
   disponible: boolean;
   motivo: string;
 }
@@ -781,6 +783,7 @@ export async function pedirRegalo(d: { nombre: string; telefono: string; email: 
     tipo: tipoCupon(r.data.tipo),
     valor: toNum(r.data.valor),
     repetido: r.data.repetido === true,
+    enmascarado: r.data.enmascarado === true,
     disponible: r.data.disponible !== false,
     motivo: String(r.data.motivo ?? ""),
   };

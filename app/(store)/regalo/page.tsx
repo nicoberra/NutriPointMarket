@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { cuponConfigPublica, pedirRegalo, type CuponConfig, type LeadResultado } from "@/lib/api";
-import { guardarCupon, textoRegalo } from "@/lib/cupon";
+import { guardarCupon, leerCupon, textoRegalo } from "@/lib/cupon";
 import { whatsappLink } from "@/lib/config";
 import { Trampa, leerTrampa } from "@/components/Trampa";
 import { CheckIcon, WhatsappIcon } from "@/components/Icons";
@@ -64,8 +64,14 @@ export default function RegaloPage() {
         origen: origen.current,
         hp: leerTrampa(e.currentTarget),
       });
-      if (r.disponible) guardarCupon({ codigo: r.codigo, tipo: r.tipo, valor: r.valor });
-      setRes(r);
+      if (r.enmascarado) {
+        // Ya lo había pedido: si está guardado en este celular, se muestra completo.
+        const g = leerCupon();
+        setRes(g && g.codigo.slice(-2) === r.codigo.slice(-2) ? { ...r, codigo: g.codigo, enmascarado: false } : r);
+      } else {
+        if (r.disponible) guardarCupon({ codigo: r.codigo, tipo: r.tipo, valor: r.valor });
+        setRes(r);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo generar tu cupón. Probá de nuevo.");
     } finally {
@@ -143,10 +149,29 @@ export default function RegaloPage() {
         <div ref={tarjeta} className="animate-slide-up scroll-mt-28 [animation-delay:200ms] motion-reduce:animate-none">
           {res ? (
             <div className="rounded-3xl bg-white p-6 shadow-drawer sm:p-8">
-              {res.disponible ? (
+              {res.enmascarado ? (
+                <>
+                  <p className="font-display text-xl font-bold text-primary">Ya pediste tu cupón</p>
+                  <p className="mt-2 text-sm text-muted">
+                    Con ese WhatsApp ya hay un cupón ({res.codigo}). Lo tenés guardado en el celular donde lo pediste y
+                    se aplica solo al confirmar el pedido. Si no lo encontrás, escribinos y te lo reenviamos.
+                  </p>
+                  <a
+                    href={whatsappLink(`Hola Suple Market! Pedí el regalo pero no encuentro mi cupón (${res.codigo}). ¿Me lo reenvían?`)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-md mt-5 w-full bg-[#25D366] font-bold text-white hover:brightness-105"
+                  >
+                    <WhatsappIcon className="h-5 w-5" /> Pedir que me lo reenvíen
+                  </a>
+                  <Link href="/productos" className="btn btn-outline btn-md mt-3 w-full">
+                    Ver productos
+                  </Link>
+                </>
+              ) : res.disponible ? (
                 <>
                   <p className="text-sm font-semibold text-muted">
-                    {res.repetido ? "Ya tenías tu cupón: acá está de nuevo" : "¡Listo! Este es tu cupón"}
+                    {res.repetido ? "Ya tenías tu cupón guardado acá" : "¡Listo! Este es tu cupón"}
                   </p>
                   {/* Ticket */}
                   <div className="relative mt-4 overflow-hidden rounded-2xl border-2 border-dashed border-primary/30 bg-accent-soft px-5 py-6 text-center">
