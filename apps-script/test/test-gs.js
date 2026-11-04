@@ -567,6 +567,19 @@ console.log("Club de sellos");
   book.sheets.Pedidos.rows.push(rowFrom("Pedidos", { id: "ped1792000000501", fecha: "2026-01-06 10:00", cliente: "Viejo", monto: 1000, pago: "Efectivo", estado: "nuevo", notas: "Email: viejo@test.com" }));
   check("  ...un pedido sin pagar ni entregar no suma", club("viejo@test.com").sellos === 1);
 
+  // Pedido con premio que quedó sin pagar más de 48 h: el premio se libera.
+  for (let i = 0; i < 5; i++) {
+    const id = "ped1792000000" + (800 + i);
+    addPedido({ id, cliente: "Club E", email: "clube@test.com", monto: 1000, pago: "Transferencia", items: items([{ n: "Sello Test", q: 1 }]) });
+    pagar(id);
+  }
+  const re = addPedido({ id: "ped1792000000810", cliente: "Club E", email: "clube@test.com", monto: 5000, pago: "Transferencia", items: items([{ n: "Sello Test", q: 10 }]) });
+  check("E: 6ta compra con premio (sin pagar, reciente) reserva el premio", re.data.club === "premio $5000" && club("clube@test.com").premioDisponible === false && club("clube@test.com").premios === 1);
+  filaPedido("ped1792000000810")[kP.indexOf("fecha")] = "2026-01-01 10:00";
+  check("  ...si pasan 48 h sin pagarlo, se libera: vuelve a tener el premio", club("clube@test.com").premioDisponible === true && club("clube@test.com").sellos === 5 && club("clube@test.com").premios === 0);
+  pagar("ped1792000000810");
+  check("  ...y si al final se paga, cuenta como usado", club("clube@test.com").premios === 1 && club("clube@test.com").sellos === 0);
+
   // "Contar desde": las compras anteriores a la fecha no suman.
   call({ action: "club_config", token: tok, data: JSON.stringify({ premio: 5000, meta: 6, desde: "2026-02-01" }) });
   check("contar desde una fecha: el pedido viejo deja de sumar", club("viejo@test.com").sellos === 0);

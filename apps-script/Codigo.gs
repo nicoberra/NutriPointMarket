@@ -233,7 +233,7 @@ var LIMITES = {
   login:       { porId: [15, 600], global: [120, 60] },
   mp:          { porId: [8, 600],  global: [60, 60] },
   comprobante: { porId: [6, 600],  global: [30, 60] },
-  club:        { porId: [30, 600], global: [120, 60] },
+  club:        { porId: [12, 600], global: [120, 60] },
   crm:         { global: [30, 60] },
 };
 var MSG_LIMITE = "Hiciste muchos intentos seguidos. Esperá unos minutos y volvé a probar.";
@@ -1140,6 +1140,17 @@ function pedidoPagado(row, keys) {
   return low(row[keys.indexOf("cobrado")]) === "sí" || est === "pagado" || est === "entregado";
 }
 
+// ¿Este pedido con premio cuenta como premio usado? Sí si está pagado o
+// entregado, o si es reciente (48 h: el premio queda reservado mientras se
+// paga). Si quedó sin pagar más tiempo, se libera y el cliente conserva sus
+// sellos (así un pedido abandonado o ajeno no le quema el premio).
+var CLUB_RESERVA_MS = 48 * 3600 * 1000;
+function premioUsado(row, keys) {
+  if (pedidoPagado(row, keys)) return true;
+  var f = Date.parse(String(row[keys.indexOf("fecha")] || "").trim().replace(" ", "T") + ":00-03:00");
+  return !isFinite(f) || Date.now() - f < CLUB_RESERVA_MS;
+}
+
 // Email del pedido: columna Email o, en pedidos viejos, "Email: x" en las notas.
 function emailDePedido(row, keys) {
   var e = low(row[keys.indexOf("email")]);
@@ -1167,7 +1178,10 @@ function clubEstado(email, telefono) {
     var row = data[r];
     var mismo = (em && emailDePedido(row, keys) === em) || (tel && telefonoClave(row[iTel]) === tel);
     if (!mismo) continue;
-    if (String(row[iClub] || "").indexOf("premio") === 0) { premios++; sellos = 0; continue; }
+    if (String(row[iClub] || "").indexOf("premio") === 0) {
+      if (premioUsado(row, keys)) { premios++; sellos = 0; }
+      continue;
+    }
     if (cfg.desde && String(row[iFecha] || "").slice(0, 10) < cfg.desde) continue;
     if (pedidoPagado(row, keys)) sellos++;
   }
@@ -1210,7 +1224,10 @@ function clubResumen() {
     if (!gr.nombre && row[iNom]) gr.nombre = String(row[iNom]);
     if (!gr.email && em) gr.email = em;
     if (!gr.telefono && tel) gr.telefono = String(row[iTel]);
-    if (String(row[iClub] || "").indexOf("premio") === 0) { gr.premios++; gr.sellos = 0; gr.ultima = String(row[iFecha] || ""); continue; }
+    if (String(row[iClub] || "").indexOf("premio") === 0) {
+      if (premioUsado(row, keys)) { gr.premios++; gr.sellos = 0; gr.ultima = String(row[iFecha] || ""); }
+      continue;
+    }
     if (cfg.desde && String(row[iFecha] || "").slice(0, 10) < cfg.desde) continue;
     if (pedidoPagado(row, keys)) { gr.sellos++; gr.ultima = String(row[iFecha] || ""); }
   }
