@@ -7,7 +7,8 @@ import type { Product } from "@/lib/types";
 import { brandName } from "@/data/brands";
 import { categoryMap } from "@/data/categories";
 import { formatPrice } from "@/lib/format";
-import { transferPrice } from "@/lib/config";
+import { PROMO_DESTACADOS, transferPrice } from "@/lib/config";
+import { usePromoDestacados } from "@/lib/promo";
 import { useCart } from "@/context/CartContext";
 import { useProducts } from "@/context/ProductsContext";
 import { availableVariants, comboComponents, comboStockMax } from "@/lib/stock";
@@ -47,6 +48,7 @@ export function ProductCard({ product, priority = false }: { product: Product; p
   // "Última unidad": queda exactamente 1 (de la variante elegida, del combo
   // según lo elegido, o del producto si no usa variantes).
   const selVar = product.variants?.find((v) => v.name === flavor);
+  const promo = usePromoDestacados();
   const lastOne =
     product.combo && product.combo.length
       ? comboStockMax(product, allProducts, choices) === 1
@@ -60,6 +62,9 @@ export function ProductCard({ product, priority = false }: { product: Product; p
       <div className="relative">
         {/* Etiquetas superiores */}
         <div className="absolute left-2.5 top-2.5 z-10 flex flex-col gap-1.5">
+          {promo && product.featured && (
+            <span className="badge bg-accent text-primary shadow-soft">⚡ {PROMO_DESTACADOS.nombre}</span>
+          )}
           {product.discount > 0 && (
             <span className="badge bg-sale text-white shadow-soft">
               {product.discount}% OFF

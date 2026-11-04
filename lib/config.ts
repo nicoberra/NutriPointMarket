@@ -200,3 +200,21 @@ export function listPrice(base: number): number {
   if (!base || base <= 0) return 0;
   return Math.round(base / (1 - TRANSFER_DISCOUNT) / 100) * 100;
 }
+
+/* ----------------------------- Promo Cyber Week ----------------------------- */
+/**
+ * Mientras la promo está activa, los productos destacados se muestran en la
+ * tienda con la etiqueta "Cyber Week" (tarjetas, ficha y carrusel de la home).
+ * Pasada la fecha, la etiqueta desaparece sola y los destacados siguen normales.
+ * Para otra promo alcanza con cambiar el nombre y la fecha de fin.
+ */
+export const PROMO_DESTACADOS = {
+  nombre: "Cyber Week",
+  /** Último momento de la promo (hora argentina). */
+  hasta: "2026-11-08T23:59:59-03:00",
+} as const;
+
+/** ¿La promo de destacados está vigente en este momento? */
+export function promoDestacadosActiva(ahora: number = Date.now()): boolean {
+  return ahora <= new Date(PROMO_DESTACADOS.hasta).getTime();
+}

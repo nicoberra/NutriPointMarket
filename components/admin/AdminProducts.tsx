@@ -9,7 +9,7 @@ import { PhotoViewer } from "./PhotoViewer";
 import { MarcaCombo } from "./MarcaCombo";
 import { ComboPicker, type FilaCombo } from "./ComboPicker";
 import { MoneyInput, formatoPlata } from "./MoneyInput";
-import type { Product } from "@/lib/types";
+import type { Category, Product } from "@/lib/types";
 import { useProducts } from "@/context/ProductsContext";
 import { fotosDeComponentes } from "@/lib/stock";
 import { useCategories } from "@/context/CategoriesContext";
@@ -25,7 +25,10 @@ import { formatPrice } from "@/lib/format";
 import { listPrice } from "@/lib/config";
 import { categoryMap } from "@/data/categories";
 import { categoriasDe, estaEnCategoria, SEP_CATEGORIAS } from "@/lib/categorias";
-import { SearchIcon, CloseIcon, CheckIcon, PlusIcon, TrashIcon, ChevronDownIcon, PackageIcon } from "@/components/Icons";
+import { SearchIcon, CloseIcon, CheckIcon, PlusIcon, TrashIcon, ChevronDownIcon, PackageIcon, StarIcon } from "@/components/Icons";
+
+/** Valor del filtro de categorías para ver solo los productos destacados. */
+const DESTACADOS = "__destacados__";
 import { AdminCategories } from "./AdminCategories";
 import { EmptyState } from "@/components/Estados";
 
@@ -54,6 +57,7 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
   const { categories } = useCategories();
   const dollar = useDollar();
   const [q, setQ] = useState("");
+  // "" = todas · DESTACADOS = solo los destacados · otro valor = slug de categoría.
   const [cat, setCat] = useState<string>("");
   const [editing, setEditing] = useState<Product | null>(null);
   const [adding, setAdding] = useState(false);
@@ -65,7 +69,9 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
     return products.filter((p) => {
-      if (cat && !estaEnCategoria(p, cat)) return false;
+      if (cat === DESTACADOS) {
+        if (!p.featured) return false;
+      } else if (cat && !estaEnCategoria(p, cat)) return false;
       if (query && !`${p.name} ${p.brand}`.toLowerCase().includes(query)) return false;
       return true;
     });
@@ -189,12 +195,14 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
   };
 
   // Grupos por categoría (solo cuando el filtro es "Todas").
-  const groups =
+  const groups: { cat?: Category; titulo?: string; list: Product[] }[] =
     cat === ""
       ? categories
           .map((c) => ({ cat: c, list: filtered.filter((p) => categoriasDe(p).includes(c.slug)) }))
           .filter((g) => g.list.length > 0)
-      : [{ cat: categoryMap[cat], list: filtered }];
+      : cat === DESTACADOS
+        ? [{ cat: undefined, titulo: "Destacados", list: filtered }]
+        : [{ cat: categoryMap[cat], list: filtered }];
 
   return (
     <div className="space-y-4">
@@ -235,6 +243,9 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
         <Chip active={cat === ""} onClick={() => setCat("")}>
           Todas
         </Chip>
+        <Chip active={cat === DESTACADOS} onClick={() => setCat(DESTACADOS)}>
+          <StarIcon className="h-3.5 w-3.5" /> Destacados
+        </Chip>
         {categories.map((c) => (
           <Chip key={c.slug} active={cat === c.slug} onClick={() => setCat(c.slug)}>
             {c.name}
@@ -257,9 +268,9 @@ export function AdminProducts({ onToast }: { onToast: (m: string) => void }) {
         />
       ) : (
         groups.map((g) => (
-          <section key={g.cat?.slug ?? "otros"}>
+          <section key={g.cat?.slug ?? g.titulo ?? "otros"}>
             <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-primary">
-              {g.cat?.name ?? "Otros"}
+              {g.cat?.name ?? g.titulo ?? "Otros"}
               <span className="text-xs font-normal text-muted">({g.list.length})</span>
               {g.cat && (
                 <CopyLinkButton url={`https://suplemarket.com.ar${categoryHref(g.cat.slug)}`} title={`Copiar link de ${g.cat.name}`} />
@@ -967,7 +978,7 @@ function Chip({
   return (
     <button
       onClick={onClick}
-      className={`shrink-0 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
+      className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
         active ? "border-primary bg-primary text-white" : "border-line bg-white text-muted"
       }`}
     >
