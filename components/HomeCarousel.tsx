@@ -39,9 +39,11 @@ export function HomeCarousel({ kind }: { kind: keyof typeof CONFIG }) {
   const promo = usePromoDestacados();
   // Con la promo vigente, los destacados se presentan como promos de la Cyber Week
   // (el bloque "Elegidos" toma el título de la promo; "Destacados" solo el antetítulo).
-  const c =
-    promo && kind !== "bestSellers"
-      ? { ...CONFIG[kind], eyebrow: `⚡ ${PROMO_DESTACADOS.nombre}`, ...(kind === "onSale" ? { title: `Promos ${PROMO_DESTACADOS.nombre}` } : {}) }
+  const promoGrande = promo && kind === "onSale";
+  const c = promoGrande
+    ? { ...CONFIG[kind], eyebrow: "", title: `Promo ${PROMO_DESTACADOS.nombre}` }
+    : promo && kind === "featured"
+      ? { ...CONFIG[kind], eyebrow: `⚡ ${PROMO_DESTACADOS.nombre}` }
       : CONFIG[kind];
 
   if (!list.length) return loading ? <ProductSkeletonRow /> : null;
@@ -54,6 +56,7 @@ export function HomeCarousel({ kind }: { kind: keyof typeof CONFIG }) {
         products={list}
         eyebrow={c.eyebrow}
         title={c.title}
+        tituloGrande={promoGrande}
         viewAllHref={c.viewAllHref}
         video={c.video}
         poster={c.bg || undefined}

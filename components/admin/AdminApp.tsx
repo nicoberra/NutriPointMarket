@@ -130,6 +130,12 @@ export function AdminApp() {
     };
   }, []);
   const [section, setSection] = useState<Section>("dashboard");
+  // Producto que el Inicio pide abrir en Productos (avisos "Sin foto" / "Sin stock").
+  const [productoBuscado, setProductoBuscado] = useState("");
+  const ir = (s: Section) => {
+    setProductoBuscado("");
+    setSection(s);
+  };
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
@@ -249,7 +255,7 @@ export function AdminApp() {
             return (
               <button
                 key={id}
-                onClick={() => setSection(id)}
+                onClick={() => ir(id)}
                 className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${
                   active ? "text-white" : "text-white/70 hover:bg-white/10"
                 }`}
@@ -334,10 +340,16 @@ export function AdminApp() {
         <main className="w-full min-w-0 flex-1 p-4 pb-24 lg:p-8 lg:pb-10 2xl:px-12">
           <div key={section} className="animate-section-in motion-reduce:animate-none">
           {section === "dashboard" && (
-            <AdminDashboard onGo={(s) => setSection(s)} />
+            <AdminDashboard
+              onGo={ir}
+              onProducto={(nombre) => {
+                setProductoBuscado(nombre);
+                setSection("productos");
+              }}
+            />
           )}
           {section === "facturacion" && <AdminBilling />}
-          {section === "productos" && <AdminProducts onToast={setToast} />}
+          {section === "productos" && <AdminProducts onToast={setToast} busquedaInicial={productoBuscado} />}
           {section === "clientes" && (
             <AdminRecords config={CLIENTES_CFG} orderConfig={PEDIDOS_CFG} onToast={setToast} />
           )}
@@ -366,7 +378,7 @@ export function AdminApp() {
           return (
             <button
               key={id}
-              onClick={() => setSection(id)}
+              onClick={() => ir(id)}
               className={`flex min-h-[48px] flex-1 flex-col items-center gap-0.5 py-2.5 text-[10px] font-semibold transition-[color,transform] active:scale-95 motion-reduce:transition-none ${
                 active ? "text-primary" : "text-muted"
               }`}
