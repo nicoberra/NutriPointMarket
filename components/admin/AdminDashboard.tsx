@@ -118,7 +118,15 @@ export function AdminDashboard({ onGo, onProducto }: {
     };
   }, [intento]);
 
-  const sinStock = products.filter((p) => p.inStock === false).slice(0, 8);
+  // Sin stock: productos agotados enteros y también los que se quedaron sin
+  // algún sabor/color (variante en 0), aunque les queden otros.
+  const sinStock = [
+    ...products.filter((p) => p.inStock === false).map((p) => ({ p, agotadas: [] as string[] })),
+    ...products
+      .filter((p) => p.inStock !== false)
+      .map((p) => ({ p, agotadas: (p.variants ?? []).filter((v) => v.qty === 0).map((v) => v.name) }))
+      .filter((x) => x.agotadas.length > 0),
+  ].slice(0, 12);
   const sinFoto = products.filter((p) => !p.image);
   const clientesN = useCountUp(m.clientes);
   const pedidosN = useCountUp(m.pedidos);
@@ -174,7 +182,7 @@ export function AdminDashboard({ onGo, onProducto }: {
                 </span>
               </h2>
               <ul className="space-y-2 sm:grid sm:grid-cols-2 sm:gap-2 sm:space-y-0 lg:grid-cols-3">
-                {sinStock.map((p) => (
+                {sinStock.map(({ p, agotadas }) => (
                   <li key={p.id}>
                     <button
                       type="button"
@@ -184,7 +192,9 @@ export function AdminDashboard({ onGo, onProducto }: {
                     >
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-ink">{p.name}</p>
-                        <p className="text-xs text-muted">{formatPrice(p.basePrice ?? p.price)}</p>
+                        <p className="truncate text-xs text-muted">
+                          {agotadas.length > 0 ? `Se agotó: ${agotadas.join(", ")}` : formatPrice(p.basePrice ?? p.price)}
+                        </p>
                       </div>
                       <span className="shrink-0 rounded-full bg-sale/10 px-2.5 py-1 text-xs font-bold text-sale">
                         Sin stock
