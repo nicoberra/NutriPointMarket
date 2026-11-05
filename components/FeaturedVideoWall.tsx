@@ -172,7 +172,7 @@ export function FeaturedVideoWall({
     <section id={id} className="scroll-mt-24 py-10 sm:py-14">
       {/* Título */}
       {tituloGrande ? (
-        // El texto se estira exactamente al ancho del contenedor (SVG con textLength).
+        // El texto se ajusta exactamente al ancho del contenedor (se mide y se escala).
         <h2 className="container-page mb-5">
           <TextoAlAncho texto={title} />
         </h2>
@@ -262,10 +262,14 @@ function TextoAlAncho({ texto }: { texto: string }) {
     const el = ref.current;
     const caja = el?.parentElement;
     if (!el || !caja) return;
+    // Se mide el ancho REAL del texto (inline-block): un "block" ocupa siempre
+    // todo el ancho de la caja y nunca se achicaba (en el celu se cortaba).
     const ajustar = () => {
       el.style.fontSize = "100px";
-      const ancho = el.getBoundingClientRect().width || 1;
-      el.style.fontSize = `${Math.max(16, (100 * caja.clientWidth) / ancho)}px`;
+      const ancho = el.scrollWidth || el.getBoundingClientRect().width || 1;
+      const cs = getComputedStyle(caja);
+      const disponible = caja.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 2;
+      el.style.fontSize = `${Math.max(16, Math.floor(((100 * disponible) / ancho) * 100) / 100)}px`;
     };
     ajustar();
     const ro = new ResizeObserver(ajustar);
@@ -276,7 +280,7 @@ function TextoAlAncho({ texto }: { texto: string }) {
   return (
     <span
       ref={ref}
-      className="block whitespace-nowrap font-display font-extrabold uppercase leading-none tracking-tight text-primary"
+      className="inline-block max-w-full whitespace-nowrap font-display font-extrabold uppercase leading-none tracking-tight text-primary"
       style={{ fontSize: "9vw" }}
     >
       {texto}
