@@ -34,9 +34,16 @@ function fechaDe(v: unknown): Date | null {
   return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4] ?? 0), Number(m[5] ?? 0));
 }
 
+/**
+ * ¿El pedido está cobrado? Manda lo que se marca en el CRM: "sí" suma, "no" NO
+ * suma nunca (aunque el estado diga "pagado"). Solo si está vacío se toma el
+ * estado "pagado" (pagos aprobados por la web / Mercado Pago).
+ */
 export function pedidoCobrado(r: Fila): boolean {
-  const est = String(r.estado ?? "").trim().toLowerCase();
-  return String(r.cobrado ?? "").trim().toLowerCase() === "sí" || est === "pagado";
+  const c = String(r.cobrado ?? "").trim().toLowerCase();
+  if (c === "sí" || c === "si") return true;
+  if (c === "no") return false;
+  return String(r.estado ?? "").trim().toLowerCase() === "pagado";
 }
 
 export interface ResultadoCaja {
