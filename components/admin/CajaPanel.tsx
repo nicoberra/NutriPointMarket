@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { peekTable, ensureTable, subscribeTable } from "@/lib/tableCache";
-import { calcularCaja, MEDIOS } from "@/lib/caja";
+import { calcularCaja, MEDIOS, type Medio } from "@/lib/caja";
 import { formatPrice } from "@/lib/format";
 
 type Fila = Record<string, unknown>;
@@ -30,7 +30,29 @@ export function CajaPanel() {
     };
   }, []);
 
+  const [abierto, setAbierto] = useState<Medio | null>(null);
   const res = useMemo(() => (pedidos && compras ? calcularCaja(pedidos, compras) : null), [pedidos, compras]);
+
+  // Pedidos que suman en un lado. En el celu va justo debajo del recuadro tocado;
+  // en la compu, debajo de los tres.
+  const lista = (medio: Medio, id: string) => {
+    const filas = res?.pedidosPorMedio[medio] ?? [];
+    if (!filas.length) return null;
+    return (
+      <ul id={id} className="animate-slide-up sm:mt-3 divide-y divide-line rounded-xl border border-line motion-reduce:animate-none">
+              {filas.map((r, i) => (
+                <li key={String(r.id ?? i)} className="flex items-start justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-ink">{String(r.cliente ?? "") || "Sin nombre"}</p>
+                    <p className="text-xs text-muted">{String(r.fecha ?? "").replace(/^(\d{4})-(\d{2})-(\d{2})/, "$3/$2/$1")}</p>
+                    {r.detalle ? <p className="mt-0.5 line-clamp-2 text-xs text-muted">{String(r.detalle).replace(/ \| /g, " · ")}</p> : null}
+                  </div>
+                  <p className="shrink-0 text-sm font-bold text-ink">{formatPrice(Number(String(r.monto ?? "").replace(/[^\d.,-]/g, "").replace(",", ".")) || 0)}</p>
+                </li>
+              ))}
+            </ul>
+    );
+  };
 
   return (
     <section className="rounded-2xl border border-line bg-white p-5" aria-busy={!res}>
@@ -46,13 +68,38 @@ export function CajaPanel() {
               : `Ventas cobradas · ${res.nVentas} ${res.nVentas === 1 ? "venta" : "ventas"}`}
           </p>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {MEDIOS.map((m) => (
-              <div key={m.id} className="rounded-xl bg-page-soft p-4">
-                <p className="text-xs font-bold uppercase tracking-wide text-muted">{m.label}</p>
-                <p className="mt-1 font-display text-2xl font-black text-ink">{formatPrice(res.porMedio[m.id])}</p>
-              </div>
-            ))}
+            {MEDIOS.map((m) => {
+              const n = res.pedidosPorMedio[m.id].length;
+              const activo = abierto === m.id;
+              return (
+                <div key={m.id} className="contents">
+                <button
+                  type="button"
+                  onClick={() => setAbierto(activo ? null : m.id)}
+                  aria-expanded={activo}
+                  aria-controls="caja-pedidos caja-pedidos-celu"
+                  disabled={n === 0}
+                  className={`rounded-xl p-4 text-left transition-[background-color,box-shadow,transform] duration-200 active:scale-[0.98] disabled:cursor-default disabled:active:scale-100 motion-reduce:transition-none motion-reduce:active:scale-100 ${
+                    activo ? "bg-primary text-white shadow-soft" : "bg-page-soft hover:bg-accent-soft"
+                  }`}
+                >
+                  <span className={`flex items-center justify-between text-xs font-bold uppercase tracking-wide ${activo ? "text-white/80" : "text-muted"}`}>
+                    {m.label}
+                    {n > 0 && (
+                      <span className="flex items-center gap-1 normal-case tracking-normal">
+                        {n} {n === 1 ? "pedido" : "pedidos"}
+                        <span aria-hidden className={`inline-block transition-transform duration-200 motion-reduce:transition-none ${activo ? "rotate-180" : ""}`}>⌄</span>
+                      </span>
+                    )}
+                  </span>
+                  <span className={`mt-1 block font-display text-2xl font-black ${activo ? "text-white" : "text-ink"}`}>{formatPrice(res.porMedio[m.id])}</span>
+                </button>
+                {activo && <div className="sm:hidden">{lista(m.id, "caja-pedidos-celu")}</div>}
+                </div>
+              );
+            })}
           </div>
+          {abierto && <div className="hidden sm:block">{lista(abierto, "caja-pedidos")}</div>}
           {res.sinMedio.n > 0 && (
             <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
               {res.sinMedio.n} {res.sinMedio.n === 1 ? "venta cobrada" : "ventas cobradas"} sin forma de pago ({formatPrice(res.sinMedio.monto)}): no

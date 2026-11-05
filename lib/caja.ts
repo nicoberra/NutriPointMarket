@@ -43,6 +43,8 @@ export interface ResultadoCaja {
   /** Última compra mayorista (desde ese día se cuentan las ventas). null = no hay compras. */
   desde: { fecha: Date; proveedor: string } | null;
   porMedio: Record<Medio, number>;
+  /** Pedidos que suman en cada lado (del más nuevo al más viejo). */
+  pedidosPorMedio: Record<Medio, Fila[]>;
   total: number;
   nVentas: number;
   /** Ventas cobradas sin forma de pago: no se pueden ubicar en ningún lado. */
@@ -59,6 +61,7 @@ export function calcularCaja(pedidos: Fila[], compras: Fila[]): ResultadoCaja {
     if (!desde || dia > desde.fecha) desde = { fecha: dia, proveedor: String(c.proveedor ?? "").trim() };
   }
   const porMedio: Record<Medio, number> = { efectivo: 0, transferencia: 0, mercadopago: 0 };
+  const pedidosPorMedio: Record<Medio, Fila[]> = { efectivo: [], transferencia: [], mercadopago: [] };
   let nVentas = 0;
   const sinMedio = { n: 0, monto: 0 };
   for (const r of pedidos) {
@@ -74,7 +77,11 @@ export function calcularCaja(pedidos: Fila[], compras: Fila[]): ResultadoCaja {
       continue;
     }
     porMedio[m] += monto;
+    pedidosPorMedio[m].push(r);
     nVentas++;
   }
-  return { desde, porMedio, total: porMedio.efectivo + porMedio.transferencia + porMedio.mercadopago, nVentas, sinMedio };
+  for (const k of Object.keys(pedidosPorMedio) as Medio[]) {
+    pedidosPorMedio[k].sort((a, b) => (fechaDe(b.fecha)?.getTime() ?? 0) - (fechaDe(a.fecha)?.getTime() ?? 0));
+  }
+  return { desde, porMedio, pedidosPorMedio, total: porMedio.efectivo + porMedio.transferencia + porMedio.mercadopago, nVentas, sinMedio };
 }
