@@ -1,9 +1,9 @@
 /**
- * "Plata que deberías tener": saldo inicial por medio de pago + ventas cobradas
- * − compras, contando solo lo cargado después de fijar el saldo.
+ * "Plata actual": todo automático. Se toma la última compra mayorista (pestaña
+ * Compras) y se suman las ventas cobradas desde ese día, separadas según cómo
+ * pagó cada cliente (transferencia, efectivo o Mercado Pago). Cuando se carga
+ * una compra nueva, el contador arranca de nuevo desde esa fecha.
  */
-import type { CajaConfig } from "@/lib/api";
-
 export type Medio = "efectivo" | "transferencia" | "mercadopago";
 export const MEDIOS: { id: Medio; label: string }[] = [
   { id: "transferencia", label: "Transferencia" },
@@ -26,70 +26,55 @@ function num(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-/** Momento en que se cargó la fila: el id lleva la hora (id/ped + ms); si no, la fecha. */
-export function cargadoEn(r: Fila): number {
-  const m = String(r.id ?? "").match(/^(?:id|ped)(\d{13})/);
-  if (m) return Number(m[1]);
-  const d = Date.parse(String(r.fecha ?? "").trim().replace(" ", "T"));
-  return Number.isFinite(d) ? d : 0;
+/** "2026-10-26" o "2026-11-04 17:05" → Date local (null si no se puede leer). */
+function fechaDe(v: unknown): Date | null {
+  const s = String(v ?? "").trim();
+  const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4] ?? 0), Number(m[5] ?? 0));
 }
 
 export function pedidoCobrado(r: Fila): boolean {
-  return String(r.cobrado ?? "").trim().toLowerCase() === "sí" || String(r.estado ?? "").trim().toLowerCase() === "pagado";
+  const est = String(r.estado ?? "").trim().toLowerCase();
+  return String(r.cobrado ?? "").trim().toLowerCase() === "sí" || est === "pagado";
 }
 
 export interface ResultadoCaja {
-  saldo: Record<Medio, number>;
+  /** Última compra mayorista (desde ese día se cuentan las ventas). null = no hay compras. */
+  desde: { fecha: Date; proveedor: string } | null;
+  porMedio: Record<Medio, number>;
   total: number;
-  ventas: Record<Medio, number>;
-  compras: Record<Medio, number>;
   nVentas: number;
-  nCompras: number;
-  /** Compras cargadas sin forma de pago (o "Otro"): no se restaron. */
-  comprasSinMedio: { n: number; monto: number };
-  /** Ventas cobradas sin medio reconocido: no se sumaron. */
-  ventasSinMedio: { n: number; monto: number };
+  /** Ventas cobradas sin forma de pago: no se pueden ubicar en ningún lado. */
+  sinMedio: { n: number; monto: number };
 }
 
-const cero = (): Record<Medio, number> => ({ efectivo: 0, transferencia: 0, mercadopago: 0 });
-
-export function calcularCaja(cfg: CajaConfig, pedidos: Fila[], compras: Fila[]): ResultadoCaja {
-  const ventas = cero();
-  const gastos = cero();
+export function calcularCaja(pedidos: Fila[], compras: Fila[]): ResultadoCaja {
+  // Última compra: la de fecha más nueva (desde el comienzo de ese día).
+  let desde: ResultadoCaja["desde"] = null;
+  for (const c of compras) {
+    const f = fechaDe(c.fecha);
+    if (!f || num(c.total) <= 0) continue;
+    const dia = new Date(f.getFullYear(), f.getMonth(), f.getDate());
+    if (!desde || dia > desde.fecha) desde = { fecha: dia, proveedor: String(c.proveedor ?? "").trim() };
+  }
+  const porMedio: Record<Medio, number> = { efectivo: 0, transferencia: 0, mercadopago: 0 };
   let nVentas = 0;
-  let nCompras = 0;
-  const comprasSinMedio = { n: 0, monto: 0 };
-  const ventasSinMedio = { n: 0, monto: 0 };
-  const pendientes = new Set(cfg.pendientes);
+  const sinMedio = { n: 0, monto: 0 };
   for (const r of pedidos) {
     if (!pedidoCobrado(r)) continue;
-    if (!(cargadoEn(r) > cfg.desde || pendientes.has(String(r.id ?? "")))) continue;
+    const f = fechaDe(r.fecha);
+    if (!f || (desde && f < desde.fecha)) continue;
     const monto = num(r.monto);
     if (monto <= 0) continue;
     const m = medioDe(r.pago);
-    if (!m) { ventasSinMedio.n++; ventasSinMedio.monto += monto; continue; }
-    ventas[m] += monto;
+    if (!m) {
+      sinMedio.n++;
+      sinMedio.monto += monto;
+      continue;
+    }
+    porMedio[m] += monto;
     nVentas++;
   }
-  for (const r of compras) {
-    if (!(cargadoEn(r) > cfg.desde)) continue;
-    const monto = num(r.total);
-    if (monto <= 0) continue;
-    const m = medioDe(r.pago);
-    if (!m) { comprasSinMedio.n++; comprasSinMedio.monto += monto; continue; }
-    gastos[m] += monto;
-    nCompras++;
-  }
-  const saldo = cero();
-  for (const { id } of MEDIOS) saldo[id] = Math.round((cfg[id] + ventas[id] - gastos[id]) * 100) / 100;
-  return {
-    saldo,
-    total: Math.round((saldo.efectivo + saldo.transferencia + saldo.mercadopago) * 100) / 100,
-    ventas,
-    compras: gastos,
-    nVentas,
-    nCompras,
-    comprasSinMedio,
-    ventasSinMedio,
-  };
+  return { desde, porMedio, total: porMedio.efectivo + porMedio.transferencia + porMedio.mercadopago, nVentas, sinMedio };
 }
