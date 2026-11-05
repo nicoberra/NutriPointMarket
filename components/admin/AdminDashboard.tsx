@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useProducts } from "@/context/ProductsContext";
 import { peekTable, ensureTable, subscribeTable } from "@/lib/tableCache";
 import { formatPrice } from "@/lib/format";
+import { pedidoCobrado } from "@/lib/caja";
 import { UserIcon, ClipboardIcon, ChevronRightIcon } from "@/components/Icons";
 import { useCountUp } from "./useCountUp";
 import { ErrorState } from "@/components/Estados";
@@ -63,7 +64,7 @@ export function AdminDashboard({ onGo, onProducto }: {
           const amount = num(r.monto);
           const cost = num(r.costo);
           const date = parseDate(r.fecha);
-          const pagado = low(r.estado) === "pagado" || low(r.cobrado) === "sí";
+          const pagado = pedidoCobrado(r);
           const entregado = low(r.estado) === "entregado";
           const esTransfer = low(r.pago).includes("transfer");
 

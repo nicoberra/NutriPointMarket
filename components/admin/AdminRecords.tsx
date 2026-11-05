@@ -9,6 +9,7 @@ import { addRow, updateRow, deleteRow, aprobarPedido, sumarCompraAlStock, localA
 import { peekTable, fetchTable, ensureTable, subscribeTable, patchTable } from "@/lib/tableCache";
 import { useProducts } from "@/context/ProductsContext";
 import { formatPrice } from "@/lib/format";
+import { pedidoCobrado } from "@/lib/caja";
 import { EmptyState, ErrorState } from "@/components/Estados";
 import {
   CloseIcon,
@@ -266,12 +267,14 @@ export function AdminRecords({
     recargar(loadPedidos);
   };
 
-  // Cobrado: columna propia; los pagos aprobados (web/MP) también cuentan.
-  const estaCobrado = (r: Row) =>
-    r.cobrado === "sí" || String(r.estado ?? "").toLowerCase() === "pagado";
+  // Cobrado: manda la columna Cobrado ("no" = sin cobrar aunque el estado diga
+  // "pagado"); si está vacía, cuentan los pagos aprobados (web/MP).
+  const estaCobrado = (r: Row) => pedidoCobrado(r);
   const toggleCobrado = async (row: Row) => {
-    const nuevo = row.cobrado === "sí" ? "no" : "sí";
+    const nuevo = estaCobrado(row) ? "no" : "sí";
     setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, cobrado: nuevo } : r)));
+    // También en la copia compartida: Facturación (plata actual) se actualiza al toque.
+    patchTable(config.tab, (rows) => rows.map((r) => (r.id === row.id ? { ...r, cobrado: nuevo } : r)));
     try {
       const r = await updateRow(config.tab, row.id, { cobrado: nuevo });
       if (r === false) throw new Error("no ok");
@@ -813,7 +816,7 @@ function DetailSheet({ row, onClose, onEdit }: { row: Row; onClose: () => void; 
             <DetailLine k="Forma de pago" v={row.pago} />
             <DetailLine
               k="Estado"
-              v={`${row.cobrado === "sí" || String(row.estado).toLowerCase() === "pagado" ? "Cobrado" : "Sin cobrar"} · ${row.estado === "Entregado" ? "entregado" : "sin entregar"} · ${row.descontado === "sí" ? "stock descontado" : "stock sin descontar"}`}
+              v={`${pedidoCobrado(row) ? "Cobrado" : "Sin cobrar"} · ${row.estado === "Entregado" ? "entregado" : "sin entregar"} · ${row.descontado === "sí" ? "stock descontado" : "stock sin descontar"}`}
             />
             <DetailLine k="Envío" v={row.envio} />
           </DetailBox>
@@ -1102,7 +1105,7 @@ function ClientSheet({
     return p.detalle || "Pedido";
   };
   const estadoDe = (p: Row) =>
-    p.cobrado === "sí" || String(p.estado).toLowerCase() === "pagado"
+    pedidoCobrado(p)
       ? { t: "Cobrado", c: "bg-green-100 text-green-700" }
       : p.estado === "Entregado"
         ? { t: "Entregado", c: "bg-accent/15 text-primary" }
