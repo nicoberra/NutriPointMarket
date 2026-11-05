@@ -138,7 +138,7 @@ const items = (arr) => JSON.stringify(arr);
 
 /* --------------------------------- Pruebas -------------------------------- */
 console.log("Versión y lecturas");
-check("version v17", call({ action: "version" }).version === "v17");
+check("version v18", call({ action: "version" }).version === "v18");
 const l1 = call({ action: "productos_list" });
 check("productos_list público sin costos", l1.ok && l1.data.length === 5 && !("costo" in l1.data[0]));
 const hitsAntes = cacheHits;
@@ -709,6 +709,21 @@ console.log("Regalo con cupón");
   book.sheets.Productos.rows = book.sheets.Productos.rows.filter((r) => r[0] !== "Cupon Test");
   book.sheets.Leads.rows = book.sheets.Leads.rows.slice(0, 1);
   check("limpieza de pedidos de prueba del cupón", pedidos().length === n0);
+}
+
+console.log("Caja (plata disponible)");
+{
+  const tok = ctx.crearToken().token;
+  check("caja sin token → auth", call({ action: "caja_config" }).error === "auth" && call({ action: "caja_config", data: "{}" }).error === "auth");
+  check("caja sin configurar", call({ action: "caja_config", token: tok }).data.configurada === false);
+  const antes = Date.now();
+  const g = call({ action: "caja_config", token: tok, data: JSON.stringify({ efectivo: 50000, transferencia: "120000.5", mercadopago: 0, pendientes: ["ped123", "id99<script>"] }) });
+  check("guardar saldo inicial", g.ok && g.data.configurada && g.data.efectivo === 50000 && g.data.transferencia === 120000.5 && g.data.desde >= antes, g);
+  check("  ...limpia los ids pendientes", JSON.stringify(g.data.pendientes) === JSON.stringify(["ped123", "id99script"]));
+  check("  ...se puede leer", call({ action: "caja_config", token: tok }).data.efectivo === 50000);
+  check("monto inválido → rechazo", call({ action: "caja_config", token: tok, data: JSON.stringify({ efectivo: "abc", transferencia: 0, mercadopago: 0 }) }).ok === false);
+  check("saldo negativo se permite (deudas)", call({ action: "caja_config", token: tok, data: JSON.stringify({ efectivo: -1000, transferencia: 0, mercadopago: 0 }) }).data.efectivo === -1000);
+  delete props.CAJA;
 }
 
 console.log("Copias automáticas");

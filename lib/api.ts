@@ -957,3 +957,41 @@ export async function renameCategory(from: string, to: string): Promise<boolean>
 export async function deleteCategory(nombre: string): Promise<boolean> {
   return deleteRow("Categorias", nombre);
 }
+
+/* --------------------------------- Caja ---------------------------------- */
+
+export interface CajaConfig {
+  /** false = todavía no se cargó el saldo inicial. */
+  configurada: boolean;
+  /** Momento (ms) desde el que cuentan las ventas y compras. */
+  desde: number;
+  efectivo: number;
+  transferencia: number;
+  mercadopago: number;
+  /** Pedidos que estaban sin cobrar al guardar: se suman si se cobran después. */
+  pendientes: string[];
+}
+
+function toCaja(d: Record<string, unknown>): CajaConfig {
+  return {
+    configurada: d.configurada === true,
+    desde: toNum(d.desde),
+    efectivo: toNum(d.efectivo),
+    transferencia: toNum(d.transferencia),
+    mercadopago: toNum(d.mercadopago),
+    pendientes: Array.isArray(d.pendientes) ? d.pendientes.map(String) : [],
+  };
+}
+
+/** CRM: saldo inicial de la caja. null si no se pudo conectar. */
+export async function cajaLeer(): Promise<CajaConfig | null> {
+  const r = (await api("caja_config", {}, 20000)) as ApiResult<Record<string, unknown>>;
+  return r.ok && r.data ? toCaja(r.data) : null;
+}
+
+/** CRM: guarda el saldo de hoy (el servidor fija la hora). Lanza Error si se rechaza. */
+export async function cajaGuardar(c: { efectivo: number; transferencia: number; mercadopago: number; pendientes: string[] }): Promise<CajaConfig> {
+  const r = (await api("caja_config", { data: JSON.stringify(c) }, 20000)) as ApiResult<Record<string, unknown>>;
+  if (r.ok === false || !r.data) throw new Error(r.error || "No se pudo guardar");
+  return toCaja(r.data);
+}

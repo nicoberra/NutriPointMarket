@@ -18,7 +18,7 @@
  * ============================================================================ */
 
 var SHEET_ID = "12paAzW6OcSgYv4u6L7QVI4tpvrEx1yqnujW0OjcieMc";
-var API_VERSION = "v17"; // v17: regalo con cupón (pestaña Leads, cupón único validado en el servidor) // v16: Club de sellos (premio en la N-ésima compra, descuento aplicado y validado en el servidor) // v15: venta por caja o por unidad (Unidades por caja + Precio caja) // v14: un producto puede estar en varias categorías ("A | B") // v13: compras pendientes (se revisan y se suman al stock después) // v12: lectura de compras con Claude Haiku 5.5 (el más barato) // v11: las compras leen fotos, archivos y texto con Claude // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
+var API_VERSION = "v18"; // v18: caja (saldo inicial por medio de pago para "Plata disponible") // v17: regalo con cupón (pestaña Leads, cupón único validado en el servidor) // v16: Club de sellos (premio en la N-ésima compra, descuento aplicado y validado en el servidor) // v15: venta por caja o por unidad (Unidades por caja + Precio caja) // v14: un producto puede estar en varias categorías ("A | B") // v13: compras pendientes (se revisan y se suman al stock después) // v12: lectura de compras con Claude Haiku 5.5 (el más barato) // v11: las compras leen fotos, archivos y texto con Claude // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
 
 // Repo de GitHub donde se guardan las fotos de productos (en public/productos/).
 // El token NO va acá: se guarda en Propiedades del script como GITHUB_TOKEN.
@@ -331,7 +331,7 @@ function limitar(tipo, id) {
 var ACCIONES_ESCRITURA = {
   productos_save: 1, add: 1, update: 1, delete: 1, categoria_rename: 1, producto_rename: 1,
   subir_imagen: 1, borrar_imagen: 1, subir_comprobante: 1, mp_webhook: 1, aprobar_pedido: 1, registrar: 1,
-  compra_sumar_stock: 1, lead: 1, cupon_config: 1,
+  compra_sumar_stock: 1, lead: 1, cupon_config: 1, caja_config: 1,
 };
 
 function conBloqueo(fn) {
@@ -460,6 +460,10 @@ function ejecutar(action, p, e, esAdmin) {
         break;
       case "cupon_config":
         out = { ok: true, data: p.data ? cuponConfigGuardar(parseData(p)) : cuponConfig() };
+        break;
+      case "caja_config":
+        // Solo CRM (con token): saldo inicial de la caja por medio de pago.
+        out = { ok: true, data: p.data ? cajaGuardar(parseData(p)) : cajaConfig() };
         break;
       default:
         out = { ok: false, error: "Acción desconocida: " + action };
@@ -1477,6 +1481,47 @@ function quitarDescuentoPedido(id, campo, nuevoPedido) {
   var notas = String(row[keys.indexOf("notas")] || "");
   cambios.notas = (notas ? notas + " · " : "") + "Sin " + (campo === "cupon" ? "cupón" : "premio del Club") + " ($" + m[1] + "): se liberó a las 48 h y se usó en " + nuevoPedido;
   updateRowByNumber("Pedidos", n, cambios);
+}
+
+/* --------------------------------- Caja ---------------------------------- */
+// "Plata disponible" del CRM: el usuario carga cuánto tiene en efectivo, en el
+// banco (transferencias) y en Mercado Pago en un momento dado; el CRM suma las
+// ventas cobradas y resta las compras cargadas DESPUÉS de ese momento. Se guarda
+// en la Propiedad del Script "CAJA" (JSON). "pendientes": pedidos sin cobrar al
+// guardar, que se suman si se cobran después.
+function cajaConfig() {
+  var c = null;
+  try { c = JSON.parse(PropertiesService.getScriptProperties().getProperty("CAJA") || "null"); } catch (e) {}
+  if (!c || !c.desde) return { configurada: false, desde: 0, efectivo: 0, transferencia: 0, mercadopago: 0, pendientes: [] };
+  return {
+    configurada: true,
+    desde: Number(c.desde) || 0,
+    efectivo: Number(c.efectivo) || 0,
+    transferencia: Number(c.transferencia) || 0,
+    mercadopago: Number(c.mercadopago) || 0,
+    pendientes: Array.isArray(c.pendientes) ? c.pendientes : [],
+  };
+}
+
+function cajaGuardar(obj) {
+  var monto = function (v) {
+    var n = Math.round(Number(v) * 100) / 100;
+    if (!isFinite(n) || Math.abs(n) > 1e10) throw new Error("Monto inválido");
+    return n;
+  };
+  var pend = (Array.isArray(obj.pendientes) ? obj.pendientes : [])
+    .map(function (x) { return String(x).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 40); })
+    .filter(Boolean)
+    .slice(0, 300);
+  var c = {
+    desde: Date.now(), // lo fija el servidor: cuentan los movimientos cargados después
+    efectivo: monto(obj.efectivo),
+    transferencia: monto(obj.transferencia),
+    mercadopago: monto(obj.mercadopago),
+    pendientes: pend,
+  };
+  PropertiesService.getScriptProperties().setProperty("CAJA", JSON.stringify(c));
+  return cajaConfig();
 }
 
 /* ------------------------------ Productos -------------------------------- */

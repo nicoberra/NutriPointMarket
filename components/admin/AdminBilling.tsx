@@ -6,6 +6,7 @@ import { formatPrice } from "@/lib/format";
 import { ChartIcon } from "@/components/Icons";
 import { EmptyState, ErrorState } from "@/components/Estados";
 import { ValorMercaderia } from "./ValorMercaderia";
+import { CajaPanel } from "./CajaPanel";
 
 /**
  * CRM · Facturación. Lee la pestaña Pedidos y arma el resumen de ventas por
@@ -190,6 +191,9 @@ export function AdminBilling() {
 
   return (
     <div className="space-y-6">
+      {/* Plata que debería haber: saldo + ventas cobradas − compras, por medio de pago */}
+      <CajaPanel />
+
       {/* Facturación */}
       <section>
         <h3 className="mb-2 text-sm font-bold text-ink">💰 Facturación</h3>
