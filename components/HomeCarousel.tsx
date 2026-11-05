@@ -4,7 +4,7 @@ import { useProducts } from "@/context/ProductsContext";
 import { PROMO_DESTACADOS } from "@/lib/config";
 import { usePromoDestacados } from "@/lib/promo";
 import { ProductCarousel } from "./ProductCarousel";
-import { FeaturedVideoWall } from "./FeaturedVideoWall";
+import { PromoCuentaRegresiva } from "./PromoCuentaRegresiva";
 import { ProductSkeletonRow } from "./ProductSkeleton";
 
 const CONFIG = {
@@ -39,30 +39,15 @@ export function HomeCarousel({ kind }: { kind: keyof typeof CONFIG }) {
   const promo = usePromoDestacados();
   // Con la promo vigente, los destacados se presentan como promos de la Cyber Week
   // (el bloque "Elegidos" toma el título de la promo; "Destacados" solo el antetítulo).
-  const promoGrande = promo && kind === "onSale";
-  const c = promoGrande
-    ? { ...CONFIG[kind], eyebrow: "", title: `Promo ${PROMO_DESTACADOS.nombre}` }
-    : promo && kind === "featured"
+  const c = promo && kind === "featured"
       ? { ...CONFIG[kind], eyebrow: `⚡ ${PROMO_DESTACADOS.nombre}` }
       : CONFIG[kind];
 
   if (!list.length) return loading ? <ProductSkeletonRow /> : null;
 
-  // "Elegidos del mes": video protagonista + tira vertical de fotos.
-  if (kind === "onSale" && c.video) {
-    return (
-      <FeaturedVideoWall
-        id="elegidos"
-        products={list}
-        eyebrow={c.eyebrow}
-        title={c.title}
-        tituloGrande={promoGrande}
-        viewAllHref={c.viewAllHref}
-        video={c.video}
-        poster={c.bg || undefined}
-      />
-    );
-  }
+  // Sección de promos (modelo "Cuenta regresiva"): cuenta regresiva hasta el fin
+  // de la promo + destacados en tarjetas. Sin promo, "Nuestros elegidos del mes".
+  if (kind === "onSale") return <PromoCuentaRegresiva products={list} />;
 
   return (
     <ProductCarousel
@@ -72,7 +57,6 @@ export function HomeCarousel({ kind }: { kind: keyof typeof CONFIG }) {
       viewAllHref={c.viewAllHref}
       bgImage={c.bg || undefined}
       bgVideo={c.video ?? undefined}
-      id={kind === "onSale" ? "elegidos" : undefined}
     />
   );
 }
