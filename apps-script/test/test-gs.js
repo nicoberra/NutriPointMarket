@@ -138,7 +138,7 @@ const items = (arr) => JSON.stringify(arr);
 
 /* --------------------------------- Pruebas -------------------------------- */
 console.log("Versión y lecturas");
-check("version v18", call({ action: "version" }).version === "v18");
+check("version v19", call({ action: "version" }).version === "v19");
 const l1 = call({ action: "productos_list" });
 check("productos_list público sin costos", l1.ok && l1.data.length === 5 && !("costo" in l1.data[0]));
 const hitsAntes = cacheHits;
@@ -527,6 +527,12 @@ console.log("Club de sellos");
   idsA.slice(0, 4).forEach(pagar);
   check("4 pagados + 1 sin pagar → 4 sellos, sin premio", club("clubA@test.com").sellos === 4 && club("clubA@test.com").premioDisponible === false, club("clubA@test.com"));
   check("  ...consulta por teléfono (otro formato) da lo mismo", club("", "+54 11 5555 0001").sellos === 4);
+  // Estado "pagado" pero marcado "no cobrado" en el CRM: no suma (misma regla que la caja).
+  const estado5 = filaPedido(idsA[4])[kP.indexOf("estado")];
+  filaPedido(idsA[4])[kP.indexOf("estado")] = "pagado";
+  filaPedido(idsA[4])[kP.indexOf("cobrado")] = "no";
+  check("estado pagado + cobrado \"no\" → no suma sello", club("clubA@test.com").sellos === 4, club("clubA@test.com"));
+  filaPedido(idsA[4])[kP.indexOf("estado")] = estado5;
   pagar(idsA[4]);
   check("5 pagados → premio disponible", club("clubA@test.com").premioDisponible === true && club("clubA@test.com").sellos === 5);
 
@@ -724,6 +730,19 @@ console.log("Caja (plata disponible)");
   check("monto inválido → rechazo", call({ action: "caja_config", token: tok, data: JSON.stringify({ efectivo: "abc", transferencia: 0, mercadopago: 0 }) }).ok === false);
   check("saldo negativo se permite (deudas)", call({ action: "caja_config", token: tok, data: JSON.stringify({ efectivo: -1000, transferencia: 0, mercadopago: 0 }) }).data.efectivo === -1000);
   delete props.CAJA;
+}
+
+console.log("Id vacío nunca toca otra fila (ERR-SUP-007)");
+{
+  const sh = book.sheets.Pedidos;
+  const antes = JSON.stringify(sh.rows);
+  for (const id of ["", "   ", null, undefined]) {
+    let edito = false, borro = false;
+    try { ctx.updateRow("Pedidos", id, { cliente: "PISADO" }); edito = true; } catch (e) {}
+    try { ctx.deleteRow("Pedidos", id); borro = true; } catch (e) {}
+    check(`id ${JSON.stringify(id)}: no edita ni borra`, !edito && !borro);
+  }
+  check("  ...la pestaña Pedidos queda igual", JSON.stringify(sh.rows) === antes);
 }
 
 console.log("Copias automáticas");

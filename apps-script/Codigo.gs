@@ -18,7 +18,7 @@
  * ============================================================================ */
 
 var SHEET_ID = "12paAzW6OcSgYv4u6L7QVI4tpvrEx1yqnujW0OjcieMc";
-var API_VERSION = "v18"; // v18: caja (saldo inicial por medio de pago para "Plata disponible") // v17: regalo con cupón (pestaña Leads, cupón único validado en el servidor) // v16: Club de sellos (premio en la N-ésima compra, descuento aplicado y validado en el servidor) // v15: venta por caja o por unidad (Unidades por caja + Precio caja) // v14: un producto puede estar en varias categorías ("A | B") // v13: compras pendientes (se revisan y se suman al stock después) // v12: lectura de compras con Claude Haiku 5.5 (el más barato) // v11: las compras leen fotos, archivos y texto con Claude // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
+var API_VERSION = "v19"; // v19: un pedido marcado "no cobrado" no suma sello del Club // v18: caja (saldo inicial por medio de pago para "Plata disponible") // v17: regalo con cupón (pestaña Leads, cupón único validado en el servidor) // v16: Club de sellos (premio en la N-ésima compra, descuento aplicado y validado en el servidor) // v15: venta por caja o por unidad (Unidades por caja + Precio caja) // v14: un producto puede estar en varias categorías ("A | B") // v13: compras pendientes (se revisan y se suman al stock después) // v12: lectura de compras con Claude Haiku 5.5 (el más barato) // v11: las compras leen fotos, archivos y texto con Claude // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
 
 // Repo de GitHub donde se guardan las fotos de productos (en public/productos/).
 // El token NO va acá: se guarda en Propiedades del script como GITHUB_TOKEN.
@@ -1198,9 +1198,14 @@ function telefonoClave(v) {
   return d.length < 8 ? "" : d.slice(-10);
 }
 
+// Misma regla que el CRM (lib/caja.ts → pedidoCobrado): "sí" cuenta, "no" NUNCA
+// cuenta (aunque el estado diga pagado) y vacío depende del estado.
 function pedidoPagado(row, keys) {
   var est = low(row[keys.indexOf("estado")]);
-  return low(row[keys.indexOf("cobrado")]) === "sí" || est === "pagado" || est === "entregado";
+  var cob = low(row[keys.indexOf("cobrado")]);
+  if (cob === "sí" || cob === "si") return true;
+  if (cob === "no") return false;
+  return est === "pagado" || est === "entregado";
 }
 
 // ¿Este pedido con premio cuenta como premio usado? Sí si está pagado o

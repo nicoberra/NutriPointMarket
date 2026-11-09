@@ -248,7 +248,8 @@ const vacio = (): ItemForm => ({ cantidad: "1", marca: "", producto: "", precio:
 export function archivosDeCompra(r?: Row): ArchivoCompra[] {
   try {
     const a = JSON.parse(r?.archivos || "[]");
-    return Array.isArray(a) ? a.filter((x) => x && x.url) : [];
+    // Solo links https: una URL "javascript:" en la planilla no puede ejecutarse al tocar el adjunto.
+    return Array.isArray(a) ? a.filter((x) => x && typeof x.url === "string" && /^https:\/\//i.test(x.url.trim())) : [];
   } catch {
     return [];
   }
