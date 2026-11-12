@@ -854,12 +854,15 @@ function DetailSheet({ row, onClose, onEdit }: { row: Row; onClose: () => void; 
 
           <DetailBox title="Totales">
             {Number(row.montoEnvio) > 0 && (
-              <DetailLine k="Envío" v={formatPrice(Number(row.montoEnvio))} />
+              <>
+                <DetailLine k="Productos" v={formatPrice((Number(row.monto) || 0) - Number(row.montoEnvio))} />
+                <DetailLine k="Envío" v={formatPrice(Number(row.montoEnvio))} />
+              </>
             )}
-            <DetailLine k="Total" v={formatPrice(Number(row.monto) || 0)} />
+            <DetailLine k={Number(row.montoEnvio) > 0 ? "Total (productos + envío)" : "Total"} v={formatPrice(Number(row.monto) || 0)} />
             {esTransfer && (
               <p className="mt-1 text-xs font-semibold text-secondary">
-                Incluye 10% de descuento por transferencia.
+                Incluye 10% de descuento por transferencia (en los productos).
               </p>
             )}
           </DetailBox>
