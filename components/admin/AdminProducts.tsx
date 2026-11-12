@@ -32,6 +32,7 @@ import { SearchIcon, CloseIcon, CheckIcon, PlusIcon, TrashIcon, ChevronDownIcon,
 const DESTACADOS = "__destacados__";
 import { AdminCategories } from "./AdminCategories";
 import { EmptyState } from "@/components/Estados";
+import { useVentasPorProducto, type VentasProducto } from "@/lib/ventas";
 
 /**
  * CRM · Productos. Cada producto es una tarjeta que se edita EN EL LUGAR:
@@ -70,6 +71,8 @@ export function AdminProducts({ onToast, busquedaInicial = "" }: {
   const [saving, setSaving] = useState(false);
   const [showCats, setShowCats] = useState(false);
   const { confirm, dialog } = useConfirm();
+  // Ventas por producto (de la pestaña Pedidos): unidades y quién compró.
+  const ventasDe = useVentasPorProducto((nombre) => products.find((x) => x.name === nombre)?.unitsPerBox ?? 1);
 
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -287,6 +290,7 @@ export function AdminProducts({ onToast, busquedaInicial = "" }: {
                   key={p.id}
                   product={p}
                   dollar={dollar}
+                  ventas={ventasDe(p.name)}
                   onSave={saveInline}
                   onEdit={() => setEditing(p)}
                   onUpload={handleUpload}
@@ -333,6 +337,7 @@ export function AdminProducts({ onToast, busquedaInicial = "" }: {
 function ProductRow({
   product,
   dollar,
+  ventas,
   onSave,
   onEdit,
   onUpload,
@@ -341,6 +346,7 @@ function ProductRow({
 }: {
   product: Product;
   dollar: number;
+  ventas?: VentasProducto;
   onSave: (p: Product, ch: Changes) => void;
   onEdit: () => void;
   onUpload: (p: Product, file: File, variante?: string) => Promise<void>;
@@ -348,6 +354,7 @@ function ProductRow({
   onDelete: (p: Product) => void;
 }) {
   const [uploading, setUploading] = useState(false);
+  const [verVentas, setVerVentas] = useState(false);
   const { products: todos } = useProducts();
   const fotosCombo = product.combo?.length ? fotosDeComponentes(product, todos).filter((f) => !(product.images ?? []).includes(f)) : [];
   // Fotos arrastradas desde la compu: "" = galería del producto, texto = esa variante.
@@ -511,6 +518,7 @@ function ProductRow({
           >
             {product.name}
           </button>
+          <VentasChip ventas={ventas} abierto={verVentas} onToggle={() => setVerVentas((v) => !v)} />
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <CopyLinkButton url={`https://suplemarket.com.ar/producto/${product.slug}/`} title="Copiar link del producto" />
@@ -529,6 +537,8 @@ function ProductRow({
           </button>
         </div>
       </div>
+
+      {verVentas && ventas && ventas.unidades > 0 && <VentasLista ventas={ventas} />}
 
       {/* Fotos del producto (galería) */}
       <div className="mb-3">
@@ -964,6 +974,57 @@ function ProductRow({
           }}
         />
       </div>
+    </div>
+  );
+}
+
+/** "Vendidos: N": al tocarlo se despliega quién lo compró (VentasLista). */
+function VentasChip({ ventas, abierto, onToggle }: { ventas?: VentasProducto; abierto: boolean; onToggle: () => void }) {
+  if (!ventas || ventas.unidades <= 0) {
+    return <p className="mt-1 text-[11px] font-semibold text-muted">Sin ventas todavía</p>;
+  }
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={abierto}
+      className="mt-1 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary transition-colors hover:bg-primary/15 active:scale-[0.97]"
+    >
+      Vendidos: <span className="tabular-nums">{ventas.unidades}</span>
+      <ChevronDownIcon className={`h-3.5 w-3.5 transition-transform duration-200 ${abierto ? "rotate-180" : ""}`} />
+    </button>
+  );
+}
+
+/** Quién compró el producto (lo más nuevo arriba), a todo el ancho de la tarjeta. */
+function VentasLista({ ventas }: { ventas: VentasProducto }) {
+  const variantes = Object.entries(ventas.porVariante).sort((a, b) => b[1] - a[1]);
+  const nPedidos = new Set(ventas.compras.map((c) => c.pedido)).size;
+  const fecha = (f: string) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(f);
+    return m ? `${m[3]}/${m[2]}/${m[1].slice(2)}` : f;
+  };
+  return (
+    <div className="mb-3 animate-fade-in rounded-lg border border-line bg-page-soft/60 p-3 motion-reduce:animate-none">
+      {variantes.length > 1 && (
+        <p className="mb-2 text-[11px] font-semibold text-muted">{variantes.map(([v, n]) => `${v}: ${n}`).join(" · ")}</p>
+      )}
+      <ul className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
+        {ventas.compras.map((c, i) => (
+          <li key={c.pedido + i} className="flex items-baseline justify-between gap-3 text-xs">
+            <span className="min-w-0 truncate font-semibold text-ink">
+              {c.cliente}
+              {c.web && <span className="ml-1 rounded bg-accent px-1 text-[9px] font-bold uppercase text-ink">web</span>}
+            </span>
+            <span className="shrink-0 text-right tabular-nums text-muted">
+              {c.unidades} u.{c.variante ? ` · ${c.variante}` : ""} · {fecha(c.fecha)}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-[10px] text-muted">
+        {nPedidos} {nPedidos === 1 ? "pedido" : "pedidos"}
+      </p>
     </div>
   );
 }

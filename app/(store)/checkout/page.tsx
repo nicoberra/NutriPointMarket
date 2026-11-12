@@ -29,6 +29,8 @@ interface DoneInfo {
   club: ClubEstado | null;
   /** Descuento del cupón del regalo que aplicó el servidor ($). */
   descCupon: number;
+  /** Costo del envío incluido en el total ($, 0 = sin envío o gratis). */
+  envio: number;
 }
 
 export default function CheckoutPage() {
@@ -280,7 +282,7 @@ export default function CheckoutPage() {
       // Efectivo / Transferencia
       intento.current = null; // compra cerrada: la próxima usa otro número
       clear();
-      setDone({ metodo, id, total: creado.monto, premioClub: creado.premioClub, club, descCupon: creado.descCupon });
+      setDone({ metodo, id, total: creado.monto, premioClub: creado.premioClub, club, descCupon: creado.descCupon, envio: shipping });
     } catch (e) {
       // El backend puede rechazar el pedido (p. ej. precios desactualizados) con un motivo claro.
       const msg = e instanceof Error && e.message && !/timeout|fetch/i.test(e.message) ? e.message : "";
@@ -296,7 +298,7 @@ export default function CheckoutPage() {
 
   /* ----------------------------- Confirmado ------------------------------ */
   if (done) {
-    const waMsg = `Hola Suple Market, hice el pedido ${done.id} por ${formatPrice(done.total)} con transferencia. Te paso el comprobante.`;
+    const waMsg = `Hola Suple Market, hice el pedido ${done.id} por ${formatPrice(done.total)}${done.envio > 0 ? " (productos + envío)" : ""} con transferencia. Te paso el comprobante.`;
     return (
       <>
         <PageBanner title="Pedido confirmado" crumbs={[{ label: "Checkout" }]} />
@@ -333,8 +335,19 @@ export default function CheckoutPage() {
                 {TRANSFER.cvu && <Row k="CVU" v={TRANSFER.cvu} copy />}
                 {TRANSFER.titular && <Row k="Titular" v={TRANSFER.titular} />}
                 {TRANSFER.banco && <Row k="Banco" v={TRANSFER.banco} />}
-                <Row k="Importe" v={formatPrice(done.total)} />
+                {done.envio > 0 && (
+                  <>
+                    <Row k="Productos" v={formatPrice(done.total - done.envio)} />
+                    <Row k="Envío" v={formatPrice(done.envio)} />
+                  </>
+                )}
+                <Row k={done.envio > 0 ? "Total a transferir" : "Importe"} v={formatPrice(done.total)} />
               </dl>
+              {done.envio > 0 && (
+                <p className="mt-2 rounded-lg bg-accent-soft px-3 py-2 text-xs font-semibold text-primary">
+                  Transferí {formatPrice(done.total)}: incluye los productos y el envío.
+                </p>
+              )}
               <p className="mt-3 text-xs text-muted">
                 Hacé la transferencia y <b>subí el comprobante acá abajo</b> para que
                 confirmemos tu pedido. 👇

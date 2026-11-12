@@ -138,6 +138,18 @@ export function AdminApp() {
     setProductoBuscado("");
     setSection(s);
   };
+  // Al tocar un aviso de compra web el CRM abre en Pedidos (/admin/?ir=pedidos).
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(window.location.search).get("ir");
+      if (q && NAV.some((n) => n.id === q)) {
+        setSection(q as Section);
+        window.history.replaceState(null, "", window.location.pathname);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
@@ -344,6 +356,7 @@ export function AdminApp() {
           {section === "dashboard" && (
             <AdminDashboard
               onGo={ir}
+              onToast={setToast}
               onProducto={(nombre) => {
                 setProductoBuscado(nombre);
                 setSection("productos");
