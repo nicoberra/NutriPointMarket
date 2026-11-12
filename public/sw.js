@@ -12,9 +12,13 @@
  *  5. Al activarse una versión nueva se BORRAN todas las cachés viejas y toma el
  *     control de inmediato; la página se recarga sola (ver PWARegister).
  *
+ *  6. Avisos de compras web (push): ver el final del archivo. La caché
+ *     PUSH_CACHE guarda la clave de este dispositivo y NO se borra al actualizar.
+ *
  * Subí VERSION en cada cambio del SW. */
-var VERSION = "v4";
+var VERSION = "v5";
 var CACHE = "suplemarket-" + VERSION;
+var PUSH_CACHE = "suplemarket-push";
 
 self.addEventListener("install", function () {
   self.skipWaiting();
@@ -27,7 +31,7 @@ self.addEventListener("activate", function (event) {
       .then(function (keys) {
         return Promise.all(
           keys.map(function (k) {
-            return k === CACHE ? null : caches.delete(k); // borra TODO lo viejo
+            return k === CACHE || k === PUSH_CACHE ? null : caches.delete(k); // borra TODO lo viejo
           })
         );
       })
@@ -145,4 +149,64 @@ self.addEventListener("fetch", function (event) {
 
 self.addEventListener("message", function (event) {
   if (event.data === "skipWaiting") self.skipWaiting();
+});
+
+/* ------------------- Avisos de compras web (push del CRM) ------------------
+ * El aviso llega sin contenido. Con la clave guardada al activarlo (CRM →
+ * Inicio → "Activar avisos") se pide el texto al backend; si no responde, se
+ * muestra un aviso genérico (el navegador exige mostrar algo siempre). */
+var AVISO_GENERICO = {
+  titulo: "🛒 Nueva compra web",
+  cuerpo: "Entró un pedido nuevo en la tienda. Tocá para verlo.",
+  url: "/admin/?ir=pedidos",
+};
+
+function textoDelAviso() {
+  var conTiempo = new Promise(function (resolve) {
+    setTimeout(function () { resolve(AVISO_GENERICO); }, 8000);
+  });
+  var pedido = caches
+    .open(PUSH_CACHE)
+    .then(function (c) { return c.match("/__avisos"); })
+    .then(function (r) { return r ? r.json() : null; })
+    .then(function (cfg) {
+      if (!cfg || !cfg.api || !cfg.k) return AVISO_GENERICO;
+      return fetch(cfg.api + "?action=push_ultimo&k=" + encodeURIComponent(cfg.k), { cache: "no-store" })
+        .then(function (r) { return r.json(); })
+        .then(function (j) { return j && j.ok && j.data && j.data.titulo ? j.data : AVISO_GENERICO; });
+    })
+    .catch(function () { return AVISO_GENERICO; });
+  return Promise.race([pedido, conTiempo]);
+}
+
+self.addEventListener("push", function (event) {
+  event.waitUntil(
+    textoDelAviso().then(function (d) {
+      return self.registration.showNotification(d.titulo, {
+        body: d.cuerpo,
+        icon: "/icon-192.png",
+        badge: "/icon-192.png",
+        tag: "compra-web-" + (d.ts || Date.now()),
+        data: { url: d.url || AVISO_GENERICO.url },
+      });
+    })
+  );
+});
+
+self.addEventListener("notificationclick", function (event) {
+  event.notification.close();
+  var url = (event.notification.data && event.notification.data.url) || "/admin/";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (lista) {
+      for (var i = 0; i < lista.length; i++) {
+        var c = lista[i];
+        if (c.url.indexOf("/admin") !== -1 && "focus" in c) {
+          return c.focus().then(function (w) {
+            return w && "navigate" in w ? w.navigate(url) : w;
+          }).catch(function () { return self.clients.openWindow(url); });
+        }
+      }
+      return self.clients.openWindow(url);
+    })
+  );
 });

@@ -18,7 +18,7 @@
  * ============================================================================ */
 
 var SHEET_ID = "12paAzW6OcSgYv4u6L7QVI4tpvrEx1yqnujW0OjcieMc";
-var API_VERSION = "v19"; // v19: un pedido marcado "no cobrado" no suma sello del Club // v18: caja (saldo inicial por medio de pago para "Plata disponible") // v17: regalo con cupón (pestaña Leads, cupón único validado en el servidor) // v16: Club de sellos (premio en la N-ésima compra, descuento aplicado y validado en el servidor) // v15: venta por caja o por unidad (Unidades por caja + Precio caja) // v14: un producto puede estar en varias categorías ("A | B") // v13: compras pendientes (se revisan y se suman al stock después) // v12: lectura de compras con Claude Haiku 5.5 (el más barato) // v11: las compras leen fotos, archivos y texto con Claude // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
+var API_VERSION = "v20"; // v20: compradores web a Clientes + avisos al celular por cada compra web // v19: un pedido marcado "no cobrado" no suma sello del Club // v18: caja (saldo inicial por medio de pago para "Plata disponible") // v17: regalo con cupón (pestaña Leads, cupón único validado en el servidor) // v16: Club de sellos (premio en la N-ésima compra, descuento aplicado y validado en el servidor) // v15: venta por caja o por unidad (Unidades por caja + Precio caja) // v14: un producto puede estar en varias categorías ("A | B") // v13: compras pendientes (se revisan y se suman al stock después) // v12: lectura de compras con Claude Haiku 5.5 (el más barato) // v11: las compras leen fotos, archivos y texto con Claude // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
 
 // Repo de GitHub donde se guardan las fotos de productos (en public/productos/).
 // El token NO va acá: se guarda en Propiedades del script como GITHUB_TOKEN.
@@ -235,6 +235,8 @@ function handle(e) {
     registrarError(action, err, p);
     out = { ok: false, error: String(err && err.message ? err.message : err) };
   }
+  // Avisos al celular (compras web): se mandan ya fuera del bloqueo.
+  if (AVISOS_PENDIENTES.length) enviarAvisosPendientes();
   return respond(out, p.callback);
 }
 
@@ -331,7 +333,7 @@ function limitar(tipo, id) {
 var ACCIONES_ESCRITURA = {
   productos_save: 1, add: 1, update: 1, delete: 1, categoria_rename: 1, producto_rename: 1,
   subir_imagen: 1, borrar_imagen: 1, subir_comprobante: 1, mp_webhook: 1, aprobar_pedido: 1, registrar: 1,
-  compra_sumar_stock: 1, lead: 1, cupon_config: 1, caja_config: 1,
+  compra_sumar_stock: 1, lead: 1, cupon_config: 1, caja_config: 1, push_suscribir: 1, push_quitar: 1,
 };
 
 function conBloqueo(fn) {
@@ -383,6 +385,10 @@ function ejecutar(action, p, e, esAdmin) {
           if (!alta.__repetido && p.tab === "Pedidos") {
             if (alta.cupon) marcarCuponUsado(String(alta.cupon).split(" ")[0], alta.id);
             (alta.__premiosLiberados || []).forEach(function (idL) { quitarDescuentoPedido(idL, "club", alta.id); });
+            // El comprador queda en Clientes → Usuarios web, y llega el aviso al
+            // celular. Ninguna de las dos cosas puede frenar la compra.
+            try { clienteDesdePedidoWeb(alta); } catch (eCli) { registrarError("cliente_web", eCli, {}); }
+            avisoCompraWeb(alta);
           }
         }
         break;
@@ -464,6 +470,23 @@ function ejecutar(action, p, e, esAdmin) {
       case "caja_config":
         // Solo CRM (con token): saldo inicial de la caja por medio de pago.
         out = { ok: true, data: p.data ? cajaGuardar(parseData(p)) : cajaConfig() };
+        break;
+      case "push_clave":
+        // CRM: clave pública para que el celular se suscriba a los avisos.
+        out = { ok: true, data: { pub: vapidClaves().pub, dispositivos: pushSubs().length } };
+        break;
+      case "push_suscribir":
+        out = { ok: true, data: pushSuscribir(p.endpoint, p.nombre) };
+        break;
+      case "push_quitar":
+        out = { ok: true, data: pushQuitar(p.endpoint) };
+        break;
+      case "push_probar":
+        out = { ok: true, data: enviarAviso("🔔 Avisos activados", "Así te va a llegar cada compra que entre por la web.", "/admin/?ir=pedidos") };
+        break;
+      case "push_ultimo":
+        // Público: el celular pide el texto del aviso con la clave de su suscripción.
+        out = { ok: true, data: pushUltimo(p.k) };
         break;
       default:
         out = { ok: false, error: "Acción desconocida: " + action };
@@ -2350,6 +2373,7 @@ function esAccionPublica(action, p) {
     case "club":
     case "lead":
     case "cupon":
+    case "push_ultimo":
       return true;
     case "list":
       return p.tab === "Categorias";
@@ -2393,6 +2417,292 @@ function hash(txt) {
       return ("0" + (b & 0xff).toString(16)).slice(-2);
     })
     .join("");
+}
+
+/* ----------------------- Clientes de las compras web ---------------------- */
+// Toda compra hecha en la web deja a la persona en Clientes → "Usuarios web".
+// Si ya está (mismo email o mismo celular) solo se completan los datos que le
+// falten: nunca se pisa lo que ya tenía, ni su origen, ni su clave.
+
+function soloDigitos(v) {
+  return String(v == null ? "" : v).replace(/\D/g, "");
+}
+// Compara celulares escritos distinto ("+54 9 11 5164-0472" = "1151640472").
+function mismoCelular(a, b) {
+  var x = soloDigitos(a), y = soloDigitos(b);
+  if (x.length < 8 || y.length < 8) return false;
+  return x.slice(-10) === y.slice(-10);
+}
+
+function clienteDesdePedidoWeb(ped) {
+  var nombre = String(ped.cliente || "").trim();
+  var email = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(ped.email || "")) ? low(ped.email) : "";
+  var tel = String(ped.telefono || "").trim();
+  if (!nombre && !email && soloDigitos(tel).length < 8) return null;
+  var sh = sheetFor("Clientes");
+  var keys = keysOf("Clientes");
+  var data = sh.getDataRange().getValues();
+  var iE = keys.indexOf("email"), iT = keys.indexOf("telefono");
+  var fila = -1;
+  for (var r = 1; r < data.length && fila < 0; r++) {
+    if (email && low(data[r][iE]) === email) fila = r + 1;
+  }
+  for (var r2 = 1; r2 < data.length && fila < 0; r2++) {
+    if (mismoCelular(data[r2][iT], tel)) fila = r2 + 1;
+  }
+  // La dirección es lo que va antes del primer " · " (después viene la zona).
+  var direccion = String(ped.envio || "").split(" · ")[0].trim();
+  if (/^(retiro|envío|envio)\b/i.test(direccion)) direccion = "";
+  var datos = { nombre: nombre, telefono: tel, email: email, direccion: direccion };
+  if (fila > 0) {
+    var actual = data[fila - 1];
+    var faltan = {};
+    var hay = false;
+    for (var k in datos) {
+      var col = keys.indexOf(k);
+      if (col >= 0 && datos[k] && String(actual[col]).trim() === "") {
+        faltan[k] = datos[k];
+        hay = true;
+      }
+    }
+    if (hay) updateRowByNumber("Clientes", fila, faltan);
+    return { nuevo: false, fila: fila };
+  }
+  datos.sinFusion = true; // fila nueva: no se fusiona por nombre con otro cliente
+  datos.origen = "web";
+  datos.notas = "Primera compra web: " + ped.id;
+  addRow("Clientes", datos);
+  return { nuevo: true };
+}
+
+// Para las compras web que entraron ANTES de esta versión: ejecutar una vez
+// desde el editor (función clientesDesdePedidosWeb). Repetirlo no duplica.
+function clientesDesdePedidosWeb() {
+  var keys = keysOf("Pedidos");
+  var data = sheetFor("Pedidos").getDataRange().getValues();
+  var nuevos = 0, vistos = 0;
+  for (var r = 1; r < data.length; r++) {
+    var o = {};
+    for (var c = 0; c < keys.length; c++) o[keys[c]] = data[r][c];
+    if (!/^ped\d{10,16}$/.test(String(o.id))) continue;
+    vistos++;
+    var res = clienteDesdePedidoWeb(o);
+    if (res && res.nuevo) nuevos++;
+  }
+  var msg = "Compras web revisadas: " + vistos + " · clientes nuevos: " + nuevos;
+  Logger.log(msg);
+  return msg;
+}
+
+/* -------------------- Avisos al celular (notificaciones) ------------------- */
+// Cuando entra una compra por la web, el CRM instalado en el celular recibe una
+// notificación (Web Push estándar, sirve en Android y en iPhone con el CRM
+// agregado a la pantalla de inicio). El aviso viaja SIN contenido: el celular,
+// al recibirlo, le pide el texto a "push_ultimo" con la clave de su suscripción.
+// Las claves VAPID se generan solas la primera vez y quedan en Propiedades del
+// script (VAPID). Las suscripciones, en PUSH_SUBS. Nada de esto va en el repo.
+
+var AVISOS_PENDIENTES = [];
+var PUSH_CONTACTO = "mailto:suplemarketargentina@gmail.com";
+
+function p256() {
+  if (p256.c) return p256.c;
+  var B = BigInt;
+  p256.c = {
+    p: B("0xffffffff00000001000000000000000000000000ffffffffffffffffffffffff"),
+    n: B("0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551"),
+    a: B("0xffffffff00000001000000000000000000000000fffffffffffffffffffffffc"),
+    G: [B("0x6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296"),
+        B("0x4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5")],
+    cero: B(0), uno: B(1), dos: B(2), tres: B(3),
+  };
+  return p256.c;
+}
+function ecMod(a, m) {
+  var r = a % m;
+  return r < p256().cero ? r + m : r;
+}
+function ecInv(a, m) {
+  var c = p256();
+  var lm = c.uno, hm = c.cero, bajo = ecMod(a, m), alto = m;
+  while (bajo > c.uno) {
+    var q = alto / bajo;
+    var nm = hm - lm * q, nb = alto - bajo * q;
+    hm = lm; alto = bajo; lm = nm; bajo = nb;
+  }
+  return ecMod(lm, m);
+}
+function ecDoble(P) {
+  var c = p256();
+  if (!P || P[1] === c.cero) return null;
+  var l = ecMod((c.tres * P[0] * P[0] + c.a) * ecInv(c.dos * P[1], c.p), c.p);
+  var x = ecMod(l * l - c.dos * P[0], c.p);
+  return [x, ecMod(l * (P[0] - x) - P[1], c.p)];
+}
+function ecSuma(P, Q) {
+  var c = p256();
+  if (!P) return Q;
+  if (!Q) return P;
+  if (P[0] === Q[0]) return ecMod(P[1] + Q[1], c.p) === c.cero ? null : ecDoble(P);
+  var l = ecMod((Q[1] - P[1]) * ecInv(Q[0] - P[0], c.p), c.p);
+  var x = ecMod(l * l - P[0] - Q[0], c.p);
+  return [x, ecMod(l * (P[0] - x) - P[1], c.p)];
+}
+function ecPor(k, P) {
+  var c = p256();
+  var R = null, A = P;
+  while (k > c.cero) {
+    if ((k & c.uno) === c.uno) R = ecSuma(R, A);
+    A = ecDoble(A);
+    k = k >> c.uno;
+  }
+  return R;
+}
+function bytesAHex(b) {
+  return b.map(function (x) { return ("0" + (x & 0xff).toString(16)).slice(-2); }).join("");
+}
+function hexABytes(h) {
+  var out = [];
+  for (var i = 0; i < h.length; i += 2) {
+    var v = parseInt(h.substr(i, 2), 16);
+    out.push(v > 127 ? v - 256 : v);
+  }
+  return out;
+}
+function bigAHex32(x) {
+  var h = x.toString(16);
+  while (h.length < 64) h = "0" + h;
+  return h;
+}
+function b64url(bytes) {
+  return Utilities.base64EncodeWebSafe(bytes).replace(/=+$/, "");
+}
+function textoABytes(s) {
+  return Utilities.newBlob(s).getBytes();
+}
+
+// Claves VAPID del servidor (se crean una sola vez).
+function vapidClaves() {
+  var props = PropertiesService.getScriptProperties();
+  var guardado = null;
+  try { guardado = JSON.parse(props.getProperty("VAPID") || "null"); } catch (e) {}
+  if (guardado && guardado.d && guardado.pub) return guardado;
+  var c = p256();
+  var semilla = Utilities.getUuid() + Utilities.getUuid() + Date.now() + Math.random();
+  var d = ecMod(BigInt("0x" + bytesAHex(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, semilla))), c.n - c.uno) + c.uno;
+  var Q = ecPor(d, c.G);
+  var claves = { d: bigAHex32(d), pub: b64url(hexABytes("04" + bigAHex32(Q[0]) + bigAHex32(Q[1]))) };
+  props.setProperty("VAPID", JSON.stringify(claves));
+  return claves;
+}
+
+// Firma ES256 (ECDSA P-256 + SHA-256) en formato r||s. El nonce sale de un
+// HMAC con la clave privada (determinístico, nunca se repite para mensajes distintos).
+function firmarES256(mensaje, dHex) {
+  var c = p256();
+  var d = BigInt("0x" + dHex);
+  var h = BigInt("0x" + bytesAHex(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, textoABytes(mensaje))));
+  for (var intento = 0; intento < 20; intento++) {
+    var kb = Utilities.computeHmacSha256Signature(textoABytes(bigAHex32(h) + ":" + intento), hexABytes(dHex));
+    var k = ecMod(BigInt("0x" + bytesAHex(kb)), c.n);
+    if (k === c.cero) continue;
+    var R = ecPor(k, c.G);
+    var r = ecMod(R[0], c.n);
+    if (r === c.cero) continue;
+    var s = ecMod(ecInv(k, c.n) * (h + r * d), c.n);
+    if (s === c.cero) continue;
+    return b64url(hexABytes(bigAHex32(r) + bigAHex32(s)));
+  }
+  throw new Error("No se pudo firmar el aviso");
+}
+
+function jwtVapid(endpoint, claves) {
+  var aud = String(endpoint).match(/^https:\/\/[^\/]+/)[0];
+  var enc = function (o) { return b64url(textoABytes(JSON.stringify(o))); };
+  var cuerpo = enc({ typ: "JWT", alg: "ES256" }) + "." +
+    enc({ aud: aud, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: PUSH_CONTACTO });
+  return cuerpo + "." + firmarES256(cuerpo, claves.d);
+}
+
+function pushSubs() {
+  try { return JSON.parse(PropertiesService.getScriptProperties().getProperty("PUSH_SUBS") || "[]") || []; } catch (e) { return []; }
+}
+function guardarPushSubs(s) {
+  PropertiesService.getScriptProperties().setProperty("PUSH_SUBS", JSON.stringify(s.slice(-15)));
+}
+
+// Solo se aceptan los servicios de push de los navegadores (nada de URLs propias).
+function endpointPushValido(url) {
+  return /^https:\/\/([a-z0-9-]+\.)*(googleapis\.com|push\.apple\.com|push\.services\.mozilla\.com|notify\.windows\.com)\//i.test(String(url || "")) &&
+    String(url).length < 1000;
+}
+
+// CRM: este dispositivo quiere recibir avisos. Devuelve la clave con la que el
+// celular pide el texto de cada aviso.
+function pushSuscribir(endpoint, nombre) {
+  if (!endpointPushValido(endpoint)) throw new Error("Dirección de avisos inválida");
+  var subs = pushSubs().filter(function (s) { return s.endpoint !== endpoint; });
+  var k = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, "");
+  subs.push({ endpoint: endpoint, k: k, nombre: String(nombre || "").slice(0, 60), alta: now() });
+  guardarPushSubs(subs);
+  return { k: k, dispositivos: subs.length };
+}
+
+function pushQuitar(endpoint) {
+  guardarPushSubs(pushSubs().filter(function (s) { return s.endpoint !== endpoint; }));
+  return { ok: true };
+}
+
+// Manda el aviso a todos los dispositivos. Los que el navegador dio de baja
+// (404/410) se borran solos. Nunca tira error: un aviso que falla no puede
+// romper una compra.
+function enviarAviso(titulo, cuerpo, url) {
+  var subs = pushSubs();
+  if (!subs.length) return { enviados: 0, dispositivos: 0 };
+  PropertiesService.getScriptProperties().setProperty("PUSH_ULTIMO", JSON.stringify({
+    titulo: String(titulo).slice(0, 80), cuerpo: String(cuerpo).slice(0, 200), url: url || "/admin/?ir=pedidos", ts: Date.now(),
+  }));
+  var claves = vapidClaves();
+  var pedidos = subs.map(function (s) {
+    return {
+      url: s.endpoint, method: "post", muteHttpExceptions: true,
+      headers: { Authorization: "vapid t=" + jwtVapid(s.endpoint, claves) + ", k=" + claves.pub, TTL: "86400", Urgency: "high" },
+    };
+  });
+  var resp = UrlFetchApp.fetchAll(pedidos);
+  var vivos = [], enviados = 0, errores = [];
+  for (var i = 0; i < subs.length; i++) {
+    var code = resp[i].getResponseCode();
+    if (code === 404 || code === 410) continue; // suscripción vencida
+    vivos.push(subs[i]);
+    if (code >= 200 && code < 300) enviados++;
+    else errores.push(code + " " + String(resp[i].getContentText() || "").slice(0, 120));
+  }
+  if (vivos.length !== subs.length) guardarPushSubs(vivos);
+  return { enviados: enviados, dispositivos: vivos.length, errores: errores };
+}
+
+// El celular pide el texto del último aviso con la clave de su suscripción.
+function pushUltimo(k) {
+  var ok = pushSubs().some(function (s) { return k && s.k === String(k); });
+  if (!ok) return null;
+  try { return JSON.parse(PropertiesService.getScriptProperties().getProperty("PUSH_ULTIMO") || "null"); } catch (e) { return null; }
+}
+
+function avisoCompraWeb(ped) {
+  var monto = "$ " + String(Math.round(Number(ped.monto) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  var titulo = "🛒 Nueva compra web · " + monto;
+  var cuerpo = (String(ped.cliente || "Cliente").trim() || "Cliente") + " · " + String(ped.pago || "") +
+    (ped.detalle ? "\n" + String(ped.detalle).slice(0, 120) : "");
+  AVISOS_PENDIENTES.push([titulo, cuerpo, "/admin/?ir=pedidos"]);
+}
+
+// Se llama al terminar cada solicitud, FUERA del bloqueo (no frena otras compras).
+function enviarAvisosPendientes() {
+  while (AVISOS_PENDIENTES.length) {
+    var a = AVISOS_PENDIENTES.shift();
+    try { enviarAviso(a[0], a[1], a[2]); } catch (e) { registrarError("push", e, {}); }
+  }
 }
 
 /* ------------------------- Renombrar un producto ------------------------- */

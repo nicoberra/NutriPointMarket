@@ -43,6 +43,8 @@ const cacheStore = {};
 let cacheHits = 0;
 const mails = [];
 const fetches = [];
+const pushes = [];
+let pushCodigo = () => 201;
 let lockCalls = 0;
 const props = { MP_ACCESS_TOKEN: "TEST-TOKEN", GITHUB_TOKEN: "GH" };
 let mpPayment = null;
@@ -63,7 +65,10 @@ const ctx = {
   LockService: { getScriptLock: () => ({ tryLock: () => { lockCalls++; return true; }, releaseLock: () => {} }) },
   Utilities: {
     formatDate: (d) => d.toISOString().slice(0, 16).replace("T", " "),
-    computeDigest: (_alg, v) => Array.from(require("crypto").createHash("sha256").update(String(v)).digest()).map((b) => (b > 127 ? b - 256 : b)), DigestAlgorithm: {}, Charset: {}, base64Encode: (x) => Buffer.from(String(x)).toString("base64"),
+    computeDigest: (_alg, v) => Array.from(require("crypto").createHash("sha256").update(Array.isArray(v) ? Buffer.from(v.map((b) => b & 0xff)) : String(v)).digest()).map((b) => (b > 127 ? b - 256 : b)), DigestAlgorithm: {}, Charset: {}, base64Encode: (x) => Buffer.from(String(x)).toString("base64"),
+    computeHmacSha256Signature: (v, k) => Array.from(require("crypto").createHmac("sha256", Buffer.from(k.map((b) => b & 0xff))).update(Buffer.from(v.map((b) => b & 0xff))).digest()).map((b) => (b > 127 ? b - 256 : b)),
+    base64EncodeWebSafe: (bytes) => Buffer.from(bytes.map((b) => b & 0xff)).toString("base64").replace(/\+/g, "-").replace(/\//g, "_"),
+    newBlob: (txt) => ({ getBytes: () => Array.from(Buffer.from(String(txt), "utf8")).map((b) => (b > 127 ? b - 256 : b)) }),
     getUuid: () => "uuid-" + Math.random(),
   },
   ContentService: { createTextOutput: (t) => ({ text: t, setMimeType() { return this; } }), MimeType: { JAVASCRIPT: "js", JSON: "json" } },
@@ -82,7 +87,7 @@ const ctx = {
     if (url.indexOf("/v1/payments/") !== -1) return { getResponseCode: () => 200, getContentText: () => JSON.stringify(mpPayment) };
     if (url.indexOf("api.github.com") !== -1) return { getResponseCode: () => 201, getContentText: () => "{}" };
     return { getResponseCode: () => 200, getContentText: () => "{}" };
-  } },
+  }, fetchAll: (reqs) => reqs.map((q) => { pushes.push(q); return { getResponseCode: () => pushCodigo(q.url), getContentText: () => "" }; }) },
   Logger: { log: () => {} },
 };
 vm.createContext(ctx);
@@ -138,7 +143,7 @@ const items = (arr) => JSON.stringify(arr);
 
 /* --------------------------------- Pruebas -------------------------------- */
 console.log("Versión y lecturas");
-check("version v19", call({ action: "version" }).version === "v19");
+check("version v20", call({ action: "version" }).version === "v20");
 const l1 = call({ action: "productos_list" });
 check("productos_list público sin costos", l1.ok && l1.data.length === 5 && !("costo" in l1.data[0]));
 const hitsAntes = cacheHits;
@@ -357,7 +362,7 @@ console.log("Compras: leer fotos, archivos y texto con Claude");
   const drive = [];
   let claude = null, claudeReq = null;
   ctx.Utilities.base64Decode = (b) => Array.from(Buffer.from(b, "base64"));
-  ctx.Utilities.newBlob = (bytes, tipo, nombre) => ({ bytes, tipo, nombre });
+  ctx.Utilities.newBlob = (bytes, tipo, nombre) => ({ bytes, tipo, nombre, getBytes: () => Array.from(Buffer.from(String(bytes), "utf8")).map((b) => (b > 127 ? b - 256 : b)) });
   ctx.DriveApp.getFoldersByName = () => ({ hasNext: () => false });
   ctx.DriveApp.createFolder = () => ({ createFile: (blob) => { drive.push(blob); return { getId: () => "F" + drive.length, getUrl: () => "https://drive.google.com/file/d/F" + drive.length }; } });
   const fetchOrig = ctx.UrlFetchApp.fetch;
@@ -743,6 +748,78 @@ console.log("Id vacío nunca toca otra fila (ERR-SUP-007)");
     check(`id ${JSON.stringify(id)}: no edita ni borra`, !edito && !borro);
   }
   check("  ...la pestaña Pedidos queda igual", JSON.stringify(sh.rows) === antes);
+}
+
+const pw = (o) => { prodRowSet("Tape", "stock", "sí"); prodRowSet("Tape", "cantidad", ""); return addPedido(o); };
+console.log("Compras web → Clientes (Usuarios web)");
+{
+  prodRowSet("Tape", "stock", "sí"); prodRowSet("Tape", "cantidad", "");
+  const cli = () => { const k = ctx.__keysOf("Clientes"); return book.sheets.Clientes.rows.slice(1).map((r) => Object.fromEntries(k.map((c, i) => [c, r[i]]))); };
+  const n0 = cli().length;
+  let rp = pw({ id: "ped1792000000001", cliente: "Evelyn Prueba", telefono: "11 5140-6542", email: "Evelyn@Test.com", monto: 1000, pago: "Efectivo", envio: "Temperley 256, Hurlingham, Buenos Aires, 1688 · Envío Vía Cargo · a coordinar", items: items([{ n: "Tape", q: 1 }]) });
+  check("pedido web OK", rp.ok === true, rp);
+  const ev = cli().find((c) => c.email === "evelyn@test.com");
+  check("  ...el comprador queda en Clientes como web", ev && ev.origen === "web" && ev.nombre === "Evelyn Prueba" && cli().length === n0 + 1, ev);
+  check("  ...con la dirección (sin la zona)", ev && ev.direccion === "Temperley 256, Hurlingham, Buenos Aires, 1688", ev && ev.direccion);
+  check("  ...sin clave (no es una cuenta)", ev && !ev.clave);
+  rp = pw({ id: "ped1792000000002", cliente: "Eve", telefono: "+54 9 11 5140 6542", monto: 1000, pago: "Efectivo", items: items([{ n: "Tape", q: 1 }]) });
+  check("segunda compra (mismo celular escrito distinto) no duplica", rp.ok === true && cli().length === n0 + 1, [rp, cli().length, n0]);
+  check("  ...y no pisa el nombre", cli().find((c) => c.email === "evelyn@test.com").nombre === "Evelyn Prueba");
+  const juan0 = cli().find((c) => c.email === "juan@test.com");
+  rp = pw({ id: "ped1792000000003", cliente: "Juan P", telefono: "11 2222-3333", email: "JUAN@test.com", monto: 1000, pago: "Efectivo", items: items([{ n: "Tape", q: 1 }]) });
+  const juan = cli().find((c) => c.email === "juan@test.com");
+  check("cliente que ya existía: completa el teléfono que faltaba", rp.ok && juan.telefono === "11 2222-3333" && cli().length === n0 + 1, juan);
+  check("  ...sin cambiar nombre, clave ni origen", juan.nombre === juan0.nombre && juan.clave === juan0.clave && juan.origen === juan0.origen);
+  rp = pw({ id: "ped1792000000003", cliente: "Juan P", telefono: "11 2222-3333", email: "JUAN@test.com", monto: 1000, pago: "Efectivo", items: items([{ n: "Tape", q: 1 }]) });
+  check("reintento del mismo pedido no toca Clientes", rp.ok && cli().length === n0 + 1);
+  const msg = ctx.clientesDesdePedidosWeb();
+  check("recorrer las compras viejas no duplica", /clientes nuevos: \d+/.test(msg) && cli().filter((c) => c.email === "evelyn@test.com").length === 1, msg);
+}
+
+console.log("Avisos al celular (Web Push)");
+{
+  prodRowSet("Tape", "stock", "sí"); prodRowSet("Tape", "cantidad", "");
+  const crypto = require("crypto");
+  const tok = ctx.crearToken().token;
+  delete props.PUSH_SUBS; delete props.VAPID; delete props.PUSH_ULTIMO;
+  pushes.length = 0;
+  let rp = pw({ id: "ped1792000000010", cliente: "Sin avisos", monto: 1000, pago: "Efectivo", items: items([{ n: "Tape", q: 1 }]) });
+  check("sin dispositivos: la compra anda y no se manda nada", rp.ok && pushes.length === 0);
+  check("push_clave exige token", call({ action: "push_clave" }).error === "auth");
+  const pub = call({ action: "push_clave", token: tok }).data.pub;
+  const pubBuf = Buffer.from(pub, "base64url");
+  check("clave pública P-256 sin comprimir (65 bytes)", pubBuf.length === 65 && pubBuf[0] === 4, pub);
+  check("  ...la segunda vez es la misma", call({ action: "push_clave", token: tok }).data.pub === pub);
+  check("  ...y queda guardada en Propiedades (no en el código)", JSON.parse(props.VAPID).pub === pub);
+  check("endpoint que no es de un navegador → rechazo", call({ action: "push_suscribir", token: tok, endpoint: "https://evil.com/x" }).ok === false);
+  check("push_suscribir exige token", call({ action: "push_suscribir", endpoint: "https://fcm.googleapis.com/fcm/send/abc" }).error === "auth");
+  const s1 = call({ action: "push_suscribir", token: tok, endpoint: "https://fcm.googleapis.com/fcm/send/abc", nombre: "Android" }).data;
+  const s2 = call({ action: "push_suscribir", token: tok, endpoint: "https://web.push.apple.com/QXYZ", nombre: "iPhone" }).data;
+  check("dos dispositivos suscriptos", s1.k && s2.k && s2.dispositivos === 2);
+  rp = pw({ id: "ped1792000000011", cliente: "Evelyn Couste", telefono: "1151406542", monto: 2000, pago: "Transferencia", detalle: "2x Tape", items: items([{ n: "Tape", q: 2 }]) });
+  check("compra web → un aviso por dispositivo", rp.ok && pushes.length === 2, [rp, pushes.length]);
+  const q = pushes.find((x) => x.url.indexOf("web.push.apple.com") !== -1);
+  const m = q && /^vapid t=([^,]+), k=(.+)$/.exec(q.headers.Authorization);
+  check("  ...con cabecera VAPID", m && m[2] === pub && q.headers.TTL && q.method === "post", q && q.headers);
+  if (m) {
+    const [h, c, sig] = m[1].split(".");
+    const claims = JSON.parse(Buffer.from(c, "base64url").toString());
+    check("  ...aud = servicio de Apple, sub y vencimiento", claims.aud === "https://web.push.apple.com" && /^mailto:/.test(claims.sub) && claims.exp > Date.now() / 1000, claims);
+    const key = crypto.createPublicKey({ key: { kty: "EC", crv: "P-256", x: pubBuf.subarray(1, 33).toString("base64url"), y: pubBuf.subarray(33).toString("base64url") }, format: "jwk" });
+    check("  ...firma ES256 válida (verificada con crypto de Node)", crypto.verify("sha256", Buffer.from(h + "." + c), { key, dsaEncoding: "ieee-p1363" }, Buffer.from(sig, "base64url")));
+  }
+  const u = call({ action: "push_ultimo", k: s2.k }).data;
+  check("el celular lee el texto con su clave", u && /Nueva compra web · \$ 2\.000/.test(u.titulo) && /Evelyn Couste · Transferencia/.test(u.cuerpo) && u.url === "/admin/?ir=pedidos", u);
+  check("  ...con una clave falsa no ve nada", call({ action: "push_ultimo", k: "falsa" }).data === null && call({ action: "push_ultimo" }).data === null);
+  pushes.length = 0;
+  pushCodigo = (url) => (url.indexOf("apple") !== -1 ? 410 : 201);
+  const pr = call({ action: "push_probar", token: tok }).data;
+  check("dispositivo dado de baja (410) se borra solo", pr.enviados === 1 && pr.dispositivos === 1 && JSON.parse(props.PUSH_SUBS).length === 1, pr);
+  pushCodigo = () => { throw new Error("sin red"); };
+  rp = pw({ id: "ped1792000000012", cliente: "Con red caida", monto: 1000, pago: "Efectivo", items: items([{ n: "Tape", q: 1 }]) });
+  check("si el aviso falla, la compra igual se guarda", rp.ok === true, rp);
+  pushCodigo = () => 201;
+  check("push_quitar borra el dispositivo", call({ action: "push_quitar", token: tok, endpoint: "https://fcm.googleapis.com/fcm/send/abc" }).ok && JSON.parse(props.PUSH_SUBS).length === 0);
 }
 
 console.log("Copias automáticas");

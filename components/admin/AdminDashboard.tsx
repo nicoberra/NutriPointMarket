@@ -8,6 +8,7 @@ import { pedidoCobrado } from "@/lib/caja";
 import { UserIcon, ClipboardIcon, ChevronRightIcon } from "@/components/Icons";
 import { useCountUp } from "./useCountUp";
 import { ErrorState } from "@/components/Estados";
+import { AvisosCompras } from "./AvisosCompras";
 
 type Section = "productos" | "clientes" | "pedidos" | "facturacion";
 
@@ -23,8 +24,10 @@ function parseDate(v: unknown): Date | null {
 }
 const low = (v: unknown) => String(v ?? "").trim().toLowerCase();
 
-export function AdminDashboard({ onGo, onProducto }: {
+export function AdminDashboard({ onGo, onProducto, onToast }: {
   onGo: (s: Section) => void;
+  /** Mensajes cortos (toast) del CRM. */
+  onToast: (t: string) => void;
   /** Abre Productos con ese producto a la vista (para cargarle foto, stock, etc.). */
   onProducto: (nombre: string) => void;
 }) {
@@ -134,6 +137,7 @@ export function AdminDashboard({ onGo, onProducto }: {
 
   return (
     <div className="space-y-5">
+      <AvisosCompras onToast={onToast} />
       {errorCarga && (
         <ErrorState
           text="No pudimos traer clientes y pedidos. Revisá tu conexión y probá de nuevo."
