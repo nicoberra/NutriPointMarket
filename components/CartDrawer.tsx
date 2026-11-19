@@ -7,6 +7,7 @@ import { categoryMap } from "@/data/categories";
 import { brandName } from "@/data/brands";
 import { formatPrice } from "@/lib/format";
 import { ASSET_PREFIX } from "@/lib/config";
+import { ENVIO_GRATIS_DESDE } from "@/lib/envios";
 import { ProductVisual } from "./ProductVisual";
 import { QuantitySelector } from "./QuantitySelector";
 import { itemMax } from "@/lib/stock";
@@ -183,6 +184,21 @@ export function CartDrawer() {
 
             {/* Footer */}
             <div className="border-t border-line bg-white px-4 py-4">
+              {/* Cuánto falta para el envío gratis (CABA y GBA, a precio publicado) */}
+              <div className="mb-3">
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-primary">
+                  <TruckIcon className="h-4 w-4 shrink-0" />
+                  {subtotal >= ENVIO_GRATIS_DESDE
+                    ? "¡Tenés envío gratis en CABA y GBA!"
+                    : `Te faltan ${formatPrice(ENVIO_GRATIS_DESDE - subtotal)} para el envío gratis en CABA y GBA`}
+                </p>
+                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-page-soft">
+                  <div
+                    className="h-full origin-left rounded-full bg-accent transition-transform duration-500 ease-enter motion-reduce:transition-none"
+                    style={{ transform: `scaleX(${Math.min(1, subtotal / ENVIO_GRATIS_DESDE)})` }}
+                  />
+                </div>
+              </div>
               <div className="mb-3 flex items-center justify-between">
                 <span className="text-sm text-muted">Subtotal</span>
                 <span className="font-display text-xl font-extrabold text-primary">
