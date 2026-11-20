@@ -21,7 +21,7 @@ import { SmartImg } from "@/components/SmartImg";
 
 export function ProductCard({ product, priority = false }: { product: Product; priority?: boolean }) {
   const { addItem } = useCart();
-  const { products: allProducts } = useProducts();
+  const { products: allProducts, live } = useProducts();
   const router = useRouter();
   const imgRef = useRef<HTMLImageElement>(null);
   const hasFlavors = product.flavors.length > 0;
@@ -49,8 +49,11 @@ export function ProductCard({ product, priority = false }: { product: Product; p
   // según lo elegido, o del producto si no usa variantes).
   const selVar = product.variants?.find((v) => v.name === flavor);
   const promo = usePromoDestacados();
+  // Solo con datos en vivo (el snapshot puede tener cantidades de otro día).
   const lastOne =
-    product.combo && product.combo.length
+    !live
+      ? false
+      : product.combo && product.combo.length
       ? comboStockMax(product, allProducts, choices) === 1
       : selVar && selVar.qty != null
         ? selVar.qty === 1

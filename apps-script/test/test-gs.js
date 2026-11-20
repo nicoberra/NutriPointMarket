@@ -143,7 +143,7 @@ const items = (arr) => JSON.stringify(arr);
 
 /* --------------------------------- Pruebas -------------------------------- */
 console.log("Versión y lecturas");
-check("version v21", call({ action: "version" }).version === "v21");
+check("version v22", call({ action: "version" }).version === "v22");
 const l1 = call({ action: "productos_list" });
 check("productos_list público sin costos", l1.ok && l1.data.length === 5 && !("costo" in l1.data[0]));
 const hitsAntes = cacheHits;
@@ -856,6 +856,41 @@ console.log("App del Barrio (aviso solo si cambia el stock de algo publicado)");
   rp = pw({ id: "ped1792000000023", cliente: "Sin pestaña", monto: 1000, pago: "Efectivo", items: items([{ n: "Tape", q: 1 }]) });
   check("sin la pestaña AppDelBarrio no hace nada y la compra anda", rp.ok);
   call({ action: "push_quitar", token: tok, endpoint: "https://fcm.googleapis.com/fcm/send/adb" });
+}
+
+console.log("Guardar producto sin pisar el stock (v22)");
+{
+  const tok = ctx.crearToken().token;
+  book.sheets.Productos.rows.push(rowFrom("Productos", { nombre: "Prueba Stock", categoria: "Varios", precio: 1000, stock: "sí", cantidad: 5, variantes: "Rojo:3, Azul:2" }));
+  const guardar = (o) => call({ action: "productos_save", token: tok, data: JSON.stringify(Object.assign({ nombre: "Prueba Stock", precio: 1000, stock: true, destacado: false }, o)) });
+  // 1) Nadie lo cambió: se guarda normal (incluido el stock nuevo).
+  let r = guardar({ variantes: "Rojo:4, Azul:2", cantidad: 6, stockAntes: { variantes: "Rojo:3, Azul:2", cantidad: 5 } });
+  check("sin cambios ajenos guarda el stock nuevo", r.ok && prod("Prueba Stock").variantes === "Rojo:4, Azul:2" && Number(prod("Prueba Stock").cantidad) === 6, [r, prod("Prueba Stock")]);
+  // 2) Hubo una venta (Rojo 4→3) y el CRM, con datos viejos, solo cambia el precio.
+  prodRowSet("Prueba Stock", "variantes", "Rojo:3, Azul:2"); prodRowSet("Prueba Stock", "cantidad", 5);
+  r = guardar({ precio: 1200, variantes: "Rojo:4, Azul:2", cantidad: 6, stockAntes: { variantes: "Rojo:4, Azul:2", cantidad: 6 } });
+  const k = ctx.__keysOf("Productos");
+  const filaP = () => book.sheets.Productos.rows.find((x) => x[0] === "Prueba Stock");
+  check("cambio de precio con datos viejos: guarda el precio y conserva el stock de la planilla", r.ok && Number(filaP()[k.indexOf("precio")]) === 1200 && prod("Prueba Stock").variantes === "Rojo:3, Azul:2" && Number(prod("Prueba Stock").cantidad) === 5, [r, prod("Prueba Stock")]);
+  // 3) Hubo una venta y el CRM quiere CAMBIAR el stock con datos viejos: se rechaza.
+  r = guardar({ variantes: "Rojo:4, Azul:5", cantidad: 9, stockAntes: { variantes: "Rojo:4, Azul:2", cantidad: 6 } });
+  check("cambio de stock sobre datos viejos: no se guarda y avisa STOCK_CAMBIO", !r.ok && /STOCK_CAMBIO/.test(r.error || "") && prod("Prueba Stock").variantes === "Rojo:3, Azul:2", [r, prod("Prueba Stock")]);
+  // 4) El stock nuevo ya coincide con la planilla: se guarda sin problema.
+  r = guardar({ variantes: "Rojo:3, Azul:2", cantidad: 5, stockAntes: { variantes: "Rojo:9", cantidad: 9 } });
+  check("si lo que guarda ya es lo de la planilla, no lo rechaza", r.ok, r);
+  // 5) Espacios y números escritos distinto cuentan como iguales.
+  r = guardar({ variantes: "Rojo:2, Azul:2", cantidad: 4, stockAntes: { variantes: "Rojo: 3 ,Azul:2", cantidad: "5" } });
+  check("compara sin importar espacios ni '5' vs 5", r.ok && prod("Prueba Stock").variantes === "Rojo:2, Azul:2", [r, prod("Prueba Stock")]);
+  // 6) CRM viejo (sin stockAntes): se guarda como antes.
+  r = guardar({ variantes: "Rojo:1, Azul:1", cantidad: 2 });
+  check("sin stockAntes guarda como antes", r.ok && prod("Prueba Stock").variantes === "Rojo:1, Azul:1", [r, prod("Prueba Stock")]);
+  // 7) Producto nuevo con stockAntes: se crea sin la columna extra.
+  r = call({ action: "productos_save", token: tok, data: JSON.stringify({ nombre: "Prueba Nuevo", precio: 500, stock: true, destacado: false, cantidad: 3, stockAntes: { variantes: "", cantidad: 0 } }) });
+  check("producto nuevo se crea normal", r.ok && Number(prod("Prueba Nuevo").cantidad) === 3, [r]);
+  // 8) Los combos no se controlan (su stock sale de sus productos).
+  r = call({ action: "productos_save", token: tok, data: JSON.stringify({ nombre: "Proteína + Creatina", precio: 70000, stock: true, destacado: false, cantidad: 0, combo: JSON.stringify([{ n: "WHEY PROTEIN TRUE MADE 1kg", q: 1 }]), stockAntes: { variantes: "", cantidad: 7 } }) });
+  check("los combos se guardan sin control de stock", r.ok, r);
+  book.sheets.Productos.rows = book.sheets.Productos.rows.filter((x) => x[0] !== "Prueba Stock" && x[0] !== "Prueba Nuevo");
 }
 
 console.log("Copias automáticas");

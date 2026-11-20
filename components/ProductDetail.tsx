@@ -32,7 +32,9 @@ import {
 export function ProductDetail({ product: initial }: { product: Product }) {
   const router = useRouter();
   const { addItem } = useCart();
-  const { getBySlug, products: allProducts } = useProducts();
+  // live: hasta que no llegan los datos en vivo, no se muestran cantidades
+  // exactas ("Quedan 3"): el snapshot o el caché pueden ser de otro día.
+  const { getBySlug, products: allProducts, live } = useProducts();
   // Usa la versión en vivo de la planilla si está disponible; si no, el respaldo.
   const product = getBySlug(initial.slug) ?? initial;
   const shape = categoryMap[product.category]?.shape ?? "tub";
@@ -464,11 +466,13 @@ export function ProductDetail({ product: initial }: { product: Product }) {
             <QuantitySelector value={qty} onChange={setQty} max={maxQty} />
             <span
               className={`text-xs font-bold ${
-                soldOut || maxQty === 1 ? "text-sale" : "text-primary"
+                soldOut || (live && maxQty === 1) ? "text-sale" : "text-primary"
               }`}
             >
               {soldOut
                 ? "Sin stock"
+                : !live
+                  ? "En stock"
                 : enCaja
                   ? cajas >= 99
                     ? "En stock"

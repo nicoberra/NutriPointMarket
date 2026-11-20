@@ -18,7 +18,7 @@
  * ============================================================================ */
 
 var SHEET_ID = "12paAzW6OcSgYv4u6L7QVI4tpvrEx1yqnujW0OjcieMc";
-var API_VERSION = "v21"; // v21: aviso al celular cuando un producto publicado en App del Barrio se queda sin stock o vuelve a tener // v20: compradores web a Clientes + avisos al celular por cada compra web // v19: un pedido marcado "no cobrado" no suma sello del Club // v18: caja (saldo inicial por medio de pago para "Plata disponible") // v17: regalo con cupón (pestaña Leads, cupón único validado en el servidor) // v16: Club de sellos (premio en la N-ésima compra, descuento aplicado y validado en el servidor) // v15: venta por caja o por unidad (Unidades por caja + Precio caja) // v14: un producto puede estar en varias categorías ("A | B") // v13: compras pendientes (se revisan y se suman al stock después) // v12: lectura de compras con Claude Haiku 5.5 (el más barato) // v11: las compras leen fotos, archivos y texto con Claude // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
+var API_VERSION = "v22"; // v22: guardar un producto desde el CRM ya no pisa el stock si cambió mientras se editaba // v21: aviso al celular cuando un producto publicado en App del Barrio se queda sin stock o vuelve a tener // v20: compradores web a Clientes + avisos al celular por cada compra web // v19: un pedido marcado "no cobrado" no suma sello del Club // v18: caja (saldo inicial por medio de pago para "Plata disponible") // v17: regalo con cupón (pestaña Leads, cupón único validado en el servidor) // v16: Club de sellos (premio en la N-ésima compra, descuento aplicado y validado en el servidor) // v15: venta por caja o por unidad (Unidades por caja + Precio caja) // v14: un producto puede estar en varias categorías ("A | B") // v13: compras pendientes (se revisan y se suman al stock después) // v12: lectura de compras con Claude Haiku 5.5 (el más barato) // v11: las compras leen fotos, archivos y texto con Claude // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
 
 // Repo de GitHub donde se guardan las fotos de productos (en public/productos/).
 // El token NO va acá: se guarda en Propiedades del script como GITHUB_TOKEN.
@@ -1622,8 +1622,70 @@ function listProductos(conCostos) {
 function saveProducto(obj) {
   if (!obj.nombre) throw new Error("Falta el nombre del producto");
   var n = findRowById("Productos", obj.nombre);
-  if (n > 0) return updateRow("Productos", obj.nombre, obj);
+  if (n > 0) {
+    protegerStockProducto(n, obj);
+    return updateRow("Productos", obj.nombre, obj);
+  }
+  delete obj.stockAntes;
   return addRow("Productos", obj);
+}
+
+// Firma comparable del stock de un producto: "Vainilla:3, Chocolate:2|5".
+// Ignora espacios y el orden de escritura de los números ("3" = 3).
+function firmaStock(variantes, cantidad) {
+  var vs = String(variantes == null ? "" : variantes).split(",").map(function (s) {
+    s = s.trim();
+    if (!s) return "";
+    var i = s.lastIndexOf(":");
+    if (i < 0) return s;
+    var q = s.slice(i + 1).trim();
+    return s.slice(0, i).trim() + ":" + (q === "" || isNaN(Number(q)) ? q : Number(q));
+  }).filter(function (s) { return s; });
+  var c = cantidad === "" || cantidad == null || isNaN(Number(cantidad)) ? 0 : Number(cantidad);
+  return vs.join(", ") + "|" + c;
+}
+
+// El CRM manda el stock completo (todas las variantes) cada vez que guarda un
+// producto, con lo que tenía en pantalla. Si mientras tanto el stock de la
+// planilla cambió (una venta, una compra, otro celu), ese guardado lo pisaba
+// con números viejos. Con "stockAntes" (lo que el CRM tenía cargado) se compara:
+//  - nadie lo cambió → se guarda normal;
+//  - cambió y este guardado NO toca el stock → se conserva el de la planilla;
+//  - cambió y este guardado SÍ cambia el stock → se rechaza para no pisarlo.
+// Sin stockAntes (CRM viejo en caché) se guarda como antes. Los combos no
+// tienen stock propio (sale de sus productos), así que no se controlan.
+function protegerStockProducto(n, obj) {
+  var antesRaw = obj.stockAntes;
+  delete obj.stockAntes;
+  if (antesRaw === undefined || antesRaw === null || antesRaw === "") return;
+  var antes;
+  try { antes = typeof antesRaw === "string" ? JSON.parse(antesRaw) : antesRaw; } catch (e) { return; }
+  if (!antes || typeof antes !== "object") return;
+  var keys = keysOf("Productos");
+  var row = sheetFor("Productos").getRange(n, 1, 1, keys.length).getValues()[0];
+  var comboFila = String(row[keys.indexOf("combo")] || "").trim();
+  var comboNuevo = String(obj.combo || "").trim();
+  if ((comboFila && comboFila !== "[]") || (comboNuevo && comboNuevo !== "[]")) return;
+  var tocaStock = obj.hasOwnProperty("variantes") || obj.hasOwnProperty("cantidad");
+  if (!tocaStock) return;
+  var actual = firmaStock(row[keys.indexOf("variantes")], row[keys.indexOf("cantidad")]);
+  var vista = firmaStock(antes.variantes, antes.cantidad);
+  var nueva = firmaStock(
+    obj.hasOwnProperty("variantes") ? obj.variantes : row[keys.indexOf("variantes")],
+    obj.hasOwnProperty("cantidad") ? obj.cantidad : row[keys.indexOf("cantidad")]
+  );
+  if (actual === vista || actual === nueva) return;
+  if (nueva === vista) {
+    // Este guardado no cambia el stock: queda el de la planilla (y su "Stock").
+    delete obj.variantes;
+    delete obj.cantidad;
+    delete obj.stock;
+    return;
+  }
+  var partes = actual.split("|");
+  throw new Error("STOCK_CAMBIO: el stock de «" + obj.nombre + "» cambió mientras lo editabas (ahora: " +
+    (partes[0] ? partes[0] + ", " : "") + "total " + partes[1] +
+    "). No se guardó para no pisarlo: se recargaron los datos, revisalo y volvé a guardar.");
 }
 
 /* ------------------------------ Imágenes --------------------------------- */

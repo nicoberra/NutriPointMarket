@@ -38,6 +38,10 @@ interface ProductsContextValue {
   products: Product[];
   brands: Brand[];
   loading: boolean;
+  /** true cuando ya llegaron los datos EN VIVO de la planilla en esta visita.
+   * Mientras es false se ven el snapshot o el caché del navegador, que pueden
+   * tener stock viejo: no se muestran cantidades exactas ni se edita el stock. */
+  live: boolean;
   refresh: () => Promise<void>;
   getBySlug: (slug: string) => Product | undefined;
   byCategory: (c: CategorySlug) => Product[];
@@ -52,6 +56,7 @@ const CACHE_KEY = "npm-products-cache-v3";
 export function ProductsProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>(SEED);
   const [loading, setLoading] = useState(true);
+  const [live, setLive] = useState(false);
 
   // Una sola lectura a la vez: si piden refrescar mientras hay una en curso,
   // se hace UNA más al terminar (así no se apilan llamadas lentas y el
@@ -69,6 +74,7 @@ export function ProductsProvider({ children }: { children: ReactNode }) {
         const live = applyComboStock(await fetchProducts());
         if (!live.length) continue; // lectura vacía: no borra la base ni el caché
         setProducts(live);
+        setLive(true);
         try {
           localStorage.setItem(CACHE_KEY, JSON.stringify(live));
         } catch {
@@ -94,11 +100,32 @@ export function ProductsProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore */
     }
-    refresh()
-      .catch(() => {
-        /* se queda con cache o vacío */
-      })
-      .finally(() => setLoading(false));
+    // Si la planilla tarda o falla, reintenta (a los 3 s y a los 10 s) en vez
+    // de quedarse con datos viejos toda la visita.
+    let vivo = true;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const intentar = (n: number): void => {
+      refresh()
+        .catch(() => {
+          if (!vivo || n >= 2) return;
+          timers.push(setTimeout(() => intentar(n + 1), n === 0 ? 3000 : 10000));
+        })
+        .finally(() => {
+          if (vivo) setLoading(false);
+        });
+    };
+    intentar(0);
+    // Al volver a la pestaña (por ejemplo, el CRM abierto hace rato en el celu)
+    // vuelve a leer la planilla para no trabajar sobre stock viejo.
+    const alVolver = () => {
+      if (document.visibilityState === "visible") refresh().catch(() => {});
+    };
+    document.addEventListener("visibilitychange", alVolver);
+    return () => {
+      vivo = false;
+      timers.forEach(clearTimeout);
+      document.removeEventListener("visibilitychange", alVolver);
+    };
   }, [refresh]);
 
   // En la TIENDA, un producto sin foto no se muestra (catálogo, carruseles,
@@ -126,6 +153,7 @@ export function ProductsProvider({ children }: { children: ReactNode }) {
       products: list,
       brands,
       loading,
+      live,
       refresh,
       getBySlug: (slug) => bySlug.get(slug),
       byCategory: (c) => list.filter((p) => estaEnCategoria(p, c)),
@@ -133,7 +161,7 @@ export function ProductsProvider({ children }: { children: ReactNode }) {
       bestSellers: list.filter((p) => p.bestSeller),
       onSale: list.filter((p) => p.discount > 0),
     };
-  }, [products, loading, refresh, isAdmin]);
+  }, [products, loading, live, refresh, isAdmin]);
 
   return <ProductsContext.Provider value={value}>{children}</ProductsContext.Provider>;
 }
