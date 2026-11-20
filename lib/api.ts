@@ -463,6 +463,19 @@ export interface ProductInput {
   porCaja?: number | "";
   /** Precio de la caja con transferencia (0 = no se vende por caja). */
   precioCaja?: number | "";
+  /** Stock que el CRM tenía en pantalla al editar. El Apps Script lo compara
+   * con la planilla: si cambió (una venta, otro celu), no lo pisa. */
+  stockAntes?: { variantes: string; cantidad: number };
+}
+
+/** El guardado se rechazó porque el stock cambió mientras se editaba. */
+export function esErrorStockCambio(msg: string): boolean {
+  return /STOCK_CAMBIO/.test(msg);
+}
+
+/** Texto del aviso de stock cambiado, sin la marca interna. */
+export function textoStockCambio(msg: string): string {
+  return msg.replace(/^.*STOCK_CAMBIO:\s*/, "").replace(/^./, (c) => c.toUpperCase());
 }
 
 export async function saveProduct(row: ProductInput): Promise<boolean> {
@@ -483,6 +496,7 @@ export async function saveProduct(row: ProductInput): Promise<boolean> {
     infoNutricional: row.infoNutricional ?? "",
     ingredientes: row.ingredientes ?? "",
     combo: row.combo ?? "",
+    ...(row.stockAntes ? { stockAntes: row.stockAntes } : {}),
   });
   const r = await api("productos_save", { data });
   return r.ok !== false;

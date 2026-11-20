@@ -20,8 +20,24 @@ import {
   deleteProductImage,
   renameProduct,
   deleteRow,
+  lastApiError,
+  esErrorStockCambio,
+  textoStockCambio,
   type ProductInput,
 } from "@/lib/api";
+
+/** Variantes con stock ("Rojo:3, Azul:2") tal como las guarda la planilla. */
+function variantesDe(p: Product): string {
+  return p.variants && p.variants.length
+    ? p.variants.map((v) => (v.qty == null ? v.name : `${v.name}:${v.qty}`)).join(", ")
+    : p.flavors.join(", ");
+}
+
+/** El stock que el CRM tiene en pantalla para este producto (para que el
+ * Apps Script detecte si cambió en la planilla y no lo pise). */
+function stockVisto(p: Product): { variantes: string; cantidad: number } {
+  return { variantes: variantesDe(p), cantidad: p.stockQty ?? 0 };
+}
 import { formatPrice } from "@/lib/format";
 import { listPrice } from "@/lib/config";
 import { categoryMap } from "@/data/categories";
@@ -59,7 +75,7 @@ export function AdminProducts({ onToast, busquedaInicial = "" }: {
   /** Nombre del producto con el que arranca el buscador (viene de los avisos del Inicio). */
   busquedaInicial?: string;
 }) {
-  const { products, refresh } = useProducts();
+  const { products, refresh, live } = useProducts();
   const { categories } = useCategories();
   const dollar = useDollar();
   const [q, setQ] = useState(busquedaInicial);
@@ -87,7 +103,25 @@ export function AdminProducts({ onToast, busquedaInicial = "" }: {
 
   // Guardado inline (precio, precioML, stock, destacado). Cruza por nombre y
   // conserva marca/categoría/variantes del producto.
+  // Avisa y refresca si todavía no llegaron los datos en vivo de la planilla
+  // (lo que se ve puede ser de otro día: editar encima pisaría el stock real).
+  const esperarDatos = () => {
+    if (live) return false;
+    onToast("Esperá: se están actualizando los datos de la planilla");
+    refresh().catch(() => {});
+    return true;
+  };
+
+  // Resultado de un guardado: si el stock cambió mientras se editaba, el Apps
+  // Script no lo pisa y lo avisa; los datos se recargan solos.
+  const avisarGuardado = (ok: boolean) => {
+    if (ok) onToast("Guardado ✓");
+    else if (esErrorStockCambio(lastApiError)) onToast(textoStockCambio(lastApiError));
+    else onToast("No se pudo guardar (reintentá)");
+  };
+
   const saveInline = async (p: Product, ch: Changes) => {
+    if (esperarDatos()) return;
     const row: ProductInput = {
       nombre: p.name,
       marca: p.brand,
@@ -97,11 +131,7 @@ export function AdminProducts({ onToast, busquedaInicial = "" }: {
       precio: ch.precio ?? p.basePrice ?? p.price,
       precioML: "precioML" in ch ? ch.precioML : p.baseOldPrice,
       // Conserva el stock por variante ("Rojo:3"), no solo los nombres.
-      variantes:
-        ch.variantes ??
-        (p.variants && p.variants.length
-          ? p.variants.map((v) => (v.qty == null ? v.name : `${v.name}:${v.qty}`)).join(", ")
-          : p.flavors.join(", ")),
+      variantes: ch.variantes ?? variantesDe(p),
       stock: ch.stock ?? p.inStock !== false,
       destacado: ch.destacado ?? p.featured,
       // Si el costo no está cargado en memoria (0), se manda "" para que la
@@ -117,10 +147,10 @@ export function AdminProducts({ onToast, busquedaInicial = "" }: {
       // 1 = no viene en caja ("" deja el valor que tenga la planilla).
       porCaja: ch.porCaja ?? (p.unitsPerBox || ""),
       precioCaja: ch.precioCaja ?? (p.boxBasePrice || ""),
+      stockAntes: stockVisto(p),
     };
     try {
-      const ok = await saveProduct(row);
-      onToast(ok ? "Guardado ✓" : "No se pudo guardar (reintentá)");
+      avisarGuardado(await saveProduct(row));
     } catch {
       onToast("Tardó demasiado: verificá si se guardó");
     }
@@ -171,13 +201,14 @@ export function AdminProducts({ onToast, busquedaInicial = "" }: {
   // Guardado optimista: cierra al toque y guarda en segundo plano (se siente
   // instantáneo). Igual avisa cuando terminó de guardar.
   const handleFullSave = async (row: ProductInput) => {
+    // El stock que se vio al abrir el editor (si es un producto existente).
+    const visto = editing ? stockVisto(editing) : undefined;
     setEditing(null);
     setAdding(false);
     setCreandoCombo(false);
     onToast("Guardando…");
     try {
-      const ok = await saveProduct(row);
-      onToast(ok ? "Guardado ✓" : "No se pudo guardar (reintentá)");
+      avisarGuardado(await saveProduct(visto ? { ...row, stockAntes: visto } : row));
     } catch {
       onToast("Tardó demasiado: verificá si se guardó");
     }
@@ -246,6 +277,12 @@ export function AdminProducts({ onToast, busquedaInicial = "" }: {
         </div>
       </div>
 
+      {!live && (
+        <p role="status" className="rounded-xl bg-page-soft px-4 py-3 text-sm font-semibold text-primary">
+          Actualizando stock y precios desde la planilla… Esperá unos segundos antes de editar.
+        </p>
+      )}
+
       {/* Compu: todas las categorías a la vista (bajan de renglón). Celular: fila deslizable. */}
       <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
         <Chip active={cat === ""} onClick={() => setCat("")}>
@@ -292,7 +329,9 @@ export function AdminProducts({ onToast, busquedaInicial = "" }: {
                   dollar={dollar}
                   ventas={ventasDe(p.name)}
                   onSave={saveInline}
-                  onEdit={() => setEditing(p)}
+                  onEdit={() => {
+                    if (!esperarDatos()) setEditing(p);
+                  }}
                   onUpload={handleUpload}
                   onDeleteImage={handleDeleteImage}
                   onDelete={handleDelete}

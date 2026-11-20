@@ -1,12 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Product } from "@/lib/types";
 import { brandName } from "@/data/brands";
 import { categoryMap } from "@/data/categories";
 import { formatPrice } from "@/lib/format";
-import { PROMO_DESTACADOS, transferPrice } from "@/lib/config";
+import { PROMO_DESTACADOS, transferPrice, whatsappLink } from "@/lib/config";
+import { ENVIO_GRATIS_DESDE } from "@/lib/envios";
 import { usePromoDestacados } from "@/lib/promo";
 import { useCart } from "@/context/CartContext";
 import { useProducts } from "@/context/ProductsContext";
@@ -30,7 +32,9 @@ import {
 export function ProductDetail({ product: initial }: { product: Product }) {
   const router = useRouter();
   const { addItem } = useCart();
-  const { getBySlug, products: allProducts } = useProducts();
+  // live: hasta que no llegan los datos en vivo, no se muestran cantidades
+  // exactas ("Quedan 3"): el snapshot o el caché pueden ser de otro día.
+  const { getBySlug, products: allProducts, live } = useProducts();
   // Usa la versión en vivo de la planilla si está disponible; si no, el respaldo.
   const product = getBySlug(initial.slug) ?? initial;
   const shape = categoryMap[product.category]?.shape ?? "tub";
@@ -63,6 +67,32 @@ export function ProductDetail({ product: initial }: { product: Product }) {
     });
     return avail ?? product.flavors[0] ?? "";
   });
+  // El sabor inicial sale del snapshot; cuando llegan los datos en vivo, si ese
+  // sabor quedó agotado se pasa al primero con stock (si no, la ficha mostraba
+  // "Sin stock" aunque hubiera otros sabores). Lo mismo con la elección del combo.
+  useEffect(() => {
+    const q = variantQty(flavor);
+    if (q !== null && q <= 0) {
+      const alt = product.flavors.find((f) => {
+        const x = variantQty(f);
+        return x == null || x > 0;
+      });
+      if (alt) setFlavor(alt);
+    }
+    setChoices((cur) => {
+      let cambio = false;
+      const next = { ...cur };
+      for (const { comp } of comboComps) {
+        const avail = availableVariants(comp);
+        if (avail.length && !avail.includes(next[comp.name])) {
+          next[comp.name] = avail[0];
+          cambio = true;
+        }
+      }
+      return cambio ? next : cur;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product, allProducts]);
   const [presentation, setPresentation] = useState(product.presentations?.[0] ?? "");
   const [qty, setQty] = useState(1);
   const [activeThumb, setActiveThumb] = useState(0);
@@ -138,6 +168,44 @@ export function ProductDetail({ product: initial }: { product: Product }) {
     add(false);
     router.push("/checkout");
   };
+
+  // Combos con stock que incluyen este producto. El ahorro sale de los precios
+  // reales: lo que cuestan sus productos por separado menos el precio del combo
+  // (solo se muestra si es positivo; nunca se inventa un descuento).
+  const combosConEste = isCombo
+    ? []
+    : allProducts
+        .filter(
+          (c) =>
+            c.slug !== product.slug &&
+            c.inStock !== false &&
+            c.price > 0 &&
+            !!c.combo?.some((r) => r.n === product.name),
+        )
+        .map((c) => {
+          const comps = comboComponents(c, allProducts);
+          const separado =
+            comps.length === c.combo!.length ? comps.reduce((s, { comp, q }) => s + comp.price * q, 0) : 0;
+          return { c, ahorro: separado > c.price ? separado - c.price : 0 };
+        })
+        .sort((a, b) => b.ahorro - a.ahorro)
+        .slice(0, 3);
+
+  // Barra fija de compra en el celular: aparece cuando los botones principales
+  // salen de la pantalla.
+  const ctaRef = useRef<HTMLDivElement>(null);
+  const [ctaVisible, setCtaVisible] = useState(true);
+  useEffect(() => {
+    const el = ctaRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([e]) => setCtaVisible(e.isIntersecting || e.boundingClientRect.top > 0));
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  const consulta = whatsappLink(
+    `Hola Suple Market, quería consultar por ${product.name}${flavor ? ` (${flavor})` : ""}.`,
+  );
 
   return (
     <div className="container-page py-8">
@@ -398,11 +466,13 @@ export function ProductDetail({ product: initial }: { product: Product }) {
             <QuantitySelector value={qty} onChange={setQty} max={maxQty} />
             <span
               className={`text-xs font-bold ${
-                soldOut || maxQty === 1 ? "text-sale" : "text-primary"
+                soldOut || (live && maxQty === 1) ? "text-sale" : "text-primary"
               }`}
             >
               {soldOut
                 ? "Sin stock"
+                : !live
+                  ? "En stock"
                 : enCaja
                   ? cajas >= 99
                     ? "En stock"
@@ -421,7 +491,7 @@ export function ProductDetail({ product: initial }: { product: Product }) {
             </span>
           </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div ref={ctaRef} className="mt-4 grid gap-3 sm:grid-cols-2">
             <button
               onClick={() => {
                 flyToCart(document.querySelector("[data-detail-image]"));
@@ -437,6 +507,72 @@ export function ProductDetail({ product: initial }: { product: Product }) {
               Comprar ahora
             </button>
           </div>
+
+          {/* Medios de pago, a la vista antes de decidir */}
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-xs text-muted">
+            <span className="rounded-md border border-line bg-white px-2.5 py-1 font-semibold text-primary">
+              Transferencia −10%
+            </span>
+            <span className="rounded-md border border-line bg-white px-2.5 py-1 font-semibold text-ink">
+              Mercado Pago
+            </span>
+            <span>Débito, crédito o dinero en cuenta</span>
+          </div>
+
+          {/* Consulta directa por este producto */}
+          <a
+            href={consulta}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 flex items-center gap-3 rounded-xl border border-line bg-white p-3 text-sm transition-colors hover:border-[#25D366]"
+          >
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#25D366] text-white">
+              <WhatsappIcon className="h-5 w-5" />
+            </span>
+            <span>
+              <b className="block text-ink">¿Dudas con este producto?</b>
+              <span className="text-muted">Escribinos por WhatsApp y te asesoramos.</span>
+            </span>
+          </a>
+
+          {/* Combos que lo incluyen: ahorro calculado con precios reales */}
+          {combosConEste.length > 0 && (
+            <div className="mt-6">
+              <p className="mb-2 text-sm font-bold text-ink">Llevalo en combo</p>
+              <ul className="space-y-2">
+                {combosConEste.map(({ c, ahorro }) => (
+                  <li key={c.slug}>
+                    <Link
+                      href={`/producto/${c.slug}/`}
+                      className="flex items-center gap-3 rounded-xl border border-line bg-white p-2.5 transition-colors hover:border-accent"
+                    >
+                      {c.image || c.images?.[0] ? (
+                        <SmartImg
+                          src={c.images?.[0] ?? c.image}
+                          alt=""
+                          sizes="64px"
+                          loading="lazy"
+                          decoding="async"
+                          className="h-16 w-16 shrink-0 rounded-lg object-cover"
+                        />
+                      ) : null}
+                      <span className="min-w-0 flex-1">
+                        <span className="line-clamp-2 text-sm font-semibold text-ink">{c.name}</span>
+                        <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm">
+                          <b className="text-primary">{formatPrice(c.price)}</b>
+                          {ahorro > 0 && (
+                            <span className="rounded-md bg-accent-soft px-1.5 py-0.5 text-xs font-bold text-primary">
+                              Ahorrás {formatPrice(ahorro)}
+                            </span>
+                          )}
+                        </span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Info de confianza */}
           <ul className="mt-6 grid grid-cols-2 gap-3 rounded-xl border border-line bg-page-soft p-4 text-xs text-muted">
@@ -461,6 +597,31 @@ export function ProductDetail({ product: initial }: { product: Product }) {
 
       {/* Tabs / Accordion */}
       <ProductTabs product={product} />
+
+      {/* Barra fija de compra (solo celular, cuando los botones quedan fuera de la pantalla).
+          A la derecha deja lugar al botón flotante de WhatsApp. */}
+      <div
+        aria-hidden={ctaVisible}
+        className={`fixed inset-x-0 bottom-0 z-[70] border-t border-line bg-white/95 py-3 pl-4 pr-[88px] shadow-drawer backdrop-blur transition-[transform,opacity] duration-300 ease-enter motion-reduce:transition-none lg:hidden ${
+          ctaVisible ? "pointer-events-none translate-y-full opacity-0" : "translate-y-0 opacity-100"
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs text-muted">{product.name}</p>
+            <p className="font-display text-lg font-black leading-tight text-primary">{formatPrice(shown.price)}</p>
+          </div>
+          <button
+            onClick={() => add()}
+            disabled={soldOut}
+            tabIndex={ctaVisible ? -1 : 0}
+            className="btn btn-primary btn-md shrink-0"
+          >
+            <CartIcon className="h-5 w-5" />
+            {soldOut ? "Sin stock" : "Agregar"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -518,6 +679,17 @@ function ProductTabs({ product }: { product: Product }) {
           <li>
             <p className="font-semibold text-ink">¿Cómo lo recibo?</p>
             <p>Coordinamos la entrega o el envío por WhatsApp según tu zona.</p>
+          </li>
+          <li>
+            <p className="font-semibold text-ink">¿Cómo puedo pagar?</p>
+            <p>
+              Con transferencia bancaria tenés 10% de descuento. También podés pagar con Mercado Pago (débito,
+              crédito o dinero en cuenta).
+            </p>
+          </li>
+          <li>
+            <p className="font-semibold text-ink">¿El envío es gratis?</p>
+            <p>Sí, en CABA y GBA en compras desde {formatPrice(ENVIO_GRATIS_DESDE)}.</p>
           </li>
         </ul>
       ),

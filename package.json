@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node scripts/optimize-images.mjs",
+    "prebuild": "node scripts/actualizar-seed.mjs && node scripts/optimize-images.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"

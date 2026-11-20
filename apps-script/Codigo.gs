@@ -18,7 +18,7 @@
  * ============================================================================ */
 
 var SHEET_ID = "12paAzW6OcSgYv4u6L7QVI4tpvrEx1yqnujW0OjcieMc";
-var API_VERSION = "v20"; // v20: compradores web a Clientes + avisos al celular por cada compra web // v19: un pedido marcado "no cobrado" no suma sello del Club // v18: caja (saldo inicial por medio de pago para "Plata disponible") // v17: regalo con cupón (pestaña Leads, cupón único validado en el servidor) // v16: Club de sellos (premio en la N-ésima compra, descuento aplicado y validado en el servidor) // v15: venta por caja o por unidad (Unidades por caja + Precio caja) // v14: un producto puede estar en varias categorías ("A | B") // v13: compras pendientes (se revisan y se suman al stock después) // v12: lectura de compras con Claude Haiku 5.5 (el más barato) // v11: las compras leen fotos, archivos y texto con Claude // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
+var API_VERSION = "v22"; // v22: guardar un producto desde el CRM ya no pisa el stock si cambió mientras se editaba // v21: aviso al celular cuando un producto publicado en App del Barrio se queda sin stock o vuelve a tener // v20: compradores web a Clientes + avisos al celular por cada compra web // v19: un pedido marcado "no cobrado" no suma sello del Club // v18: caja (saldo inicial por medio de pago para "Plata disponible") // v17: regalo con cupón (pestaña Leads, cupón único validado en el servidor) // v16: Club de sellos (premio en la N-ésima compra, descuento aplicado y validado en el servidor) // v15: venta por caja o por unidad (Unidades por caja + Precio caja) // v14: un producto puede estar en varias categorías ("A | B") // v13: compras pendientes (se revisan y se suman al stock después) // v12: lectura de compras con Claude Haiku 5.5 (el más barato) // v11: las compras leen fotos, archivos y texto con Claude // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
 
 // Repo de GitHub donde se guardan las fotos de productos (en public/productos/).
 // El token NO va acá: se guarda en Propiedades del script como GITHUB_TOKEN.
@@ -235,6 +235,11 @@ function handle(e) {
     registrarError(action, err, p);
     out = { ok: false, error: String(err && err.message ? err.message : err) };
   }
+  // App del Barrio: solo si la acción pudo cambiar stock, se fija si un producto
+  // publicado allá se quedó sin stock o volvió a tener (y avisa al celular).
+  if (ACCIONES_STOCK[action] && out && out.ok !== false) {
+    try { revisarAppDelBarrio(); } catch (eA) { registrarError("app_del_barrio", eA, {}); }
+  }
   // Avisos al celular (compras web): se mandan ya fuera del bloqueo.
   if (AVISOS_PENDIENTES.length) enviarAvisosPendientes();
   return respond(out, p.callback);
@@ -334,6 +339,11 @@ var ACCIONES_ESCRITURA = {
   productos_save: 1, add: 1, update: 1, delete: 1, categoria_rename: 1, producto_rename: 1,
   subir_imagen: 1, borrar_imagen: 1, subir_comprobante: 1, mp_webhook: 1, aprobar_pedido: 1, registrar: 1,
   compra_sumar_stock: 1, lead: 1, cupon_config: 1, caja_config: 1, push_suscribir: 1, push_quitar: 1,
+};
+
+// Acciones que pueden cambiar el stock (pedidos, compras, edición de productos).
+var ACCIONES_STOCK = {
+  productos_save: 1, add: 1, update: 1, delete: 1, mp_webhook: 1, aprobar_pedido: 1, compra_sumar_stock: 1,
 };
 
 function conBloqueo(fn) {
@@ -1612,8 +1622,70 @@ function listProductos(conCostos) {
 function saveProducto(obj) {
   if (!obj.nombre) throw new Error("Falta el nombre del producto");
   var n = findRowById("Productos", obj.nombre);
-  if (n > 0) return updateRow("Productos", obj.nombre, obj);
+  if (n > 0) {
+    protegerStockProducto(n, obj);
+    return updateRow("Productos", obj.nombre, obj);
+  }
+  delete obj.stockAntes;
   return addRow("Productos", obj);
+}
+
+// Firma comparable del stock de un producto: "Vainilla:3, Chocolate:2|5".
+// Ignora espacios y el orden de escritura de los números ("3" = 3).
+function firmaStock(variantes, cantidad) {
+  var vs = String(variantes == null ? "" : variantes).split(",").map(function (s) {
+    s = s.trim();
+    if (!s) return "";
+    var i = s.lastIndexOf(":");
+    if (i < 0) return s;
+    var q = s.slice(i + 1).trim();
+    return s.slice(0, i).trim() + ":" + (q === "" || isNaN(Number(q)) ? q : Number(q));
+  }).filter(function (s) { return s; });
+  var c = cantidad === "" || cantidad == null || isNaN(Number(cantidad)) ? 0 : Number(cantidad);
+  return vs.join(", ") + "|" + c;
+}
+
+// El CRM manda el stock completo (todas las variantes) cada vez que guarda un
+// producto, con lo que tenía en pantalla. Si mientras tanto el stock de la
+// planilla cambió (una venta, una compra, otro celu), ese guardado lo pisaba
+// con números viejos. Con "stockAntes" (lo que el CRM tenía cargado) se compara:
+//  - nadie lo cambió → se guarda normal;
+//  - cambió y este guardado NO toca el stock → se conserva el de la planilla;
+//  - cambió y este guardado SÍ cambia el stock → se rechaza para no pisarlo.
+// Sin stockAntes (CRM viejo en caché) se guarda como antes. Los combos no
+// tienen stock propio (sale de sus productos), así que no se controlan.
+function protegerStockProducto(n, obj) {
+  var antesRaw = obj.stockAntes;
+  delete obj.stockAntes;
+  if (antesRaw === undefined || antesRaw === null || antesRaw === "") return;
+  var antes;
+  try { antes = typeof antesRaw === "string" ? JSON.parse(antesRaw) : antesRaw; } catch (e) { return; }
+  if (!antes || typeof antes !== "object") return;
+  var keys = keysOf("Productos");
+  var row = sheetFor("Productos").getRange(n, 1, 1, keys.length).getValues()[0];
+  var comboFila = String(row[keys.indexOf("combo")] || "").trim();
+  var comboNuevo = String(obj.combo || "").trim();
+  if ((comboFila && comboFila !== "[]") || (comboNuevo && comboNuevo !== "[]")) return;
+  var tocaStock = obj.hasOwnProperty("variantes") || obj.hasOwnProperty("cantidad");
+  if (!tocaStock) return;
+  var actual = firmaStock(row[keys.indexOf("variantes")], row[keys.indexOf("cantidad")]);
+  var vista = firmaStock(antes.variantes, antes.cantidad);
+  var nueva = firmaStock(
+    obj.hasOwnProperty("variantes") ? obj.variantes : row[keys.indexOf("variantes")],
+    obj.hasOwnProperty("cantidad") ? obj.cantidad : row[keys.indexOf("cantidad")]
+  );
+  if (actual === vista || actual === nueva) return;
+  if (nueva === vista) {
+    // Este guardado no cambia el stock: queda el de la planilla (y su "Stock").
+    delete obj.variantes;
+    delete obj.cantidad;
+    delete obj.stock;
+    return;
+  }
+  var partes = actual.split("|");
+  throw new Error("STOCK_CAMBIO: el stock de «" + obj.nombre + "» cambió mientras lo editabas (ahora: " +
+    (partes[0] ? partes[0] + ", " : "") + "total " + partes[1] +
+    "). No se guardó para no pisarlo: se recargaron los datos, revisalo y volvé a guardar.");
 }
 
 /* ------------------------------ Imágenes --------------------------------- */
@@ -2660,7 +2732,7 @@ function enviarAviso(titulo, cuerpo, url) {
   var subs = pushSubs();
   if (!subs.length) return { enviados: 0, dispositivos: 0 };
   PropertiesService.getScriptProperties().setProperty("PUSH_ULTIMO", JSON.stringify({
-    titulo: String(titulo).slice(0, 80), cuerpo: String(cuerpo).slice(0, 200), url: url || "/admin/?ir=pedidos", ts: Date.now(),
+    titulo: String(titulo).slice(0, 80), cuerpo: String(cuerpo).slice(0, 300), url: url || "/admin/?ir=pedidos", ts: Date.now(),
   }));
   var claves = vapidClaves();
   var pedidos = subs.map(function (s) {
@@ -2703,6 +2775,109 @@ function enviarAvisosPendientes() {
     var a = AVISOS_PENDIENTES.shift();
     try { enviarAviso(a[0], a[1], a[2]); } catch (e) { registrarError("push", e, {}); }
   }
+}
+
+/* ------------------- App del Barrio (marketplace del barrio) -------------- */
+// Pestaña "AppDelBarrio": Producto | Publicación | Disponible | Sabores.
+// Solo figuran los productos publicados allá. Después de cada cambio de stock
+// se compara: si uno se quedó sin stock o volvió a tener (o, si la columna
+// Sabores tiene algo, cambiaron los sabores con stock), avisa al celular para
+// pausar, reactivar o corregir esa publicación. Si no cambió nada, no hace nada.
+// Disponible vacío = todavía sin dato: se completa sin avisar.
+var ADB_TAB = "AppDelBarrio";
+
+function adbVariantes(p) {
+  return String(p.variantes || "").split(",").map(function (s) { return s.trim(); }).filter(String).map(function (s) {
+    var i = s.lastIndexOf(":");
+    return i < 0 ? { n: s, q: null } : { n: s.slice(0, i).trim(), q: Number(s.slice(i + 1)) || 0 };
+  });
+}
+function adbSabores(p) {
+  return adbVariantes(p).filter(function (v) { return v.q == null || v.q > 0; }).map(function (v) { return v.n; });
+}
+
+// Mismo criterio que la tienda (lib/stock.ts): un combo está disponible si
+// cada producto que lo arma lo está (y su sabor fijo, si tiene, con stock).
+function adbDisponible(p, porNombre) {
+  var combo = [];
+  try { combo = p.combo ? JSON.parse(p.combo) : []; } catch (e) {}
+  if (combo.length) {
+    for (var i = 0; i < combo.length; i++) {
+      var comp = porNombre[combo[i].n];
+      if (!comp || comp.stock === false) return false;
+      if (combo[i].v) {
+        var v = adbVariantes(comp).filter(function (x) { return x.n === combo[i].v; })[0];
+        if (v && v.q != null && v.q <= 0) return false;
+      } else if (adbVariantes(comp).length && !adbSabores(comp).length) return false;
+    }
+    return true;
+  }
+  if (p.stock === false) return false;
+  if (adbVariantes(p).length && !adbSabores(p).length) return false;
+  return true;
+}
+
+// Sabores con stock: los del producto, o en un combo los del producto que el
+// cliente elige (renglón sin sabor fijo).
+function adbSaboresDe(p, porNombre) {
+  var combo = [];
+  try { combo = p.combo ? JSON.parse(p.combo) : []; } catch (e) {}
+  if (!combo.length) return adbSabores(p);
+  var out = [];
+  for (var i = 0; i < combo.length; i++) {
+    var comp = porNombre[combo[i].n];
+    if (comp && !combo[i].v) out = out.concat(adbSabores(comp));
+  }
+  return out;
+}
+
+function revisarAppDelBarrio() {
+  var sh = ss().getSheetByName(ADB_TAB);
+  if (!sh) return { cambios: 0 };
+  var filas = sh.getDataRange().getValues();
+  if (filas.length < 2) return { cambios: 0 };
+  var porNombre = {};
+  var lista = leerCacheado("cat_productos", function () { return listProductos(false); });
+  for (var k = 0; k < lista.length; k++) porNombre[lista[k].nombre] = lista[k];
+  var lineas = [], link = "";
+  for (var r = 1; r < filas.length; r++) {
+    var nombre = String(filas[r][0] || "").trim();
+    if (!nombre) continue;
+    var p = porNombre[nombre];
+    var disp = p ? adbDisponible(p, porNombre) : false;
+    var antes = String(filas[r][2] || "").trim();
+    var txtDisp = disp ? "sí" : "no";
+    var cambio = false;
+    if (!antes) {
+      sh.getRange(r + 1, 3).setValue(txtDisp);
+    } else if (antes !== txtDisp) {
+      sh.getRange(r + 1, 3).setValue(txtDisp);
+      lineas.push(disp ? "🟢 «" + nombre + "» volvió a tener stock: reactivá la publicación."
+                       : "🔴 «" + nombre + "» se quedó sin stock: pausá la publicación.");
+      cambio = true;
+    }
+    var sabAntes = String(filas[r][3] || "").trim();
+    if (sabAntes && disp && p) {
+      var sab = adbSaboresDe(p, porNombre).join(", ");
+      if (sab && sab !== sabAntes) {
+        sh.getRange(r + 1, 4).setValue(sab);
+        if (!cambio) lineas.push("✏️ «" + nombre + "» ahora tiene: " + sab + ". Corregí los sabores del aviso.");
+        cambio = true;
+      }
+    }
+    if (cambio && !link) link = String(filas[r][1] || "").trim();
+  }
+  if (!lineas.length) return { cambios: 0 };
+  var texto = lineas.join("\n");
+  if (AVISOS_PENDIENTES.length) {
+    // Un solo aviso por solicitud (el celular lee el último texto guardado).
+    var ult = AVISOS_PENDIENTES[AVISOS_PENDIENTES.length - 1];
+    ult[1] = String(ult[1]).slice(0, 130) + "\n📍 App del Barrio:\n" + texto;
+  } else {
+    AVISOS_PENDIENTES.push(["📍 App del Barrio: revisá tus publicaciones", texto,
+      /^https:\/\/(www\.)?appdelbarrio\.com\//.test(link) ? link : "/admin/"]);
+  }
+  return { cambios: lineas.length };
 }
 
 /* ------------------------- Renombrar un producto ------------------------- */
