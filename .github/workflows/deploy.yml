@@ -1,7 +1,10 @@
-# Verifica cada cambio y publica la tienda en GitHub Pages.
+# Verifica cada cambio. La tienda se publica en VERCEL (proyecto suple-market,
+# equipo Paginas web) con cada push a main, desde el 21/11/2026.
+# GitHub Pages queda solo como respaldo MANUAL: Actions → Run workflow en main
+# (y apuntar el DNS de Cloudflare de vuelta a GitHub si hiciera falta).
 # - En cada push (cualquier rama) y en cada PR: pruebas del backend (planilla
 #   simulada), lint, build y chequeo de tipos. Si algo falla, no se publica.
-# - Solo un push a main que pasa todo se publica.
+# - Publicar en GitHub Pages: solo a mano (workflow_dispatch en main).
 # Sin secretos ni acceso a producción: el repo es público.
 # Requiere (una sola vez): Settings → Pages → Source = "GitHub Actions".
 name: Verificar y publicar
@@ -48,14 +51,14 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Subir artefacto para publicar
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./out
 
   deploy:
     # Solo main, y solo si "verificar" pasó.
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     needs: verificar
     runs-on: ubuntu-latest
     permissions:
