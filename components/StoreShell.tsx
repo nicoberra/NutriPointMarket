@@ -4,6 +4,7 @@ import { CartDrawer } from "@/components/CartDrawer";
 import { WelcomeToast } from "@/components/WelcomeToast";
 import { WhatsAppButton } from "@/components/WhatsAppButton";
 import { ToastHost } from "@/components/ToastHost";
+import { ClarityTag } from "@/components/ClarityTag";
 
 /** Armazón de la TIENDA (header, footer, carrito, WhatsApp, toasts). */
 export function StoreShell({ children }: { children: React.ReactNode }) {
@@ -16,6 +17,7 @@ export function StoreShell({ children }: { children: React.ReactNode }) {
       <WelcomeToast />
       <WhatsAppButton />
       <ToastHost />
+      <ClarityTag />
     </div>
   );
 }

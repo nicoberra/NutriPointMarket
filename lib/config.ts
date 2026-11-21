@@ -218,3 +218,10 @@ export const PROMO_DESTACADOS = {
 export function promoDestacadosActiva(ahora: number = Date.now()): boolean {
   return ahora <= new Date(PROMO_DESTACADOS.hasta).getTime();
 }
+
+/**
+ * Microsoft Clarity (grabaciones y mapas de calor de la TIENDA, gratis). Es el ID
+ * del proyecto en clarity.microsoft.com (no es secreto). Vacío = no se carga.
+ * Nunca se carga en el CRM y en las páginas con datos de clientes se enmascara todo.
+ */
+export const CLARITY_ID = "";

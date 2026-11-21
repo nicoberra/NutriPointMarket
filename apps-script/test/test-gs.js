@@ -143,7 +143,7 @@ const items = (arr) => JSON.stringify(arr);
 
 /* --------------------------------- Pruebas -------------------------------- */
 console.log("Versión y lecturas");
-check("version v22", call({ action: "version" }).version === "v22");
+check("version v23", call({ action: "version" }).version === "v23");
 const l1 = call({ action: "productos_list" });
 check("productos_list público sin costos", l1.ok && l1.data.length === 5 && !("costo" in l1.data[0]));
 const hitsAntes = cacheHits;
@@ -891,6 +891,196 @@ console.log("Guardar producto sin pisar el stock (v22)");
   r = call({ action: "productos_save", token: tok, data: JSON.stringify({ nombre: "Proteína + Creatina", precio: 70000, stock: true, destacado: false, cantidad: 0, combo: JSON.stringify([{ n: "WHEY PROTEIN TRUE MADE 1kg", q: 1 }]), stockAntes: { variantes: "", cantidad: 7 } }) });
   check("los combos se guardan sin control de stock", r.ok, r);
   book.sheets.Productos.rows = book.sheets.Productos.rows.filter((x) => x[0] !== "Prueba Stock" && x[0] !== "Prueba Nuevo");
+}
+
+console.log("Redes: subir al Drive por partes y conexión con la oficina (v23)");
+{
+  const tok = ctx.crearToken().token;
+  // ---- Drive simulado: carpetas y archivos en memoria ----
+  let nid = 0;
+  const byId = {};
+  const iter = (arr) => { let i = 0; return { hasNext: () => i < arr.length, next: () => arr[i++] }; };
+  const mkFile = (name, mime, parent, size) => {
+    const f = { id: "f" + ++nid, name, mime, parent, size, created: nid,
+      getId: () => f.id, getName: () => f.name, getMimeType: () => f.mime,
+      moveTo: (dest) => { f.parent = dest.id; } };
+    byId[f.id] = f; return f;
+  };
+  const mkFolder = (name, parent) => {
+    const d = { id: "d" + ++nid, name, parent, trashed: false, created: nid,
+      getId: () => d.id, getName: () => d.name, setName: (n) => { d.name = n; },
+      isTrashed: () => d.trashed, setTrashed: (v) => { d.trashed = v; },
+      getUrl: () => "https://drive/" + d.id,
+      kids: () => Object.values(byId).filter((x) => x.parent === d.id),
+      getFolders: () => iter(d.kids().filter((x) => x.getFolders)),
+      getFoldersByName: (n) => iter(d.kids().filter((x) => x.getFolders && x.name === n && !x.trashed)),
+      getFiles: () => iter(d.kids().filter((x) => !x.getFolders)),
+      createFolder: (n) => mkFolder(n, d.id),
+      createFile: (n, txt, mime) => mkFile(n, mime, d.id, String(txt).length),
+      moveTo: (dest) => { d.parent = dest.id; } };
+    byId[d.id] = d; return d;
+  };
+  const myDrive = mkFolder("Mi unidad", null);
+  const raiz = mkFolder("Contenido", myDrive.id);
+  byId[raiz.id] = raiz; raiz.id = "1bqXyufIqEZs82HNsb4RDrhzRDC73HW2r"; byId[raiz.id] = raiz;
+  mkFolder("San Ou", raiz.id);
+  const suple = mkFolder("Suple Market", raiz.id);
+  const historias = mkFolder("00 - Historias (todas)", suple.id);
+  const posteos = mkFolder("00 - Posteos (todos)", suple.id);
+  mkFolder("Creatina", posteos.id); // un posteo que ya existe con ese nombre
+  const driveOrig = ctx.DriveApp, fetchOrig = ctx.UrlFetchApp.fetch, uuidOrig = ctx.Utilities.getUuid;
+  let u = 0;
+  ctx.Utilities.getUuid = () => "a1b2-" + (++u).toString(16).padStart(8, "0");
+  ctx.ScriptApp.getOAuthToken = () => "OAUTH";
+  ctx.MimeType = { PLAIN_TEXT: "text/plain" };
+  ctx.DriveApp = {
+    getFolderById: (id) => { if (!byId[id]) throw new Error("no existe"); return byId[id]; },
+    getFoldersByName: (n) => myDrive.getFoldersByName(n),
+    createFolder: (n) => myDrive.createFolder(n),
+  };
+  // ---- Drive REST (subida reanudable y listado) y la oficina ----
+  const sesiones = {};
+  const oficina = [];
+  ctx.UrlFetchApp.fetch = (url, opt) => {
+    opt = opt || {};
+    if (url.indexOf("uploadType=resumable") !== -1) {
+      const meta = JSON.parse(opt.payload);
+      const sid = "https://upload/s" + Object.keys(sesiones).length;
+      sesiones[sid] = { meta, total: Number(opt.headers["X-Upload-Content-Length"]), bytes: [] };
+      return { getResponseCode: () => 200, getHeaders: () => ({ Location: sid }), getContentText: () => "" };
+    }
+    if (sesiones[url]) {
+      const s = sesiones[url];
+      const m = /bytes (\d+)-(\d+)\/(\d+)/.exec(opt.headers["Content-Range"]);
+      if (Number(m[1]) !== s.bytes.length) return { getResponseCode: () => 400, getHeaders: () => ({}), getContentText: () => "mal" };
+      s.bytes = s.bytes.concat(opt.payload);
+      if (s.bytes.length < s.total) return { getResponseCode: () => 308, getHeaders: () => ({ Range: "bytes=0-" + (s.bytes.length - 1) }), getContentText: () => "" };
+      const f = mkFile(s.meta.name, s.meta.mimeType, s.meta.parents[0], s.bytes.length);
+      return { getResponseCode: () => 200, getHeaders: () => ({}), getContentText: () => JSON.stringify({ id: f.id }) };
+    }
+    if (url.indexOf("googleapis.com/drive/v3/files?") !== -1) {
+      const q = decodeURIComponent(url.split("&q=")[1]);
+      const pid = /'([^']+)' in parents/.exec(q)[1];
+      const carpetas = q.indexOf("mimeType = 'application/vnd.google-apps.folder'") !== -1;
+      const files = Object.values(byId).filter((x) => x.parent === pid && !x.trashed && (carpetas ? !!x.getFolders : !x.getFolders && !/^text\//.test(x.mime)))
+        .sort((a, b) => b.created - a.created)
+        .map((x) => ({ id: x.id, name: x.name, mimeType: x.getFolders ? "application/vnd.google-apps.folder" : x.mime, createdTime: "2026-11-21", webViewLink: "https://drive/" + x.id }));
+      return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ files }) };
+    }
+    if (url.indexOf("crm-bridge") !== -1) {
+      oficina.push({ url, opt });
+      if (opt.headers.Authorization !== "Bearer CLAVE-OFICINA-PRUEBA") return { getResponseCode: () => 401, getContentText: () => JSON.stringify({ error: "Clave inválida" }) };
+      if (opt.method === "post") return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ approved: 2 }) };
+      return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ counts: { pending: 1 }, pending: [{ id: "q1", label: "Historia" }], upcoming: [], recent: [] }) };
+    }
+    return fetchOrig(url, opt);
+  };
+  const post = (body) => call({}, Object.assign({ token: tok }, body));
+  const PARTE = 256 * 1024;
+  const subir = (pieza, mime, size, extra) => {
+    const ini = post(Object.assign({ action: "redes_subir_inicio", pieza, mime, tamano: size }, extra || {}));
+    if (!ini.ok) return ini;
+    const datos = Buffer.alloc(size, 7);
+    let desde = 0, r, vueltas = 0;
+    while (vueltas++ < 50) {
+      const trozo = datos.subarray(desde, Math.min(size, desde + PARTE));
+      r = post({ action: "redes_subir_parte", subida: ini.subida, desde, data: trozo.toString("base64") });
+      if (!r.ok || r.listo) break;
+      desde = r.recibido;
+    }
+    return Object.assign({ nombre: ini.nombre }, r);
+  };
+  const enCarpeta = (d) => Object.values(byId).filter((x) => x.parent === d.id && !x.trashed).map((x) => x.name).sort();
+
+  // Sin token no se puede.
+  check("sin token: auth", call({}, { action: "redes_pieza", tipo: "historia" }).error === "auth");
+
+  // 1) Historia de 3 partes: queda en «00 - Historias (todas)» recién al terminar.
+  let pz = post({ action: "redes_pieza", tipo: "historia" });
+  check("historia: crea la pieza", pz.ok && /^Historia \d{4}-\d{2}-\d{2}/.test(pz.nombre), pz);
+  let r = subir(pz.pieza, "video/mp4", PARTE * 2 + 1000);
+  check("historia: sube por partes (3)", r.ok && r.listo && r.archivo, r);
+  check("historia: antes de terminar NO está en la carpeta de la oficina", enCarpeta(historias).length === 0, enCarpeta(historias));
+  r = post({ action: "redes_terminar", pieza: pz.pieza, texto: "no va" });
+  check("historia: al terminar se mueve a Historias", r.ok && enCarpeta(historias).length === 1 && /^Historia .+\.mp4$/.test(enCarpeta(historias)[0]), [r, enCarpeta(historias)]);
+  r = post({ action: "redes_terminar", pieza: pz.pieza });
+  check("historia: terminar dos veces no duplica", r.ok && enCarpeta(historias).length === 1);
+
+  // 2) Reintento de una parte que Drive ya tenía: sigue desde donde quedó.
+  pz = post({ action: "redes_pieza", tipo: "historia" });
+  const ini = post({ action: "redes_subir_inicio", pieza: pz.pieza, mime: "image/jpeg", tamano: PARTE + 10 });
+  const b = Buffer.alloc(PARTE + 10, 1);
+  post({ action: "redes_subir_parte", subida: ini.subida, desde: 0, data: b.subarray(0, PARTE).toString("base64") });
+  r = post({ action: "redes_subir_parte", subida: ini.subida, desde: 0, data: b.subarray(0, PARTE).toString("base64") });
+  check("reintento de parte ya recibida: devuelve dónde seguir", r.ok && r.recibido === PARTE && !r.listo, r);
+  r = post({ action: "redes_subir_parte", subida: ini.subida, desde: PARTE, data: b.subarray(PARTE).toString("base64") });
+  check("  ...y termina bien", r.ok && r.listo, r);
+
+  // 3) Carrusel de 3 fotos con texto: carpeta «Carrusel - <nombre>» en Posteos.
+  pz = post({ action: "redes_pieza", tipo: "posteo", nombre: "Combos de la semana", cantidad: 3 });
+  for (let i = 1; i <= 3; i++) subir(pz.pieza, "image/jpeg", 2000, { orden: i });
+  r = post({ action: "redes_terminar", pieza: pz.pieza, texto: "Llevá tu combo 💪\r\nEnvíos a todo el país" });
+  const car = Object.values(byId).find((x) => x.name === "Carrusel - Combos de la semana");
+  check("carrusel: carpeta con su nombre dentro de Posteos", r.ok && car && car.parent === posteos.id, r);
+  check("carrusel: fotos numeradas + texto para publicar", car && JSON.stringify(enCarpeta(car)) === JSON.stringify(["Combos de la semana - Texto para publicar.txt", "Combos de la semana 1.jpg", "Combos de la semana 2.jpg", "Combos de la semana 3.jpg"]), car && enCarpeta(car));
+
+  // 4) Posteo con nombre repetido: no pisa el que ya existe.
+  pz = post({ action: "redes_pieza", tipo: "posteo", nombre: "Creatina" });
+  check("posteo con nombre ya usado: le suma « 2»", pz.ok && pz.nombre === "Creatina 2", pz);
+  subir(pz.pieza, "image/png", 500);
+  r = post({ action: "redes_terminar", pieza: pz.pieza, texto: "" });
+  const p2 = Object.values(byId).find((x) => x.name === "Creatina 2");
+  check("posteo sin texto: solo la foto", r.ok && p2 && JSON.stringify(enCarpeta(p2)) === JSON.stringify(["Creatina 2.png"]), p2 && enCarpeta(p2));
+  // Faltan fotos: no se publica.
+  pz = post({ action: "redes_pieza", tipo: "posteo", nombre: "Incompleto", cantidad: 2 });
+  subir(pz.pieza, "image/jpeg", 500, { orden: 1 });
+  r = post({ action: "redes_terminar", pieza: pz.pieza });
+  check("carrusel incompleto: no se mueve a Posteos", !r.ok && /Faltan fotos/.test(r.error) && !Object.values(byId).some((x) => /Incompleto/.test(x.name) && x.parent === posteos.id), r);
+
+  // 5) Reel con portada y texto: crea «Reels listos para subir» si no existe.
+  pz = post({ action: "redes_pieza", tipo: "reel", nombre: "Reel creatina: cómo tomarla - portada" });
+  check("reel: limpia el nombre (sin «: » ni «- portada»)", pz.ok && pz.nombre === "Reel creatina cómo tomarla", pz);
+  check("reel: una foto como video se rechaza", !subir(pz.pieza, "image/jpeg", 100).ok);
+  subir(pz.pieza, "video/quicktime", PARTE + 5);
+  subir(pz.pieza, "image/jpeg", 300, { rol: "portada" });
+  r = post({ action: "redes_terminar", pieza: pz.pieza, texto: "Cómo tomar creatina" });
+  const reels = Object.values(byId).find((x) => x.name === "Reels listos para subir");
+  check("reel: video + portada + texto en «Reels listos para subir»", r.ok && reels && reels.parent === suple.id && JSON.stringify(enCarpeta(reels)) === JSON.stringify(["Reel creatina cómo tomarla - Texto para publicar.txt", "Reel creatina cómo tomarla - portada.jpg", "Reel creatina cómo tomarla.mov"]), reels && enCarpeta(reels));
+
+  // 6) Validaciones.
+  check("tipo inválido", !post({ action: "redes_pieza", tipo: "tiktok" }).ok);
+  check("posteo sin nombre", !post({ action: "redes_pieza", tipo: "posteo", nombre: "  " }).ok);
+  pz = post({ action: "redes_pieza", tipo: "posteo", nombre: "X" });
+  check("formato no soportado (gif)", !post({ action: "redes_subir_inicio", pieza: pz.pieza, mime: "image/gif", tamano: 10 }).ok);
+  check("video en un posteo se rechaza", !post({ action: "redes_subir_inicio", pieza: pz.pieza, mime: "video/mp4", tamano: 10 }).ok);
+  check("foto de más de 40 MB se rechaza", !post({ action: "redes_subir_inicio", pieza: pz.pieza, mime: "image/jpeg", tamano: 41 * 1024 * 1024 }).ok);
+  check("pieza inexistente", !post({ action: "redes_terminar", pieza: "nada" }).ok);
+
+  // 7) Lista de lo subido.
+  r = post({ action: "redes_lista" });
+  check("lista: historias, posteos (carpetas) y reels", r.ok && r.data.historia.length === 1 && r.data.posteo.some((x) => x.nombre === "Carrusel - Combos de la semana") && r.data.reel.length === 2 && r.data.reel.every((x) => !/\.txt$/.test(x.nombre)), r.data);
+
+  // 8) Oficina: sin clave avisa; con clave lee y aprueba; la clave nunca vuelve al CRM.
+  r = post({ action: "redes_estado" });
+  check("oficina sin clave: avisa que falta OFICINA_CRM_KEY", !r.ok && /OFICINA_CRM_KEY/.test(r.error), r);
+  props.OFICINA_CRM_KEY = "CLAVE-OFICINA-MAL";
+  r = post({ action: "redes_estado" });
+  check("oficina con clave mala: error claro", !r.ok && /inválida/.test(r.error), r);
+  props.OFICINA_CRM_KEY = "CLAVE-OFICINA-PRUEBA";
+  r = post({ action: "redes_estado" });
+  check("oficina: trae lo que espera el OK", r.ok && r.data.pending[0].id === "q1" && oficina[oficina.length - 1].opt.method === "get", r);
+  check("  ...y la respuesta no incluye la clave", JSON.stringify(r).indexOf("CLAVE-OFICINA") === -1);
+  r = call({ action: "redes_aprobar", token: tok, accion: "approve", ids: JSON.stringify(["q1", "q2"]) });
+  check("aprobar por JSONP manda ids a la oficina", r.ok && JSON.parse(oficina[oficina.length - 1].opt.payload).ids.length === 2, r);
+  r = call({ action: "redes_aprobar", token: tok, accion: "approve", todas: "1" });
+  check("aprobar todas", r.ok && JSON.parse(oficina[oficina.length - 1].opt.payload).all === true, r);
+  r = call({ action: "redes_aprobar", token: tok, accion: "reject", ids: JSON.stringify(["q1"]) });
+  check("sacar una", r.ok && JSON.parse(oficina[oficina.length - 1].opt.payload).action === "reject", r);
+  check("sacar sin ids no hace nada", !call({ action: "redes_aprobar", token: tok, accion: "reject", todas: "1" }).ok);
+  check("sin token no llega a la oficina", call({ action: "redes_estado" }).error === "auth");
+  delete props.OFICINA_CRM_KEY; delete props.REDES_CARPETA_ID;
+
+  ctx.DriveApp = driveOrig; ctx.UrlFetchApp.fetch = fetchOrig; ctx.Utilities.getUuid = uuidOrig;
 }
 
 console.log("Copias automáticas");

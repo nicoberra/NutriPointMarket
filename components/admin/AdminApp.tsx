@@ -13,6 +13,7 @@ import { ClubPanel } from "./ClubPanel";
 import { RegaloPanel } from "./RegaloPanel";
 import { resumenCompra } from "./Compras";
 import { PullToRefresh } from "./PullToRefresh";
+import { RedesPanel } from "./RedesPanel";
 import { prefetchTables, clearTables } from "@/lib/tableCache";
 import {
   GridIcon,
@@ -23,11 +24,12 @@ import {
   CartIcon,
   LogoutIcon,
   CheckIcon,
+  InstagramIcon,
 } from "@/components/Icons";
 
 const AUTH_KEY = "npm-crm-auth-v1";
 
-type Section = "dashboard" | "facturacion" | "productos" | "clientes" | "pedidos" | "compras";
+type Section = "dashboard" | "facturacion" | "productos" | "clientes" | "pedidos" | "compras" | "redes";
 
 const NAV: { id: Section; label: string; Icon: typeof GridIcon }[] = [
   { id: "dashboard", label: "Inicio", Icon: GridIcon },
@@ -36,6 +38,7 @@ const NAV: { id: Section; label: string; Icon: typeof GridIcon }[] = [
   { id: "clientes", label: "Clientes", Icon: UserIcon },
   { id: "pedidos", label: "Pedidos", Icon: ClipboardIcon },
   { id: "compras", label: "Compras", Icon: CartIcon },
+  { id: "redes", label: "Redes", Icon: InstagramIcon },
 ];
 
 const CLIENTES_CFG: RecordsConfig = {
@@ -244,6 +247,7 @@ export function AdminApp() {
     clientes: "Clientes",
     pedidos: "Pedidos",
     compras: "Compras de mercadería",
+    redes: "Redes",
   };
 
   return (
@@ -382,6 +386,7 @@ export function AdminApp() {
               <AdminRecords config={COMPRAS_CFG} onToast={setToast} />
             </div>
           )}
+          {section === "redes" && <RedesPanel onToast={setToast} />}
           </div>
         </main>
       </div>

@@ -57,6 +57,15 @@ export default function TerminosPage() {
           25.326 de Protección de Datos Personales, podés pedir el acceso, la corrección o la eliminación de
           tus datos escribiéndonos a {SITE.email}.
         </p>
+        <p className="mt-3">
+          Para mejorar la web usamos Microsoft Clarity, que registra de forma anónima cómo se navega (clics,
+          desplazamientos y páginas vistas) mediante cookies. No registra lo que escribís en los formularios y
+          no se usa en tu cuenta, en el checkout ni en la página de pago. Más información en la{" "}
+          <a href="https://privacy.microsoft.com/es-es/privacystatement" target="_blank" rel="noopener noreferrer" className="underline">
+            declaración de privacidad de Microsoft
+          </a>
+          .
+        </p>
 
         <H id="compras">5. Precios, pagos y stock</H>
         <p className="mt-3">
