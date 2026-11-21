@@ -18,7 +18,7 @@
  * ============================================================================ */
 
 var SHEET_ID = "12paAzW6OcSgYv4u6L7QVI4tpvrEx1yqnujW0OjcieMc";
-var API_VERSION = "v22"; // v22: guardar un producto desde el CRM ya no pisa el stock si cambió mientras se editaba // v21: aviso al celular cuando un producto publicado en App del Barrio se queda sin stock o vuelve a tener // v20: compradores web a Clientes + avisos al celular por cada compra web // v19: un pedido marcado "no cobrado" no suma sello del Club // v18: caja (saldo inicial por medio de pago para "Plata disponible") // v17: regalo con cupón (pestaña Leads, cupón único validado en el servidor) // v16: Club de sellos (premio en la N-ésima compra, descuento aplicado y validado en el servidor) // v15: venta por caja o por unidad (Unidades por caja + Precio caja) // v14: un producto puede estar en varias categorías ("A | B") // v13: compras pendientes (se revisan y se suman al stock después) // v12: lectura de compras con Claude Haiku 5.5 (el más barato) // v11: las compras leen fotos, archivos y texto con Claude // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
+var API_VERSION = "v23"; // v23: sección Redes del CRM (subir historias, posteos y reels al Drive de la oficina y aprobar lo que espera el OK) // v22: guardar un producto desde el CRM ya no pisa el stock si cambió mientras se editaba // v21: aviso al celular cuando un producto publicado en App del Barrio se queda sin stock o vuelve a tener // v20: compradores web a Clientes + avisos al celular por cada compra web // v19: un pedido marcado "no cobrado" no suma sello del Club // v18: caja (saldo inicial por medio de pago para "Plata disponible") // v17: regalo con cupón (pestaña Leads, cupón único validado en el servidor) // v16: Club de sellos (premio en la N-ésima compra, descuento aplicado y validado en el servidor) // v15: venta por caja o por unidad (Unidades por caja + Precio caja) // v14: un producto puede estar en varias categorías ("A | B") // v13: compras pendientes (se revisan y se suman al stock después) // v12: lectura de compras con Claude Haiku 5.5 (el más barato) // v11: las compras leen fotos, archivos y texto con Claude // v10: las compras crean los productos nuevos // v9: las compras suman stock // v8: envío gratis desde $120.000 // v7: compras de mercadería (pestaña Compras) // v6: límite contra abuso, campo trampa y bloqueo de login // v3: validación de pedidos, bloqueo, caché y registro de errores
 
 // Repo de GitHub donde se guardan las fotos de productos (en public/productos/).
 // El token NO va acá: se guarda en Propiedades del script como GITHUB_TOKEN.
@@ -497,6 +497,28 @@ function ejecutar(action, p, e, esAdmin) {
       case "push_ultimo":
         // Público: el celular pide el texto del aviso con la clave de su suscripción.
         out = { ok: true, data: pushUltimo(p.k) };
+        break;
+      // ---- Redes (sección del CRM): subir al Drive y conexión con la oficina ----
+      case "redes_pieza":
+        out = redesPieza(p);
+        break;
+      case "redes_subir_inicio":
+        out = redesSubirInicio(p);
+        break;
+      case "redes_subir_parte":
+        out = redesSubirParte(p);
+        break;
+      case "redes_terminar":
+        out = redesTerminar(p);
+        break;
+      case "redes_lista":
+        out = redesLista();
+        break;
+      case "redes_estado":
+        out = redesEstado();
+        break;
+      case "redes_aprobar":
+        out = redesAprobar(p);
         break;
       default:
         out = { ok: false, error: "Acción desconocida: " + action };
@@ -3098,4 +3120,374 @@ function setCrmPin() {
     PropertiesService.getScriptProperties().setProperty("CRM_PIN", String(PIN));
     SpreadsheetApp.getActive().toast("PIN del CRM configurado.", "NutriPointMarket", 4);
   }
+}
+
+
+/* ================================== REDES ================================= */
+// Sección «Redes» del CRM (v23):
+// 1) Subir historias, posteos y reels al Drive, en las carpetas que la oficina
+//    (ai-business-hq) importa cada hora para publicarlos con el OK del dueño.
+//    Los archivos se suben por partes (videos grandes desde el celular) a una
+//    carpeta temporal FUERA de la carpeta de contenido, y recién al terminar se
+//    mueven a su lugar: así la oficina nunca importa una pieza a medio subir.
+// 2) Ver y aprobar lo que la oficina tiene de Suple Market (puente crm-bridge).
+//    La clave va en Propiedades del Script (OFICINA_CRM_KEY): el CRM nunca la ve.
+
+var REDES_RAIZ_ID = "1bqXyufIqEZs82HNsb4RDrhzRDC73HW2r"; // carpeta raíz de contenido (una subcarpeta por empresa)
+var REDES_TEMPORAL = "Suple Market - Subidas del CRM (temporal)";
+var REDES_CARPETAS = {
+  historia: "00 - Historias (todas)",
+  posteo: "00 - Posteos (todos)",
+  reel: "Reels listos para subir",
+};
+var REDES_PARTE_MAX = 4 * 1024 * 1024; // bytes por parte (múltiplo de 256 KB)
+var REDES_MAX_FOTO = 40 * 1024 * 1024;
+var REDES_MAX_VIDEO = 500 * 1024 * 1024;
+var REDES_MAX_FOTOS_CARRUSEL = 10;
+var OFICINA_CRM_URL = "https://ai-business-hq-cyan.vercel.app/api/crm-bridge";
+var REDES_EXT = {
+  "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png", "image/webp": "webp",
+  "video/mp4": "mp4", "video/quicktime": "mov", "video/x-m4v": "m4v",
+};
+
+/** Nombre seguro para el Drive: sin caracteres raros ni sufijos que confundan a la oficina. */
+function redesNombre(v) {
+  var s = String(v || "")
+    .replace(/[\\\/:*?"<>|\u0000-\u001f]/g, " ")
+    .replace(/\s*[-_–]\s*(portada|cover|texto( para publicar)?|caption|copy|descripci[oó]n)\s*$/i, "")
+    .replace(/^\s*(portada|carrusel|carousel|historia|story)\b[\s:–-]*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return s.slice(0, 80).trim();
+}
+
+function redesTipo(v) {
+  var t = String(v || "");
+  if (!REDES_CARPETAS[t]) throw new Error("Tipo inválido: elegí historia, posteo o reel.");
+  return t;
+}
+
+function redesCarpetaEmpresa() {
+  var props = PropertiesService.getScriptProperties();
+  var id = props.getProperty("REDES_CARPETA_ID");
+  if (id) {
+    try {
+      var f = DriveApp.getFolderById(id);
+      if (!f.isTrashed()) return f;
+    } catch (e) {}
+  }
+  var raiz = DriveApp.getFolderById(REDES_RAIZ_ID);
+  var it = raiz.getFolders();
+  while (it.hasNext()) {
+    var c = it.next();
+    if (/suple|nutri\s*point/i.test(c.getName())) {
+      props.setProperty("REDES_CARPETA_ID", c.getId());
+      return c;
+    }
+  }
+  throw new Error("No encontré la carpeta de Suple Market en el Drive de contenido.");
+}
+
+/** Subcarpeta con ese nombre exacto (si no existe, la crea). */
+function redesSubcarpeta(padre, nombre) {
+  var it = padre.getFoldersByName(nombre);
+  return it.hasNext() ? it.next() : padre.createFolder(nombre);
+}
+
+function redesDestino(tipo) {
+  return redesSubcarpeta(redesCarpetaEmpresa(), REDES_CARPETAS[tipo]);
+}
+
+function redesTemporal() {
+  var it = DriveApp.getFoldersByName(REDES_TEMPORAL);
+  var tmp = it.hasNext() ? it.next() : DriveApp.createFolder(REDES_TEMPORAL);
+  // Subidas que quedaron a medias (se cortó la señal): a la papelera después de un día.
+  try {
+    var viejas = tmp.getFolders();
+    var limite = Date.now() - 24 * 3600 * 1000;
+    while (viejas.hasNext()) {
+      var v = viejas.next();
+      if (v.getDateCreated().getTime() < limite) v.setTrashed(true);
+    }
+  } catch (e) {}
+  return tmp;
+}
+
+/** ¿Ya hay algo con ese nombre en la carpeta? (para no pisar ni mezclar piezas). */
+function redesNombreUsado(carpeta, tipo, nombre) {
+  if (tipo === "posteo") {
+    return carpeta.getFoldersByName(nombre).hasNext() || carpeta.getFoldersByName("Carrusel - " + nombre).hasNext();
+  }
+  var it = carpeta.getFiles();
+  var base = nombre.toLowerCase();
+  while (it.hasNext()) {
+    var n = it.next().getName().toLowerCase().replace(/\.[^.]+$/, "");
+    if (n === base || n.indexOf(base + " - ") === 0) return true;
+  }
+  return false;
+}
+
+function redesCache() {
+  return CacheService.getScriptCache();
+}
+
+function redesLeer(prefijo, id) {
+  var limpio = String(id || "").replace(/[^\w-]/g, "").slice(0, 60);
+  var v = limpio && redesCache().get(prefijo + limpio);
+  if (!v) throw new Error("La subida venció o no existe: volvé a subir la pieza.");
+  return { id: limpio, data: JSON.parse(v) };
+}
+
+function redesGuardar(prefijo, id, data) {
+  redesCache().put(prefijo + id, JSON.stringify(data), 21600);
+}
+
+/**
+ * Empieza una pieza: historia (1 foto o video), posteo (1 foto, o 2 a 10 para
+ * carrusel) o reel (video + portada opcional). Devuelve el id de la pieza.
+ */
+function redesPieza(p) {
+  var tipo = redesTipo(p.tipo);
+  var cantidad = Math.max(1, Math.min(REDES_MAX_FOTOS_CARRUSEL, Number(p.cantidad) || 1));
+  var nombre = redesNombre(p.nombre);
+  if (tipo === "historia") {
+    nombre = "Historia " + Utilities.formatDate(new Date(), "America/Argentina/Buenos_Aires", "yyyy-MM-dd HH.mm.ss");
+  } else if (!nombre) {
+    throw new Error("Falta el nombre de la pieza.");
+  }
+  // Nombre único en la carpeta de destino (si ya existe, le suma « 2», « 3»...).
+  var destino = redesDestino(tipo);
+  var base = nombre;
+  for (var i = 2; redesNombreUsado(destino, tipo, nombre); i++) {
+    if (i > 50) throw new Error("Ya existen muchas piezas con ese nombre: usá otro.");
+    nombre = base + " " + i;
+  }
+  var id = Utilities.getUuid().replace(/-/g, "");
+  var tmp = redesTemporal().createFolder(id);
+  redesGuardar("rpz_", id, { tipo: tipo, nombre: nombre, cantidad: cantidad, carpeta: tmp.getId(), archivos: 0 });
+  return { ok: true, pieza: id, nombre: nombre };
+}
+
+/** Nombre final de cada archivo, con el formato que entiende la oficina. */
+function redesNombreArchivo(pz, rol, orden, ext) {
+  if (pz.tipo === "historia") return pz.nombre + "." + ext;
+  if (pz.tipo === "reel") return rol === "portada" ? pz.nombre + " - portada." + ext : pz.nombre + "." + ext;
+  // Posteo: una foto «<nombre>.jpg»; carrusel «<nombre> 1.jpg», «<nombre> 2.jpg»...
+  return pz.cantidad > 1 ? pz.nombre + " " + orden + "." + ext : pz.nombre + "." + ext;
+}
+
+/** Abre la subida por partes de un archivo de la pieza (sesión reanudable de Drive). */
+function redesSubirInicio(p) {
+  var pz = redesLeer("rpz_", p.pieza);
+  var mime = String(p.mime || "").toLowerCase();
+  var ext = REDES_EXT[mime];
+  if (!ext) throw new Error("Formato no soportado (" + (mime || "sin tipo") + "): subí JPG, PNG, WEBP, MP4 o MOV.");
+  var esVideo = mime.indexOf("video/") === 0;
+  var rol = p.rol === "portada" ? "portada" : esVideo ? "video" : "foto";
+  var t = pz.data.tipo;
+  if (rol === "portada" && (t !== "reel" || esVideo)) throw new Error("La portada tiene que ser una foto de un reel.");
+  if (t === "reel" && rol === "foto") throw new Error("El reel tiene que ser un video.");
+  if (t === "posteo" && esVideo) throw new Error("Los posteos son fotos: para un video usá Reel.");
+  var tamano = Number(p.tamano) || 0;
+  if (tamano <= 0) throw new Error("El archivo está vacío.");
+  if (tamano > (esVideo ? REDES_MAX_VIDEO : REDES_MAX_FOTO)) throw new Error("El archivo es demasiado grande (máximo " + (esVideo ? "500" : "40") + " MB).");
+  var orden = Math.max(1, Math.min(REDES_MAX_FOTOS_CARRUSEL, Number(p.orden) || 1));
+  var nombre = redesNombreArchivo(pz.data, rol, orden, ext);
+  var res = UrlFetchApp.fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true", {
+    method: "post",
+    contentType: "application/json; charset=UTF-8",
+    payload: JSON.stringify({ name: nombre, parents: [pz.data.carpeta], mimeType: mime }),
+    headers: {
+      Authorization: "Bearer " + ScriptApp.getOAuthToken(),
+      "X-Upload-Content-Type": mime,
+      "X-Upload-Content-Length": String(tamano),
+    },
+    muteHttpExceptions: true,
+  });
+  var h = res.getHeaders() || {};
+  var url = h.Location || h.location;
+  if (res.getResponseCode() !== 200 || !url) {
+    throw new Error("Drive no aceptó la subida (" + res.getResponseCode() + "): " + String(res.getContentText()).slice(0, 200));
+  }
+  var id = Utilities.getUuid().replace(/-/g, "");
+  redesGuardar("rup_", id, { url: url, total: tamano, recibido: 0, pieza: pz.id });
+  return { ok: true, subida: id, parte: REDES_PARTE_MAX, nombre: nombre };
+}
+
+/** Recibe una parte (base64) y la pasa a Drive. Devuelve cuántos bytes ya tiene Drive. */
+function redesSubirParte(p) {
+  var up = redesLeer("rup_", p.subida);
+  var u = up.data;
+  var desde = Number(p.desde) || 0;
+  if (u.archivo) return { ok: true, listo: true, recibido: u.total, archivo: u.archivo };
+  // Reintento de una parte que Drive ya tenía: se sigue desde donde quedó.
+  if (desde < u.recibido) return { ok: true, listo: false, recibido: u.recibido };
+  if (desde > u.recibido) throw new Error("Se perdió una parte de la subida: volvé a subir la pieza.");
+  var bytes = Utilities.base64Decode(String(p.data || ""));
+  if (!bytes.length) throw new Error("Llegó una parte vacía.");
+  if (bytes.length > REDES_PARTE_MAX) throw new Error("Parte demasiado grande.");
+  var fin = desde + bytes.length - 1;
+  if (fin >= u.total) throw new Error("La subida trae más datos que el archivo.");
+  if (fin < u.total - 1 && bytes.length % (256 * 1024) !== 0) throw new Error("Parte inválida (tamaño).");
+  var res = UrlFetchApp.fetch(u.url, {
+    method: "put",
+    payload: bytes,
+    headers: { "Content-Range": "bytes " + desde + "-" + fin + "/" + u.total },
+    muteHttpExceptions: true,
+    followRedirects: false,
+  });
+  var code = res.getResponseCode();
+  if (code === 200 || code === 201) {
+    var f = JSON.parse(res.getContentText() || "{}");
+    u.recibido = u.total;
+    u.archivo = f.id || "";
+    redesGuardar("rup_", up.id, u);
+    var pz = redesLeer("rpz_", u.pieza);
+    pz.data.archivos = (pz.data.archivos || 0) + 1;
+    redesGuardar("rpz_", pz.id, pz.data);
+    return { ok: true, listo: true, recibido: u.total, archivo: u.archivo };
+  }
+  if (code === 308) {
+    var h = res.getHeaders() || {};
+    var rango = String(h.Range || h.range || "");
+    var m = /bytes=0-(\d+)/.exec(rango);
+    u.recibido = m ? Number(m[1]) + 1 : 0;
+    redesGuardar("rup_", up.id, u);
+    return { ok: true, listo: false, recibido: u.recibido };
+  }
+  throw new Error("Drive cortó la subida (" + code + "). Probá de nuevo.");
+}
+
+/** Termina la pieza: guarda el texto y la mueve a su carpeta (recién ahí la ve la oficina). */
+function redesTerminar(p) {
+  var pz = redesLeer("rpz_", p.pieza);
+  var d = pz.data;
+  if (d.listo) return { ok: true, nombre: d.nombre, url: d.url || "" };
+  var tmp = DriveApp.getFolderById(d.carpeta);
+  var archivos = [];
+  var it = tmp.getFiles();
+  while (it.hasNext()) archivos.push(it.next());
+  var videos = archivos.filter(function (f) { return /^video\//.test(f.getMimeType()); });
+  if (!archivos.length) throw new Error("Falta subir el archivo.");
+  if (d.tipo === "historia" && archivos.length !== 1) throw new Error("Una historia lleva un solo archivo.");
+  if (d.tipo === "reel" && videos.length !== 1) throw new Error("Falta el video del reel.");
+  if (d.tipo === "posteo" && archivos.length !== d.cantidad) throw new Error("Faltan fotos del posteo: subiste " + archivos.length + " de " + d.cantidad + ".");
+  var texto = String(p.texto || "").replace(/\r\n?/g, "\n").trim().slice(0, 2200);
+  if (texto && d.tipo !== "historia") {
+    tmp.createFile(d.nombre + " - Texto para publicar.txt", texto, MimeType.PLAIN_TEXT);
+  }
+  var destino = redesDestino(d.tipo);
+  var url;
+  if (d.tipo === "posteo") {
+    tmp.setName(d.cantidad > 1 ? "Carrusel - " + d.nombre : d.nombre);
+    tmp.moveTo(destino);
+    url = tmp.getUrl();
+  } else {
+    var todos = tmp.getFiles();
+    while (todos.hasNext()) todos.next().moveTo(destino);
+    tmp.setTrashed(true);
+    url = destino.getUrl();
+  }
+  d.listo = true;
+  d.url = url;
+  redesGuardar("rpz_", pz.id, d);
+  return { ok: true, nombre: d.nombre, url: url };
+}
+
+/** Lo último que se subió a cada carpeta (historias, posteos y reels). */
+function redesLista() {
+  var empresa = redesCarpetaEmpresa();
+  var out = {};
+  for (var tipo in REDES_CARPETAS) {
+    var it = empresa.getFoldersByName(REDES_CARPETAS[tipo]);
+    var items = [];
+    if (it.hasNext()) {
+      var carpeta = it.next();
+      var q = "'" + carpeta.getId() + "' in parents and trashed = false" +
+        (tipo === "posteo" ? " and mimeType = 'application/vnd.google-apps.folder'" : " and not mimeType contains 'text/'");
+      var res = UrlFetchApp.fetch(
+        "https://www.googleapis.com/drive/v3/files?pageSize=15&orderBy=createdTime%20desc&fields=files(id,name,mimeType,createdTime,webViewLink)&q=" + encodeURIComponent(q),
+        { headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() }, muteHttpExceptions: true }
+      );
+      if (res.getResponseCode() === 200) {
+        var files = (JSON.parse(res.getContentText()).files || []);
+        items = files.map(function (f) {
+          return { nombre: f.name, fecha: f.createdTime, url: f.webViewLink, video: /^video\//.test(f.mimeType), carpeta: f.mimeType === "application/vnd.google-apps.folder" };
+        });
+      }
+    }
+    out[tipo] = items;
+  }
+  return { ok: true, data: out };
+}
+
+/* ---- Conexión con la oficina (solo Suple Market) ---- */
+
+function oficinaFetch(metodo, cuerpo) {
+  var props = PropertiesService.getScriptProperties();
+  var clave = String(props.getProperty("OFICINA_CRM_KEY") || "").trim();
+  if (!clave) throw new Error("Falta conectar la oficina: cargá la clave OFICINA_CRM_KEY en Propiedades del script.");
+  var opt = {
+    method: metodo,
+    headers: { Authorization: "Bearer " + clave },
+    muteHttpExceptions: true,
+  };
+  if (cuerpo) {
+    opt.contentType = "application/json";
+    opt.payload = JSON.stringify(cuerpo);
+  }
+  var res = UrlFetchApp.fetch(props.getProperty("OFICINA_CRM_URL") || OFICINA_CRM_URL, opt);
+  var code = res.getResponseCode();
+  if (code === 401) throw new Error("Clave de la oficina inválida: revisá OFICINA_CRM_KEY.");
+  var json;
+  try {
+    json = JSON.parse(res.getContentText() || "{}");
+  } catch (e) {
+    throw new Error("La oficina no respondió bien (" + code + "). Probá en un rato.");
+  }
+  if (code !== 200) throw new Error("La oficina respondió con error (" + code + "): " + String(json.error || "").slice(0, 200));
+  return json;
+}
+
+function redesEstado() {
+  return { ok: true, data: oficinaFetch("get") };
+}
+
+function redesAprobar(p) {
+  var accion = p.accion === "reject" ? "reject" : p.accion === "approve" ? "approve" : "";
+  if (!accion) throw new Error("Acción inválida.");
+  var ids = p.ids;
+  if (typeof ids === "string") {
+    try { ids = JSON.parse(ids); } catch (e) { ids = []; }
+  }
+  ids = (Array.isArray(ids) ? ids : [])
+    .map(function (x) { return String(x).slice(0, 100); })
+    .filter(function (x) { return x; })
+    .slice(0, 400);
+  var todas = accion === "approve" && (p.todas === true || p.todas === "1" || p.todas === "true");
+  if (!todas && !ids.length) throw new Error("Faltan las piezas.");
+  var cuerpo = todas ? { action: "approve", all: true } : { action: accion, ids: ids };
+  return { ok: true, data: oficinaFetch("post", cuerpo) };
+}
+
+/**
+ * Autoprueba de la subida (correr a mano desde el editor). Sube un archivo de
+ * prueba en 2 partes a la carpeta TEMPORAL (nunca a la de la oficina), revisa
+ * que llegó entero y lo manda a la papelera. También lee la lista de subidos.
+ */
+function probarRedes() {
+  var pz = redesPieza({ tipo: "historia" });
+  var bytes = Utilities.newBlob(new Array(300 * 1024 + 1).join("x")).getBytes();
+  var ini = redesSubirInicio({ pieza: pz.pieza, mime: "image/png", tamano: bytes.length });
+  var r1 = redesSubirParte({ subida: ini.subida, desde: 0, data: Utilities.base64Encode(bytes.slice(0, 256 * 1024)) });
+  var r2 = redesSubirParte({ subida: ini.subida, desde: r1.recibido, data: Utilities.base64Encode(bytes.slice(r1.recibido)) });
+  var tmp = DriveApp.getFolderById(JSON.parse(CacheService.getScriptCache().get("rpz_" + pz.pieza)).carpeta);
+  var f = tmp.getFiles().next();
+  var ok = r1.ok && !r1.listo && r2.listo && f.getSize() === bytes.length;
+  tmp.setTrashed(true);
+  var lista = redesLista().data;
+  var txt = (ok ? "SUBIDA OK" : "SUBIDA FALLÓ") + " (" + f.getSize() + " de " + bytes.length + " bytes, 2 partes). En el Drive: " +
+    lista.historia.length + " historias, " + lista.posteo.length + " posteos, " + lista.reel.length + " reels.";
+  Logger.log(txt);
+  return txt;
 }
