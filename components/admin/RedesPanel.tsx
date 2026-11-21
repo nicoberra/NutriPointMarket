@@ -68,7 +68,8 @@ export function RedesPanel({ onToast }: { onToast: (t: string) => void }) {
     cargar();
   }, [cargar]);
 
-  const pendientes = estado?.pending.length ?? 0;
+  // La oficina manda solo las próximas 40, pero el total real viene en counts.
+  const pendientes = Math.max(estado?.counts?.pending ?? 0, estado?.pending.length ?? 0);
 
   return (
     <div className="space-y-4">
@@ -111,7 +112,14 @@ export function RedesPanel({ onToast }: { onToast: (t: string) => void }) {
 
       <div key={vista} className="animate-section-in motion-reduce:animate-none">
         {vista === "aprobar" && (
-          <ParaAprobar estado={estado} cargando={cargando} recargar={cargar} onToast={onToast} quitar={(ids) => setEstado((e) => (e ? { ...e, pending: e.pending.filter((p) => !ids.includes(p.id)) } : e))} />
+          <ParaAprobar estado={estado} cargando={cargando} recargar={cargar} onToast={onToast} quitar={(ids) =>
+              setEstado((e) => {
+                if (!e) return e;
+                const pending = e.pending.filter((p) => !ids.includes(p.id));
+                const sacadas = e.pending.length - pending.length;
+                return { ...e, pending, counts: { ...e.counts, pending: Math.max(pending.length, (e.counts?.pending ?? 0) - sacadas) } };
+              })
+            } />
         )}
         {vista === "calendario" && <Calendario piezas={estado?.upcoming ?? []} cargando={cargando} />}
         {vista === "publicado" && <Publicado piezas={estado?.recent ?? []} cargando={cargando} />}
@@ -139,6 +147,7 @@ function ParaAprobar({
   const { confirm, dialog } = useConfirm();
   const [ocupado, setOcupado] = useState<string>("");
   const piezas = estado?.pending ?? [];
+  const total = Math.max(estado?.counts?.pending ?? 0, piezas.length);
 
   const accion = async (accion: "approve" | "reject", ids: string[], todas = false) => {
     setOcupado(todas ? "todas" : ids[0]);
@@ -165,12 +174,19 @@ function ParaAprobar({
       {dialog}
       <div className="flex items-center justify-between gap-3 rounded-2xl bg-white p-3 shadow-soft">
         <p className="text-sm text-muted">
-          <strong className="text-ink">{piezas.length}</strong> {piezas.length === 1 ? "pieza espera" : "piezas esperan"} tu OK
+          <strong className="text-ink">{total}</strong> {total === 1 ? "pieza espera" : "piezas esperan"} tu OK
+          {total > piezas.length && <span className="block text-xs">Acá ves las próximas {piezas.length}; al aprobar o sacar aparecen las siguientes.</span>}
         </p>
         <button
           disabled={!!ocupado}
           onClick={async () => {
-            if (await confirm({ title: `¿Aprobar las ${piezas.length}?`, message: "Se publican solas en el día y la hora de cada una.", confirmLabel: "Aprobar todas" }))
+            if (
+              await confirm({
+                title: `¿Aprobar las ${total}?`,
+                message: `Se aprueban todas las que esperan tu OK${total > piezas.length ? `, también las ${total - piezas.length} que todavía no ves acá` : ""}. Se publican solas en el día y la hora de cada una.`,
+                confirmLabel: "Aprobar todas",
+              })
+            )
               accion("approve", [], true);
           }}
           className="rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white transition-transform active:scale-[0.97] disabled:opacity-60"
@@ -178,6 +194,7 @@ function ParaAprobar({
           {ocupado === "todas" ? "Aprobando…" : "Aprobar todas"}
         </button>
       </div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4">
       {piezas.map((p) => (
         <TarjetaPieza key={p.id} pieza={p}>
           <div className="mt-3 grid grid-cols-2 gap-2">
@@ -201,6 +218,7 @@ function ParaAprobar({
           </div>
         </TarjetaPieza>
       ))}
+      </div>
     </div>
   );
 }
