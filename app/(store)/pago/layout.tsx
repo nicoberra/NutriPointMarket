@@ -6,6 +6,8 @@ export const metadata: Metadata = {
   robots: { index: false, follow: true },
 };
 
+// data-clarity-mask: Microsoft Clarity no graba nada de esta página (datos de clientes),
+// ya desde el HTML (así no hay ni un instante sin enmascarar al navegar).
 export default function Layout({ children }: { children: React.ReactNode }) {
-  return children;
+  return <div data-clarity-mask="True">{children}</div>;
 }
