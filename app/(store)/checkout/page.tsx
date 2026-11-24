@@ -10,7 +10,8 @@ import { createOrder, mpCreatePreference, uploadComprobante, clubEstado, cuponCo
 import { leerCupon, guardarCupon, descuentoCupon, esCodigoValido, normalizarCodigo, type CuponGuardado } from "@/lib/cupon";
 import { ClubCard } from "@/components/ClubCard";
 import { PageBanner } from "@/components/PageBanner";
-import { CheckIcon, WhatsappIcon } from "@/components/Icons";
+import { CheckIcon, WhatsappIcon, CardIcon, ShieldIcon } from "@/components/Icons";
+import { CheckoutSugeridos } from "@/components/CheckoutSugeridos";
 import { PROVINCIAS, ZONAS_ENVIO, ENVIO_GRATIS_DESDE, calcularEnvio, detectarZona, type ZonaDetectada } from "@/lib/envios";
 import { Trampa, CAMPO_TRAMPA } from "@/components/Trampa";
 
@@ -417,8 +418,9 @@ export default function CheckoutPage() {
 
   const metodos: { v: Metodo; label: string; hint?: string }[] = [
     { v: "Transferencia", label: "Transferencia bancaria", hint: "10% de descuento. Subís el comprobante acá al confirmar (o lo mandás por WhatsApp)." },
-    { v: "Mercado Pago", label: "Mercado Pago", hint: "Dinero en cuenta, débito o crédito. Te lleva a Mercado Pago." },
+    { v: "Mercado Pago", label: "Mercado Pago", hint: "Pagalo en cuotas con tarjeta de crédito, o con débito o dinero en cuenta. Te lleva a Mercado Pago." },
   ];
+  const whatsDudas = whatsappLink("Hola Suple Market, tengo una duda antes de pagar mi pedido.");
 
   return (
     <>
@@ -451,6 +453,16 @@ export default function CheckoutPage() {
                     <span>
                       <span className="font-semibold text-ink">{m.label}</span>
                       {m.hint && <span className="block text-xs text-muted">{m.hint}</span>}
+                      {m.v === "Mercado Pago" && (
+                        <span className="mt-1.5 flex flex-wrap items-center gap-1" aria-label="Tarjetas: Visa, Mastercard, American Express y más">
+                          {["Visa", "Mastercard", "Amex"].map((t) => (
+                            <span key={t} aria-hidden className="rounded border border-line bg-white px-1.5 py-0.5 text-[10px] font-bold text-ink">
+                              {t}
+                            </span>
+                          ))}
+                          <span aria-hidden className="text-[10px] text-muted">y más</span>
+                        </span>
+                      )}
                     </span>
                   </label>
                 ))}
@@ -635,6 +647,7 @@ export default function CheckoutPage() {
                   </li>
                 ))}
               </ul>
+              <CheckoutSugeridos />
               <dl className="mt-4 space-y-2 border-t border-line pt-4 text-sm">
                 <div className="flex justify-between">
                   <dt className="text-muted">Subtotal ({count})</dt>
@@ -740,6 +753,11 @@ export default function CheckoutPage() {
                   {formatPrice(descuento)}
                 </p>
               )}
+              {method === "Mercado Pago" && (
+                <p className="mt-1 text-right text-xs text-muted">
+                  Podés pagarlo en cuotas con tarjeta de crédito. Elegís la cantidad en Mercado Pago.
+                </p>
+              )}
 
               {error && (
                 <p className="mt-4 rounded-lg bg-sale/10 px-3 py-2 text-center text-sm text-sale">
@@ -764,6 +782,29 @@ export default function CheckoutPage() {
                   Seguir navegando
                 </Link>
               </div>
+              <ul className="mt-4 space-y-2 rounded-lg bg-page-soft p-3 text-xs text-muted">
+                <li className="flex items-start gap-2">
+                  <CardIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <span>
+                    <b className="text-ink">Pago seguro.</b> Con Mercado Pago tus datos de tarjeta los procesa Mercado Pago; nosotros no los vemos.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <ShieldIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <span>
+                    <b className="text-ink">Productos originales</b> de distribuidores oficiales.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <WhatsappIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <span>
+                    ¿Dudas antes de pagar?{" "}
+                    <a href={whatsDudas} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary underline">
+                      Escribinos por WhatsApp
+                    </a>
+                  </span>
+                </li>
+              </ul>
               <p className="mt-3 text-center text-xs text-muted sm:text-left">
                 Al confirmar aceptás los{" "}
                 <Link href="/terminos/" className="font-semibold text-primary underline">
